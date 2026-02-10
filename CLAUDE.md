@@ -4,106 +4,169 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GeQL is a GraphQL library for Gleam that provides parsing, schema definition, and query execution capabilities. The project follows a clean architecture with a pure GraphQL core library and separate database/web integration examples.
+**mochi** 🍡 is a Code First GraphQL library for Gleam. It allows developers to define GraphQL schemas using Gleam types and automatically generates TypeScript types and GraphQL SDL.
+
+Inspired by [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b).
 
 ## Commands
 
-### Core Development
 ```bash
-gleam build              # Build the core library
-gleam test               # Run all tests (3 tests currently)
-gleam run                # Run main demo (pure GraphQL demonstration)
+gleam build              # Build the library
+gleam test               # Run all tests (35 tests)
+gleam run                # Run main demo
 ```
 
-### Example Applications
+### Run specific examples
 ```bash
-# Pure GraphQL examples
-cd examples/core_library_examples
-gleam run                # Run core library examples
-
-# Web application example (requires PostgreSQL)
-cd examples/geql_web_app
-gleam deps download      # Install dependencies
-gleam run -m cigogne last # Run database migrations
-gleam run                # Start web server on :8080
+gleam run -m typescript_codegen_test  # TypeScript generation demo
+gleam run -m sdl_codegen_test         # SDL generation demo
 ```
 
 ## Architecture
 
-The codebase follows a layered architecture with clear separation of concerns:
+### Core Modules (`src/mochi/`)
 
-### Core Library (`src/geql/`)
-- **Pure GraphQL implementation** with zero database dependencies
-- Only depends on `gleam_stdlib`
-- Complete GraphQL parsing, schema definition, and execution
-- Key modules:
-  - `ast.gleam` - Abstract Syntax Tree definitions
-  - `lexer.gleam` - Tokenization and lexical analysis
-  - `parser.gleam` - GraphQL query parsing
-  - `schema.gleam` - Schema definition system with fluent builder API
-  - `schema_gen.gleam` - Auto-generate schemas from Gleam types
-  - `executor.gleam` - Query execution engine with resolver system
-  - `dataloader.gleam` - Batching and caching for N+1 query problem
+| Module | Purpose |
+|--------|---------|
+| `query.gleam` | **Code First API** - Query/Mutation builders |
+| `types.gleam` | **Type Builders** - Object, enum, field definitions |
+| `schema.gleam` | Core schema types and low-level builder API |
+| `parser.gleam` | GraphQL query parsing |
+| `executor.gleam` | Query execution engine |
+| `dataloader.gleam` | N+1 query batching |
 
-### Examples Structure
-- `examples/core_library_examples/` - Pure GraphQL functionality demonstrations
-- `examples/geql_web_app/` - Complete web application using Wisp, Cake, Cigogne, and PostgreSQL
+### Codegen Modules (`src/mochi/codegen/`)
+
+| Module | Output |
+|--------|--------|
+| `typescript.gleam` | `.d.ts` TypeScript type definitions |
+| `sdl.gleam` | `.graphql` Schema Definition Language |
 
 ## Key Concepts
 
-### Schema Definition
-Uses a fluent builder API for type-safe schema construction:
+### Code First API
+
+The main API for defining schemas:
+
 ```gleam
-let user_type = 
-  schema.object("User")
-  |> schema.description("A user in the system")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.id_type()))
-    |> schema.field_description("User ID")
-    |> schema.resolver(resolver_function)
-  )
+import mochi/query
+import mochi/types
+
+// 1. Define Gleam type
+pub type User {
+  User(id: String, name: String, age: Int)
+}
+
+// 2. Create GraphQL type with extractors
+let user_type = types.object("User")
+  |> types.id("id", fn(u: User) { u.id })
+  |> types.string("name", fn(u: User) { u.name })
+  |> types.int("age", fn(u: User) { u.age })
+  |> types.build(decode_user)
+
+// 3. Define queries
+let users_query = query.query("users", return_type, resolver, encoder)
+
+// 4. Build schema
+let schema = query.new()
+  |> query.add_query(users_query)
+  |> query.add_type(user_type)
+  |> query.build
 ```
 
-### Resolver System
-Resolvers are struct-based functions that extract data from parent objects:
+### Type Builders (`types.gleam`)
+
 ```gleam
-|> schema.resolver(fn(info) {
-  // info.parent - parent object value
-  // info.arguments - field arguments 
-  // info.context - execution context
-  case extract_from_parent(info.parent) {
-    Ok(data) -> Ok(serialize_to_dynamic(data))
-    Error(err) -> Error("Resolution failed")
-  }
-})
+types.object("TypeName")
+|> types.description("...")
+|> types.id("field", extractor)
+|> types.string("field", extractor)
+|> types.int("field", extractor)
+|> types.float("field", extractor)
+|> types.bool("field", extractor)
+|> types.list_string("field", extractor)
+|> types.build(decoder)
 ```
 
-### Schema Generation
-Automatically generate GraphQL schemas from Gleam types:
+### Query Builders (`query.gleam`)
+
 ```gleam
-let schema = schema_gen.create_schema_with_query(
-  "TypeName",
-  [
-    schema_gen.string_field("field", "description", extractor_fn),
-    schema_gen.int_field("count", "description", extractor_fn),
-  ],
-  root_resolver_fn
-)
+// No args
+query.query(name, return_type, resolver, encoder)
+
+// With args
+query.query_with_args(name, args, return_type, args_decoder, resolver, encoder)
+
+// Mutation
+query.mutation(name, args, return_type, args_decoder, resolver, encoder)
+```
+
+### Codegen
+
+```gleam
+import mochi/codegen/typescript
+import mochi/codegen/sdl
+
+// Generate TypeScript
+let ts = typescript.generate(schema)
+
+// Generate SDL
+let gql = sdl.generate(schema)
+```
+
+## File Structure
+
+```
+src/
+├── mochi.gleam              # Main module, re-exports
+├── mochi/
+│   ├── query.gleam          # Code First query/mutation API
+│   ├── types.gleam          # Type builders
+│   ├── schema.gleam         # Core schema types
+│   ├── parser.gleam         # GraphQL parser
+│   ├── executor.gleam       # Query execution
+│   ├── codegen/
+│   │   ├── typescript.gleam # TS codegen
+│   │   └── sdl.gleam        # SDL codegen
+│   └── ...
+├── mochi_ffi.mjs            # JavaScript FFI
+test/
+├── mochi_test.gleam         # Parser tests
+├── code_first_test.gleam    # Code First API tests
+├── typescript_codegen_test.gleam
+├── sdl_codegen_test.gleam
+└── ...
 ```
 
 ## Development Notes
 
-- Tests use `gleeunit` framework
-- The core library maintains zero database dependencies
-- Web integrations are kept in separate example projects
-- Dynamic/JSON serialization requires external functions (use `gleam_json` in practice)
-- All database connectivity handled via `cake` query builder and `cigogne` migrations in web example
-- GraphiQL playground available at `/graphiql` in web application example
+- Uses `gleeunit` for testing
+- Uses `birdie` for snapshot testing
+- Core library has minimal dependencies (`gleam_stdlib` only)
+- `types.to_dynamic` converts Gleam values to Dynamic for resolvers
+- Tests cover: parsing, schema building, codegen
 
-## Project Philosophy
+## Common Patterns
 
-The library follows a "pure core, flexible integration" approach where:
-- Core GraphQL functionality remains dependency-free
-- Database, web server, and business logic are handled in separate integration layers
-- Type safety is maintained throughout the GraphQL type system and resolvers
-- Schema generation reduces boilerplate while maintaining type consistency
+### Decoder Function
+```gleam
+fn decode_user(dyn: Dynamic) -> Result(User, String) {
+  // Decode Dynamic to typed value
+  Ok(User(...))
+}
+```
+
+### Resolver Function
+```gleam
+fn resolver(ctx: ExecutionContext) -> Result(a, String) {
+  // Fetch data and return
+  Ok(data)
+}
+```
+
+### Encoder Function
+```gleam
+fn encoder(value: a) -> Dynamic {
+  types.to_dynamic(value)
+}
+```

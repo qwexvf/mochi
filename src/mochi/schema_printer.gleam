@@ -1,7 +1,7 @@
 // Schema Printer - Converts GraphQL schemas back to SDL format
 // This allows you to serialize schemas, inspect them, and generate documentation
 
-import geql/schema
+import mochi/schema
 import gleam/dict
 import gleam/io
 import gleam/list

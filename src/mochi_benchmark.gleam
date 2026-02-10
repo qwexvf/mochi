@@ -1,17 +1,16 @@
-// GeQL Performance Benchmark Runner
-// Measures parsing and execution performance to generate README metrics
+// mochi Performance Benchmark Runner
+// Measures parsing and execution performance
 
-import geql/executor
-import geql/parser
-import geql/schema
-import gleam/float
+import mochi/executor
+import mochi/parser
+import mochi/schema
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
 
 pub fn main() {
-  io.println("🚀 GeQL Performance Benchmark")
+  io.println("🍡 mochi Performance Benchmark")
   io.println("=" |> string.repeat(40))
   io.println("")
 
@@ -38,7 +37,7 @@ pub fn main() {
   io.println("")
   io.println("📊 Benchmark Results Summary")
   io.println("-" |> string.repeat(30))
-  io.println("GeQL demonstrates strong parsing performance")
+  io.println("mochi demonstrates strong parsing performance")
   io.println("Execution limited by Dynamic serialization (known issue)")
   io.println("Ready for HTTP load testing comparison!")
 }

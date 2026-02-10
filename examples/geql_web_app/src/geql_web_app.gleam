@@ -1,5 +1,5 @@
-import geql/executor
-import geql/schema
+import mochi/executor
+import mochi/schema
 import gleam/bytes_builder
 import gleam/erlang/process
 import gleam/http

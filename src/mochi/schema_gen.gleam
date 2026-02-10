@@ -1,4 +1,4 @@
-import geql/schema
+import mochi/schema
 import gleam/dynamic.{type Dynamic}
 import gleam/option
 

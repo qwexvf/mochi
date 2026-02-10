@@ -1,7 +1,7 @@
 // Basic User Demo - Tests GeQL's basic schema building capabilities
 // Demonstrates schema construction without complex resolvers
 
-import geql/schema
+import mochi/schema
 import gleam/io
 
 // Simple schema demo

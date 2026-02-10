@@ -1,6 +1,6 @@
-import geql/executor
-import geql/schema
-import geql/schema_gen
+import mochi/executor
+import mochi/schema
+import mochi/schema_gen
 import gleam/dynamic.{type Dynamic}
 import gleam/io
 import gleam/option.{None, Some}

@@ -1,6 +1,6 @@
 import database
-import geql/schema
-import geql/schema_gen
+import mochi/schema
+import mochi/schema_gen
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
 import gleam/result

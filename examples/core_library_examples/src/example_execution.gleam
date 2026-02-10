@@ -1,5 +1,5 @@
-import geql/executor
-import geql/schema
+import mochi/executor
+import mochi/schema
 import gleam/dynamic.{type Dynamic}
 import gleam/io
 import gleam/option.{None, Some}

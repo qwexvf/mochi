@@ -1,4 +1,4 @@
-import geql/schema
+import mochi/schema
 
 pub fn user_schema() -> schema.Schema {
   let user_type =

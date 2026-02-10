@@ -1,8 +1,8 @@
 // SDL Parser - Parses GraphQL Schema Definition Language
 // Converts SDL tokens into an AST that can be used to build schemas
 
-import geql/sdl_ast.{type SDLDocument, type TypeSystemDefinition}
-import geql/sdl_lexer.{
+import mochi/sdl_ast.{type SDLDocument, type TypeSystemDefinition}
+import mochi/sdl_lexer.{
   type Position, type SDLLexerError, type SDLToken, type SDLTokenWithPosition,
 }
 import gleam/list

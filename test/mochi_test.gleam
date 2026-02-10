@@ -1,4 +1,4 @@
-import geql
+import mochi
 import gleeunit
 
 pub fn main() -> Nil {
@@ -7,7 +7,7 @@ pub fn main() -> Nil {
 
 pub fn basic_query_test() {
   let query = "{ user { entries { id } } }"
-  let result = geql.parse(query)
+  let result = mochi.parse(query)
 
   case result {
     Ok(_document) -> Nil
@@ -17,7 +17,7 @@ pub fn basic_query_test() {
 
 pub fn named_query_test() {
   let query = "query GetUser { user { name id } }"
-  let result = geql.parse(query)
+  let result = mochi.parse(query)
 
   case result {
     Ok(_document) -> Nil
@@ -28,7 +28,7 @@ pub fn named_query_test() {
 pub fn nested_fields_test() {
   let query =
     "{ user { profile { name avatar { url size } } posts { title content } } }"
-  let result = geql.parse(query)
+  let result = mochi.parse(query)
 
   case result {
     Ok(_document) -> Nil
@@ -38,7 +38,7 @@ pub fn nested_fields_test() {
 
 pub fn basic_mutation_test() {
   let mutation = "mutation { createUser { id name } }"
-  let result = geql.parse(mutation)
+  let result = mochi.parse(mutation)
 
   case result {
     Ok(_document) -> Nil
@@ -48,7 +48,7 @@ pub fn basic_mutation_test() {
 
 pub fn named_mutation_test() {
   let mutation = "mutation CreateUser { createUser { id name email } }"
-  let result = geql.parse(mutation)
+  let result = mochi.parse(mutation)
 
   case result {
     Ok(_document) -> Nil

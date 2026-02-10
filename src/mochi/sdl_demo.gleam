@@ -1,9 +1,9 @@
 // SDL Complete Demo - Shows full parsing and printing of GraphQL SDL
 // Tests all the SDL functionality: lexing, parsing, and schema printing
 
-import geql/sdl_ast
-import geql/sdl_lexer
-import geql/sdl_parser
+import mochi/sdl_ast
+import mochi/sdl_lexer
+import mochi/sdl_parser
 import gleam/io
 
 /// Comprehensive SDL demo showing parsing and error handling

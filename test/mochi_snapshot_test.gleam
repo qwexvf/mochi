@@ -2,8 +2,8 @@
 // Tests SDL parsing, schema building, and query structures
 
 import birdie
-import geql/schema
-import geql/sdl_parser
+import mochi/schema
+import mochi/sdl_parser
 import gleam/string
 import gleeunit
 

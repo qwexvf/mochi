@@ -1,7 +1,7 @@
 import dataloader_example
 import example_execution
 import examples
-import geql
+import mochi
 import gleam/io
 import person_example
 
