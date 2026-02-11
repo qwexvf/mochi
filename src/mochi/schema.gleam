@@ -10,7 +10,50 @@ pub type Schema {
     mutation: Option(ObjectType),
     subscription: Option(ObjectType),
     types: Dict(String, TypeDefinition),
+    directives: Dict(String, DirectiveDefinition),
   )
+}
+
+/// Custom directive definition
+pub type DirectiveDefinition {
+  DirectiveDefinition(
+    name: String,
+    description: Option(String),
+    arguments: Dict(String, ArgumentDefinition),
+    locations: List(DirectiveLocation),
+    is_repeatable: Bool,
+    handler: Option(DirectiveHandler),
+  )
+}
+
+/// Handler function for custom directives
+/// Takes the directive arguments and field value, returns modified value or error
+pub type DirectiveHandler =
+  fn(Dict(String, Dynamic), Dynamic) -> Result(Dynamic, String)
+
+/// Locations where a directive can be used
+pub type DirectiveLocation {
+  // Executable locations (query/mutation/subscription)
+  QueryLocation
+  MutationLocation
+  SubscriptionLocation
+  FieldLocation
+  FragmentDefinitionLocation
+  FragmentSpreadLocation
+  InlineFragmentLocation
+  VariableDefinitionLocation
+  // Type system locations (schema definition)
+  SchemaLocation
+  ScalarLocation
+  ObjectLocation
+  FieldDefinitionLocation
+  ArgumentDefinitionLocation
+  InterfaceLocation
+  UnionLocation
+  EnumLocation
+  EnumValueLocation
+  InputObjectLocation
+  InputFieldDefinitionLocation
 }
 
 pub type TypeDefinition {
@@ -186,7 +229,13 @@ pub fn update_data_loader(
 
 // Builder API
 pub fn schema() -> Schema {
-  Schema(query: None, mutation: None, subscription: None, types: dict.new())
+  Schema(
+    query: None,
+    mutation: None,
+    subscription: None,
+    types: dict.new(),
+    directives: dict.new(),
+  )
 }
 
 pub fn query(schema: Schema, query_type: ObjectType) -> Schema {
@@ -438,4 +487,143 @@ pub fn union_resolve_type(
   resolver: TypeResolver,
 ) -> UnionType {
   UnionType(..union_type, resolve_type: Some(resolver))
+}
+
+// ============================================================================
+// Directive Builder API
+// ============================================================================
+
+/// Add a directive definition to the schema
+pub fn add_directive(schema: Schema, directive: DirectiveDefinition) -> Schema {
+  Schema(
+    ..schema,
+    directives: dict.insert(schema.directives, directive.name, directive),
+  )
+}
+
+/// Create a new directive definition
+pub fn directive(
+  name: String,
+  locations: List(DirectiveLocation),
+) -> DirectiveDefinition {
+  DirectiveDefinition(
+    name: name,
+    description: None,
+    arguments: dict.new(),
+    locations: locations,
+    is_repeatable: False,
+    handler: None,
+  )
+}
+
+/// Add description to a directive
+pub fn directive_description(
+  dir: DirectiveDefinition,
+  desc: String,
+) -> DirectiveDefinition {
+  DirectiveDefinition(..dir, description: Some(desc))
+}
+
+/// Add an argument to a directive
+pub fn directive_argument(
+  dir: DirectiveDefinition,
+  arg_def: ArgumentDefinition,
+) -> DirectiveDefinition {
+  DirectiveDefinition(
+    ..dir,
+    arguments: dict.insert(dir.arguments, arg_def.name, arg_def),
+  )
+}
+
+/// Make a directive repeatable
+pub fn directive_repeatable(dir: DirectiveDefinition) -> DirectiveDefinition {
+  DirectiveDefinition(..dir, is_repeatable: True)
+}
+
+/// Set the handler function for a directive (for field-level directives)
+pub fn directive_handler(
+  dir: DirectiveDefinition,
+  handler: DirectiveHandler,
+) -> DirectiveDefinition {
+  DirectiveDefinition(..dir, handler: Some(handler))
+}
+
+// ============================================================================
+// Built-in Directive Definitions
+// ============================================================================
+
+/// @skip(if: Boolean!) directive
+pub fn skip_directive() -> DirectiveDefinition {
+  directive("skip", [
+    FieldLocation,
+    FragmentSpreadLocation,
+    InlineFragmentLocation,
+  ])
+  |> directive_description(
+    "Directs the executor to skip this field or fragment when the `if` argument is true.",
+  )
+  |> directive_argument(
+    arg("if", non_null(boolean_type()))
+    |> arg_description("Skipped when true."),
+  )
+}
+
+/// @include(if: Boolean!) directive
+pub fn include_directive() -> DirectiveDefinition {
+  directive("include", [
+    FieldLocation,
+    FragmentSpreadLocation,
+    InlineFragmentLocation,
+  ])
+  |> directive_description(
+    "Directs the executor to include this field or fragment only when the `if` argument is true.",
+  )
+  |> directive_argument(
+    arg("if", non_null(boolean_type()))
+    |> arg_description("Included when true."),
+  )
+}
+
+/// @deprecated(reason: String) directive
+pub fn deprecated_directive() -> DirectiveDefinition {
+  directive("deprecated", [FieldDefinitionLocation, EnumValueLocation])
+  |> directive_description(
+    "Marks an element of a GraphQL schema as no longer supported.",
+  )
+  |> directive_argument(
+    arg("reason", string_type())
+    |> arg_description(
+      "Explains why this element was deprecated, usually also including a suggestion for how to access supported similar data.",
+    ),
+  )
+}
+
+/// Get all built-in directives
+pub fn builtin_directives() -> List(DirectiveDefinition) {
+  [skip_directive(), include_directive(), deprecated_directive()]
+}
+
+/// Convert DirectiveLocation to string (for SDL generation)
+pub fn directive_location_to_string(loc: DirectiveLocation) -> String {
+  case loc {
+    QueryLocation -> "QUERY"
+    MutationLocation -> "MUTATION"
+    SubscriptionLocation -> "SUBSCRIPTION"
+    FieldLocation -> "FIELD"
+    FragmentDefinitionLocation -> "FRAGMENT_DEFINITION"
+    FragmentSpreadLocation -> "FRAGMENT_SPREAD"
+    InlineFragmentLocation -> "INLINE_FRAGMENT"
+    VariableDefinitionLocation -> "VARIABLE_DEFINITION"
+    SchemaLocation -> "SCHEMA"
+    ScalarLocation -> "SCALAR"
+    ObjectLocation -> "OBJECT"
+    FieldDefinitionLocation -> "FIELD_DEFINITION"
+    ArgumentDefinitionLocation -> "ARGUMENT_DEFINITION"
+    InterfaceLocation -> "INTERFACE"
+    UnionLocation -> "UNION"
+    EnumLocation -> "ENUM"
+    EnumValueLocation -> "ENUM_VALUE"
+    InputObjectLocation -> "INPUT_OBJECT"
+    InputFieldDefinitionLocation -> "INPUT_FIELD_DEFINITION"
+  }
 }
