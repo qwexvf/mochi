@@ -1,9 +1,9 @@
-import mochi/executor
-import mochi/schema
 import gleam/dynamic.{type Dynamic}
 import gleam/io
 import gleam/option.{None, Some}
 import gleam/result
+import mochi/executor
+import mochi/schema
 
 // Sample user data
 pub type User {

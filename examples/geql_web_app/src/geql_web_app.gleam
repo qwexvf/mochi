@@ -1,5 +1,3 @@
-import mochi/executor
-import mochi/schema
 import gleam/bytes_builder
 import gleam/erlang/process
 import gleam/http
@@ -9,6 +7,8 @@ import gleam/io
 import gleam/result
 import gleam/string
 import mist
+import mochi/executor
+import mochi/schema
 
 /// Main entry point for the GraphQL web application
 pub fn main() {

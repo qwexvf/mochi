@@ -1,13 +1,13 @@
 /// DataLoader example demonstrating batching and caching for efficient data fetching
 /// This solves the N+1 query problem common in GraphQL implementations
-import mochi/dataloader
-import mochi/executor
-import mochi/schema
 import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
+import mochi/dataloader
+import mochi/executor
+import mochi/schema
 
 // Example data types
 pub type User {
