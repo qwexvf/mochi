@@ -1,12 +1,12 @@
 // Schema Printer - Converts GraphQL schemas back to SDL format
 // This allows you to serialize schemas, inspect them, and generate documentation
 
-import mochi/schema
 import gleam/dict
 import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
+import mochi/schema
 
 /// Print a schema to SDL format
 pub fn print_schema(schema_def: schema.Schema) -> String {

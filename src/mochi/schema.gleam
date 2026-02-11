@@ -1,7 +1,7 @@
-import mochi/dataloader.{type DataLoader}
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{type Option, None, Some}
+import mochi/dataloader.{type DataLoader}
 
 // Core schema types
 pub type Schema {

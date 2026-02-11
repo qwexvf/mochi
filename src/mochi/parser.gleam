@@ -1,3 +1,6 @@
+import gleam/list
+import gleam/option.{type Option, None, Some}
+import gleam/result
 import mochi/ast.{
   type Document, type Field, type Operation, type OperationType, type Selection,
   type SelectionSet,
@@ -5,9 +8,6 @@ import mochi/ast.{
 import mochi/lexer.{
   type LexerError, type Position, type Token, type TokenWithPosition,
 }
-import gleam/list
-import gleam/option.{type Option, None, Some}
-import gleam/result
 
 pub type ParseError {
   LexError(error: LexerError)
@@ -55,7 +55,9 @@ fn parse_definition(
       |> result.map(fn(result) { #(ast.FragmentDefinition(result.0), result.1) })
     _ ->
       parse_operation_definition(parser)
-      |> result.map(fn(result) { #(ast.OperationDefinition(result.0), result.1) })
+      |> result.map(fn(result) {
+        #(ast.OperationDefinition(result.0), result.1)
+      })
   }
 }
 
@@ -71,11 +73,7 @@ fn parse_fragment_definition(
   // Parse fragment name
   use #(name, parser) <- result.try(parse_name_from_parser(parser))
   // Expect 'on' keyword
-  use #(_, parser) <- result.try(expect_token(
-    parser,
-    lexer.On,
-    "'on' keyword",
-  ))
+  use #(_, parser) <- result.try(expect_token(parser, lexer.On, "'on' keyword"))
   // Parse type condition
   use #(type_condition, parser) <- result.try(parse_name_from_parser(parser))
   // Parse selection set
@@ -104,9 +102,9 @@ fn parse_operation_definition(
     | Ok(lexer.TokenWithPosition(lexer.Subscription, _)) -> {
       use #(op_type, parser) <- result.try(parse_operation_type(parser))
       use #(name, parser) <- result.try(parse_optional_name(parser))
-      use #(variable_defs, parser) <- result.try(
-        parse_variable_definitions(parser),
-      )
+      use #(variable_defs, parser) <- result.try(parse_variable_definitions(
+        parser,
+      ))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
       Ok(#(
         ast.Operation(
@@ -211,7 +209,10 @@ fn parse_fragment_spread_or_inline(
   case peek_token(parser) {
     // Inline fragment with type condition: ... on TypeName { ... }
     Ok(lexer.TokenWithPosition(lexer.On, _)) -> {
-      use #(_, parser) <- result.try(consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("'on'") }))
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("'on'") }),
+      )
       use #(type_name, parser) <- result.try(parse_name_from_parser(parser))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
       Ok(#(
@@ -237,12 +238,12 @@ fn parse_fragment_spread_or_inline(
     }
     // Fragment spread: ...FragmentName
     Ok(lexer.TokenWithPosition(lexer.Name(name), _)) -> {
-      use #(_, parser) <- result.try(consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("fragment name") }))
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("fragment name") }),
+      )
       Ok(#(
-        ast.FragmentSpread(ast.FragmentSpreadValue(
-          name: name,
-          directives: [],
-        )),
+        ast.FragmentSpread(ast.FragmentSpreadValue(name: name, directives: [])),
         parser,
       ))
     }
@@ -432,9 +433,9 @@ fn parse_variable_definition(
   // Parse type
   use #(var_type, parser) <- result.try(parse_type(parser))
   // Parse optional default value
-  use #(default_value, parser) <- result.try(
-    parse_optional_default_value(parser),
-  )
+  use #(default_value, parser) <- result.try(parse_optional_default_value(
+    parser,
+  ))
 
   Ok(#(
     ast.VariableDefinition(
@@ -462,17 +463,19 @@ fn parse_type(parser: Parser) -> Result(#(ast.Type, Parser), ParseError) {
         "']' to close list type",
       ))
       // Check for non-null
-      use #(final_type, parser) <- result.try(
-        parse_optional_non_null(parser, ast.ListType(inner_type)),
-      )
+      use #(final_type, parser) <- result.try(parse_optional_non_null(
+        parser,
+        ast.ListType(inner_type),
+      ))
       Ok(#(final_type, parser))
     }
     Ok(lexer.TokenWithPosition(lexer.Name(_), _)) -> {
       use #(name, parser) <- result.try(parse_name_from_parser(parser))
       // Check for non-null
-      use #(final_type, parser) <- result.try(
-        parse_optional_non_null(parser, ast.NamedType(name)),
-      )
+      use #(final_type, parser) <- result.try(parse_optional_non_null(
+        parser,
+        ast.NamedType(name),
+      ))
       Ok(#(final_type, parser))
     }
     Ok(lexer.TokenWithPosition(token, position)) ->

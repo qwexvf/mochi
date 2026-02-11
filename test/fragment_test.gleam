@@ -27,7 +27,9 @@ fn build_test_schema() -> schema.Schema {
     query.query(
       "user",
       schema.Named("User"),
-      fn(_info) { Ok(types.to_dynamic(User("1", "Alice", "alice@example.com"))) },
+      fn(_info) {
+        Ok(types.to_dynamic(User("1", "Alice", "alice@example.com")))
+      },
       fn(u) { types.to_dynamic(u) },
     )
 
@@ -41,7 +43,10 @@ fn decode_user(_dyn: dynamic.Dynamic) -> Result(User, String) {
   Ok(User("1", "Alice", "alice@example.com"))
 }
 
-fn execute_query(schema_def: schema.Schema, query_str: String) -> executor.ExecutionResult {
+fn execute_query(
+  schema_def: schema.Schema,
+  query_str: String,
+) -> executor.ExecutionResult {
   executor.execute_query(schema_def, query_str)
 }
 
@@ -249,4 +254,3 @@ pub fn multiple_fragments_test() {
   should.be_true(option.is_some(result.data))
   should.equal(result.errors, [])
 }
-
