@@ -292,3 +292,4 @@ Apache 2.0
 ---
 
 **mochi** 🍡 - Code First GraphQL for Gleam
+# CI trigger
