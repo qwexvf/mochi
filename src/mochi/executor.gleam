@@ -191,16 +191,81 @@ fn execute_field(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  let response_name = option.unwrap(field.alias, field.name)
-  let field_path = list.append(field_context.path, [response_name])
+  // Check directives first - @skip and @include
+  case should_include_field(field.directives, context.variable_values) {
+    False -> ok_result(types.to_dynamic(dict.new()))  // Skip this field
+    True -> {
+      let response_name = option.unwrap(field.alias, field.name)
+      let field_path = list.append(field_context.path, [response_name])
 
-  case field.name {
-    "__typename" -> ok_result(make_field(response_name, types.to_dynamic(object_type.name)))
-    "__schema" -> execute_introspection_schema(context, field, response_name)
-    "__type" -> execute_introspection_type(context, field, field_path, response_name)
-    _ -> execute_regular_field(context, field, object_type, field_context, response_name, field_path)
+      case field.name {
+        "__typename" -> ok_result(make_field(response_name, types.to_dynamic(object_type.name)))
+        "__schema" -> execute_introspection_schema(context, field, response_name)
+        "__type" -> execute_introspection_type(context, field, field_path, response_name)
+        _ -> execute_regular_field(context, field, object_type, field_context, response_name, field_path)
+      }
+    }
   }
 }
+
+// ============================================================================
+// Directive Evaluation
+// ============================================================================
+
+/// Check if a field should be included based on @skip and @include directives
+fn should_include_field(
+  directives: List(ast.Directive),
+  variables: Dict(String, Dynamic),
+) -> Bool {
+  // Check @skip first - if @skip(if: true), exclude the field
+  let skip_value = get_directive_bool_arg(directives, "skip", "if", variables)
+  case skip_value {
+    Some(True) -> False  // Skip this field
+    _ -> {
+      // Check @include - if @include(if: false), exclude the field
+      let include_value = get_directive_bool_arg(directives, "include", "if", variables)
+      case include_value {
+        Some(False) -> False  // Exclude this field
+        _ -> True  // Include by default
+      }
+    }
+  }
+}
+
+/// Get a boolean argument value from a specific directive
+fn get_directive_bool_arg(
+  directives: List(ast.Directive),
+  directive_name: String,
+  arg_name: String,
+  variables: Dict(String, Dynamic),
+) -> Option(Bool) {
+  directives
+  |> list.find(fn(d) { d.name == directive_name })
+  |> result.map(fn(directive) {
+    directive.arguments
+    |> list.find(fn(arg) { arg.name == arg_name })
+    |> result.map(fn(arg) { eval_bool_value(arg.value, variables) })
+    |> result.unwrap(None)
+  })
+  |> result.unwrap(None)
+}
+
+/// Evaluate a Value to a boolean, handling variables
+fn eval_bool_value(value: ast.Value, variables: Dict(String, Dynamic)) -> Option(Bool) {
+  case value {
+    ast.BooleanValue(b) -> Some(b)
+    ast.VariableValue(name) -> {
+      dict.get(variables, name)
+      |> result.map(decode_bool_from_dynamic)
+      |> result.unwrap(None)
+    }
+    _ -> None
+  }
+}
+
+@external(erlang, "mochi_ffi", "dynamic_to_bool")
+@external(javascript, "../mochi_ffi.mjs", "dynamic_to_bool")
+fn decode_bool_from_dynamic(value: Dynamic) -> Option(Bool)
 
 fn execute_regular_field(
   context: QueryExecutionContext,
@@ -215,7 +280,7 @@ fn execute_regular_field(
   let field_args = coerce_arguments(field.arguments, field_def.arguments, context.variable_values)
 
   case field_def.resolver {
-    Some(resolver) -> resolve_field(context, field, field_def, field_args, response_name, field_path, resolver)
+    Some(resolver) -> resolve_field(context, field, field_def, field_args, response_name, field_path, resolver, field_context.parent_value)
     None -> resolve_from_parent(field_context.parent_value, field.name, response_name, field_path)
   }
 }
@@ -243,9 +308,10 @@ fn resolve_field(
   response_name: String,
   field_path: List(String),
   resolver: schema.Resolver,
+  parent_value: Option(Dynamic),
 ) -> ExecutionResult {
   let resolver_info = schema.ResolverInfo(
-    parent: None,
+    parent: parent_value,
     arguments: field_args,
     context: context.execution_context,
     info: types.to_dynamic(dict.new()),

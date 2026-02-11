@@ -11,3 +11,10 @@ export function dynamic_to_string(value) {
   }
   return new None();
 }
+
+export function dynamic_to_bool(value) {
+  if (typeof value === "boolean") {
+    return new Some(value);
+  }
+  return new None();
+}
