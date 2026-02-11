@@ -113,7 +113,8 @@ pub fn parse_type_introspection_test() {
 }
 
 pub fn parse_full_introspection_query_test() {
-  let query_str = "
+  let query_str =
+    "
     query IntrospectionQuery {
       __schema {
         queryType { name }
@@ -154,21 +155,28 @@ pub fn execute_typename_test() {
 
 pub fn execute_schema_introspection_test() {
   let test_schema = create_test_schema()
-  let _ = executor.execute_query(test_schema, "{ __schema { queryType { name } } }")
+  let _ =
+    executor.execute_query(test_schema, "{ __schema { queryType { name } } }")
   Nil
 }
 
 pub fn execute_type_introspection_test() {
   let test_schema = create_test_schema()
-  let _ = executor.execute_query(test_schema, "{ __type(name: \"User\") { name kind } }")
+  let _ =
+    executor.execute_query(
+      test_schema,
+      "{ __type(name: \"User\") { name kind } }",
+    )
   Nil
 }
 
 pub fn execute_type_introspection_with_variable_test() {
   let test_schema = create_test_schema()
-  let query_str = "query GetType($name: String!) { __type(name: $name) { name kind } }"
+  let query_str =
+    "query GetType($name: String!) { __type(name: $name) { name kind } }"
   let variables = dict.from_list([#("name", types.to_dynamic("User"))])
-  let _ = executor.execute_query_with_variables(test_schema, query_str, variables)
+  let _ =
+    executor.execute_query_with_variables(test_schema, query_str, variables)
   Nil
 }
 
@@ -179,13 +187,15 @@ pub fn execute_type_introspection_with_variable_test() {
 pub fn schema_has_user_type_test() {
   let test_schema = create_test_schema()
 
-  let user_type = assert_ok(
-    dict.get(test_schema.types, "User"),
-    "Schema should have User type",
-  )
+  let user_type =
+    assert_ok(
+      dict.get(test_schema.types, "User"),
+      "Schema should have User type",
+    )
 
   case user_type {
-    schema.ObjectTypeDef(obj) -> assert_true(obj.name == "User", "Type name should be User")
+    schema.ObjectTypeDef(obj) ->
+      assert_true(obj.name == "User", "Type name should be User")
     _ -> panic as "Should be ObjectTypeDef"
   }
 }
@@ -193,10 +203,11 @@ pub fn schema_has_user_type_test() {
 pub fn schema_has_role_enum_test() {
   let test_schema = create_test_schema()
 
-  let role_type = assert_ok(
-    dict.get(test_schema.types, "Role"),
-    "Schema should have Role enum",
-  )
+  let role_type =
+    assert_ok(
+      dict.get(test_schema.types, "Role"),
+      "Schema should have Role enum",
+    )
 
   case role_type {
     schema.EnumTypeDef(enum) -> {
@@ -213,8 +224,13 @@ pub fn schema_query_type_test() {
   case test_schema.query {
     Some(query_type) -> {
       assert_true(query_type.name == "Query", "Query type name should be Query")
-      let _ = assert_ok(dict.get(query_type.fields, "users"), "Should have users field")
-      let _ = assert_ok(dict.get(query_type.fields, "user"), "Should have user field")
+      let _ =
+        assert_ok(
+          dict.get(query_type.fields, "users"),
+          "Should have users field",
+        )
+      let _ =
+        assert_ok(dict.get(query_type.fields, "user"), "Should have user field")
       Nil
     }
     _ -> panic as "Schema should have query type"

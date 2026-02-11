@@ -63,13 +63,21 @@ pub fn parse_query_with_variables_test() {
 
   assert_eq(
     vars,
-    [ast.VariableDefinition("id", ast.NonNullType(ast.NamedType("ID")), option.None, [])],
+    [
+      ast.VariableDefinition(
+        "id",
+        ast.NonNullType(ast.NamedType("ID")),
+        option.None,
+        [],
+      ),
+    ],
     "Should have one ID! variable",
   )
 }
 
 pub fn parse_multiple_variables_test() {
-  let doc = parse_ok("query GetUsers($limit: Int, $offset: Int = 0) { users { id } }")
+  let doc =
+    parse_ok("query GetUsers($limit: Int, $offset: Int = 0) { users { id } }")
   let vars = doc |> get_first_operation |> get_variable_definitions
 
   assert_eq(list.length(vars), 2, "Should have two variables")
@@ -78,7 +86,11 @@ pub fn parse_multiple_variables_test() {
     [first, second] -> {
       assert_eq(first.variable, "limit", "First should be limit")
       assert_eq(second.variable, "offset", "Second should be offset")
-      assert_eq(second.default_value, Some(ast.IntValue(0)), "Offset should have default 0")
+      assert_eq(
+        second.default_value,
+        Some(ast.IntValue(0)),
+        "Offset should have default 0",
+      )
     }
     _ -> panic as "Expected two variables"
   }
@@ -87,12 +99,17 @@ pub fn parse_multiple_variables_test() {
 import gleam/list
 
 pub fn parse_list_type_variable_test() {
-  let doc = parse_ok("query GetByIds($ids: [ID!]!) { users(ids: $ids) { name } }")
+  let doc =
+    parse_ok("query GetByIds($ids: [ID!]!) { users(ids: $ids) { name } }")
   let vars = doc |> get_first_operation |> get_variable_definitions
 
   case vars {
     [ast.VariableDefinition(variable: "ids", type_: t, ..)] ->
-      assert_eq(t, ast.NonNullType(ast.ListType(ast.NonNullType(ast.NamedType("ID")))), "Type should be [ID!]!")
+      assert_eq(
+        t,
+        ast.NonNullType(ast.ListType(ast.NonNullType(ast.NamedType("ID")))),
+        "Type should be [ID!]!",
+      )
     _ -> panic as "Expected ids variable"
   }
 }
@@ -105,54 +122,88 @@ pub fn parse_field_with_string_argument_test() {
   let doc = parse_ok("{ user(id: \"123\") { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  assert_eq(field.arguments, [ast.Argument("id", ast.StringValue("123"))], "Should have string argument")
+  assert_eq(
+    field.arguments,
+    [ast.Argument("id", ast.StringValue("123"))],
+    "Should have string argument",
+  )
 }
 
 pub fn parse_field_with_int_argument_test() {
   let doc = parse_ok("{ users(limit: 10) { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  assert_eq(field.arguments, [ast.Argument("limit", ast.IntValue(10))], "Should have int argument")
+  assert_eq(
+    field.arguments,
+    [ast.Argument("limit", ast.IntValue(10))],
+    "Should have int argument",
+  )
 }
 
 pub fn parse_field_with_variable_argument_test() {
   let doc = parse_ok("query GetUser($id: ID!) { user(id: $id) { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  assert_eq(field.arguments, [ast.Argument("id", ast.VariableValue("id"))], "Should have variable argument")
+  assert_eq(
+    field.arguments,
+    [ast.Argument("id", ast.VariableValue("id"))],
+    "Should have variable argument",
+  )
 }
 
 pub fn parse_field_with_boolean_argument_test() {
   let doc = parse_ok("{ users(active: true) { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  assert_eq(field.arguments, [ast.Argument("active", ast.BooleanValue(True))], "Should have boolean argument")
+  assert_eq(
+    field.arguments,
+    [ast.Argument("active", ast.BooleanValue(True))],
+    "Should have boolean argument",
+  )
 }
 
 pub fn parse_field_with_null_argument_test() {
   let doc = parse_ok("{ user(email: null) { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  assert_eq(field.arguments, [ast.Argument("email", ast.NullValue)], "Should have null argument")
+  assert_eq(
+    field.arguments,
+    [ast.Argument("email", ast.NullValue)],
+    "Should have null argument",
+  )
 }
 
 pub fn parse_field_with_list_argument_test() {
   let doc = parse_ok("{ users(ids: [\"1\", \"2\", \"3\"]) { name } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  let expected_list = ast.ListValue([ast.StringValue("1"), ast.StringValue("2"), ast.StringValue("3")])
-  assert_eq(field.arguments, [ast.Argument("ids", expected_list)], "Should have list argument")
+  let expected_list =
+    ast.ListValue([
+      ast.StringValue("1"),
+      ast.StringValue("2"),
+      ast.StringValue("3"),
+    ])
+  assert_eq(
+    field.arguments,
+    [ast.Argument("ids", expected_list)],
+    "Should have list argument",
+  )
 }
 
 pub fn parse_field_with_object_argument_test() {
   let doc = parse_ok("{ createUser(input: {name: \"John\", age: 30}) { id } }")
   let field = doc |> get_first_operation |> get_first_field
 
-  let expected_obj = ast.ObjectValue([
-    ast.ObjectField("name", ast.StringValue("John")),
-    ast.ObjectField("age", ast.IntValue(30)),
-  ])
-  assert_eq(field.arguments, [ast.Argument("input", expected_obj)], "Should have object argument")
+  let expected_obj =
+    ast.ObjectValue([
+      ast.ObjectField("name", ast.StringValue("John")),
+      ast.ObjectField("age", ast.IntValue(30)),
+    ])
+  assert_eq(
+    field.arguments,
+    [ast.Argument("input", expected_obj)],
+    "Should have object argument",
+  )
 }
 
 pub fn parse_multiple_arguments_test() {
@@ -210,6 +261,7 @@ pub fn executor_with_variables_test() {
   let variables = dict.from_list([#("id", types.to_dynamic("123"))])
 
   // Should execute without panicking
-  let _ = executor.execute_query_with_variables(test_schema, query_str, variables)
+  let _ =
+    executor.execute_query_with_variables(test_schema, query_str, variables)
   Nil
 }

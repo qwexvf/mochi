@@ -2,10 +2,10 @@
 // Tests SDL parsing, schema building, and query structures
 
 import birdie
-import mochi/schema
-import mochi/sdl_parser
 import gleam/string
 import gleeunit
+import mochi/schema
+import mochi/sdl_parser
 
 pub fn main() {
   // Run a simple test to verify snapshots are working

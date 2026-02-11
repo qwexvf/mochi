@@ -36,12 +36,12 @@
 //   |> query.build
 // ```
 
+import gleam/io
 import mochi/ast
 import mochi/executor
 import mochi/parser
 import mochi/query as mochi_query
 import mochi/schema
-import gleam/io
 
 // ============================================================================
 // Re-exports for convenient access

@@ -1,13 +1,13 @@
 // mochi Performance Benchmark Runner
 // Measures parsing and execution performance
 
-import mochi/executor
-import mochi/parser
-import mochi/schema
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
+import mochi/executor
+import mochi/parser
+import mochi/schema
 
 pub fn main() {
   io.println("🍡 mochi Performance Benchmark")

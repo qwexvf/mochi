@@ -339,14 +339,20 @@ pub fn schema_with_mutation_test() {
 
 pub fn schema_multiple_queries_test() {
   let users_query =
-    query.query("users", schema.list_type(schema.named_type("User")), fn(_) {
-      Ok([])
-    }, types.to_dynamic)
+    query.query(
+      "users",
+      schema.list_type(schema.named_type("User")),
+      fn(_) { Ok([]) },
+      types.to_dynamic,
+    )
 
   let posts_query =
-    query.query("posts", schema.list_type(schema.named_type("Post")), fn(_) {
-      Ok([])
-    }, types.to_dynamic)
+    query.query(
+      "posts",
+      schema.list_type(schema.named_type("Post")),
+      fn(_) { Ok([]) },
+      types.to_dynamic,
+    )
 
   let built_schema =
     query.new()

@@ -41,7 +41,10 @@ fn decode_user(_dyn: dynamic.Dynamic) -> Result(User, String) {
   Ok(User("1", "Alice", True))
 }
 
-fn execute_query(schema_def: schema.Schema, query_str: String) -> executor.ExecutionResult {
+fn execute_query(
+  schema_def: schema.Schema,
+  query_str: String,
+) -> executor.ExecutionResult {
   executor.execute_query(schema_def, query_str)
 }
 
