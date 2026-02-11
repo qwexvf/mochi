@@ -196,7 +196,16 @@ fn generate_enum(enum_type: EnumType, config: Config) -> String {
       let #(name, value_def) = kv
       let value_desc =
         generate_description(value_def.description, config.indent, config)
-      value_desc <> config.indent <> name
+      let deprecated = case value_def.is_deprecated {
+        True ->
+          case value_def.deprecation_reason {
+            Some(reason) ->
+              " @deprecated(reason: \"" <> escape_string(reason) <> "\")"
+            None -> " @deprecated"
+          }
+        False -> ""
+      }
+      value_desc <> config.indent <> name <> deprecated
     })
     |> string.join("\n")
 
@@ -281,12 +290,23 @@ fn generate_field(field: FieldDefinition, config: Config) -> String {
     False -> ""
   }
 
+  let deprecated = case field.is_deprecated {
+    True ->
+      case field.deprecation_reason {
+        Some(reason) ->
+          " @deprecated(reason: \"" <> escape_string(reason) <> "\")"
+        None -> " @deprecated"
+      }
+    False -> ""
+  }
+
   desc
   <> config.indent
   <> field.name
   <> args
   <> ": "
   <> field_type_to_sdl(field.field_type)
+  <> deprecated
 }
 
 fn generate_arguments(

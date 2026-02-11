@@ -121,6 +121,69 @@ pub fn sdl_list_type_test() {
   }
 }
 
+pub fn sdl_deprecated_field_test() {
+  let query_type =
+    schema.object("Query")
+    |> schema.field(
+      schema.field_def("oldUsers", schema.list_type(schema.named_type("User")))
+      |> schema.deprecate("Use users instead")
+      |> schema.resolver(fn(_) { Error("test") }),
+    )
+    |> schema.field(
+      schema.field_def("users", schema.list_type(schema.named_type("User")))
+      |> schema.resolver(fn(_) { Error("test") }),
+    )
+
+  let test_schema =
+    schema.schema()
+    |> schema.query(query_type)
+
+  let sdl_code = sdl.generate(test_schema)
+
+  // Should have @deprecated directive with reason
+  let has_deprecated =
+    string.contains(sdl_code, "@deprecated(reason: \"Use users instead\")")
+
+  case has_deprecated {
+    True -> Nil
+    False -> panic as "SDL should include @deprecated directive with reason"
+  }
+}
+
+pub fn sdl_deprecated_enum_value_test() {
+  let status_enum =
+    types.enum_type("Status")
+    |> types.value("ACTIVE")
+    |> types.deprecated_value_with_reason("LEGACY", "Use ARCHIVED instead")
+    |> types.build_enum
+
+  let query_type =
+    schema.object("Query")
+    |> schema.field(
+      schema.field_def("status", schema.named_type("Status"))
+      |> schema.resolver(fn(_) { Error("test") }),
+    )
+
+  let test_schema =
+    schema.schema()
+    |> schema.query(query_type)
+    |> schema.add_type(schema.EnumTypeDef(status_enum))
+
+  let sdl_code = sdl.generate(test_schema)
+
+  // Should have @deprecated directive on enum value
+  let has_deprecated =
+    string.contains(
+      sdl_code,
+      "LEGACY @deprecated(reason: \"Use ARCHIVED instead\")",
+    )
+
+  case has_deprecated {
+    True -> Nil
+    False -> panic as "SDL should include @deprecated on enum value"
+  }
+}
+
 // Print example output
 pub fn main() {
   io.println("🍡 SDL Codegen Test")

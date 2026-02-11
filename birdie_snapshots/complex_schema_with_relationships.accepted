@@ -1,7 +1,7 @@
 ---
 version: 1.3.2
 title: Complex schema with relationships
-file: ./test/geql_snapshot_test.gleam
+file: ./test/mochi_snapshot_test.gleam
 test_name: complex_schema_parsing_test
 ---
 Ok(SDLDocument([TypeDefinition(ObjectTypeDefinition(ObjectTypeDef("Query", None, [], [], [FieldDef("user", None, [], NamedType("User"), []), FieldDef("posts", None, [], NonNullType(ListType(NonNullType(NamedType("Post")))), [])]))), TypeDefinition(ObjectTypeDefinition(ObjectTypeDef("User", None, [], [], [FieldDef("id", None, [], NonNullType(NamedType("ID")), []), FieldDef("name", None, [], NonNullType(NamedType("String")), []), FieldDef("posts", None, [], NonNullType(ListType(NonNullType(NamedType("Post")))), [])]))), TypeDefinition(ObjectTypeDefinition(ObjectTypeDef("Post", None, [], [], [FieldDef("id", None, [], NonNullType(NamedType("ID")), []), FieldDef("title", None, [], NonNullType(NamedType("String")), []), FieldDef("author", None, [], NonNullType(NamedType("User")), [])])))]))

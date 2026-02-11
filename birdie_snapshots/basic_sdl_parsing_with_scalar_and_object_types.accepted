@@ -1,7 +1,7 @@
 ---
 version: 1.3.2
 title: Basic SDL parsing with scalar and object types
-file: ./test/geql_snapshot_test.gleam
+file: ./test/mochi_snapshot_test.gleam
 test_name: basic_sdl_parsing_test
 ---
 Ok(SDLDocument([TypeDefinition(ScalarTypeDefinition(ScalarTypeDef("DateTime", None, []))), TypeDefinition(ObjectTypeDefinition(ObjectTypeDef("User", None, [], [], [FieldDef("id", None, [], NonNullType(NamedType("ID")), []), FieldDef("name", None, [], NamedType("String"), []), FieldDef("email", None, [], NonNullType(NamedType("String")), [])])))]))

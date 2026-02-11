@@ -346,7 +346,12 @@ pub type EnumBuilder {
 
 /// An enum value
 pub type EnumValue {
-  EnumValue(name: String, description: Option(String))
+  EnumValue(
+    name: String,
+    description: Option(String),
+    is_deprecated: Bool,
+    deprecation_reason: Option(String),
+  )
 }
 
 /// Create a new enum builder
@@ -361,7 +366,10 @@ pub fn enum_description(builder: EnumBuilder, desc: String) -> EnumBuilder {
 
 /// Add an enum value
 pub fn value(builder: EnumBuilder, name: String) -> EnumBuilder {
-  EnumBuilder(..builder, values: [EnumValue(name, None), ..builder.values])
+  EnumBuilder(..builder, values: [
+    EnumValue(name, None, False, None),
+    ..builder.values
+  ])
 }
 
 /// Add an enum value with description
@@ -370,7 +378,30 @@ pub fn value_with_desc(
   name: String,
   desc: String,
 ) -> EnumBuilder {
-  EnumBuilder(..builder, values: [EnumValue(name, Some(desc)), ..builder.values])
+  EnumBuilder(..builder, values: [
+    EnumValue(name, Some(desc), False, None),
+    ..builder.values
+  ])
+}
+
+/// Add a deprecated enum value
+pub fn deprecated_value(builder: EnumBuilder, name: String) -> EnumBuilder {
+  EnumBuilder(..builder, values: [
+    EnumValue(name, None, True, None),
+    ..builder.values
+  ])
+}
+
+/// Add a deprecated enum value with reason
+pub fn deprecated_value_with_reason(
+  builder: EnumBuilder,
+  name: String,
+  reason: String,
+) -> EnumBuilder {
+  EnumBuilder(..builder, values: [
+    EnumValue(name, None, True, Some(reason)),
+    ..builder.values
+  ])
 }
 
 /// Build the enum type
@@ -382,6 +413,8 @@ pub fn build_enum(builder: EnumBuilder) -> schema.EnumType {
           name: v.name,
           description: v.description,
           value: to_dynamic(v.name),
+          is_deprecated: v.is_deprecated,
+          deprecation_reason: v.deprecation_reason,
         )
       dict.insert(acc, v.name, value_def)
     })

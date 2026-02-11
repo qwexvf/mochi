@@ -1,7 +1,7 @@
 ---
 version: 1.3.2
 title: SDL parsing error handling
-file: ./test/geql_snapshot_test.gleam
+file: ./test/mochi_snapshot_test.gleam
 test_name: sdl_parsing_error_test
 ---
 Error(UnexpectedToken("field definition or '}'", Comment(" Missing closing brace"), Position(5, 7)))

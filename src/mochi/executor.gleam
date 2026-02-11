@@ -919,8 +919,11 @@ fn build_enum_introspection(enum: schema.EnumType) -> Dynamic {
         dict.from_list([
           #("name", types.to_dynamic(name)),
           #("description", types.to_dynamic(option.unwrap(def.description, ""))),
-          #("isDeprecated", types.to_dynamic(False)),
-          #("deprecationReason", types.to_dynamic(Nil)),
+          #("isDeprecated", types.to_dynamic(def.is_deprecated)),
+          #("deprecationReason", case def.deprecation_reason {
+            option.Some(reason) -> types.to_dynamic(reason)
+            option.None -> types.to_dynamic(Nil)
+          }),
         ]),
       )
     })
@@ -1097,8 +1100,11 @@ fn build_fields_introspection(
         #("description", types.to_dynamic(option.unwrap(def.description, ""))),
         #("args", types.to_dynamic(args)),
         #("type", build_field_type_introspection(def.field_type)),
-        #("isDeprecated", types.to_dynamic(False)),
-        #("deprecationReason", types.to_dynamic(Nil)),
+        #("isDeprecated", types.to_dynamic(def.is_deprecated)),
+        #("deprecationReason", case def.deprecation_reason {
+          option.Some(reason) -> types.to_dynamic(reason)
+          option.None -> types.to_dynamic(Nil)
+        }),
       ]),
     )
   })

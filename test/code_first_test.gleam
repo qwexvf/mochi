@@ -370,3 +370,77 @@ pub fn schema_multiple_queries_test() {
     None -> panic as "Schema should have query type"
   }
 }
+
+// ============================================================================
+// Deprecation Tests
+// ============================================================================
+
+pub fn field_deprecation_test() {
+  let field =
+    schema.field_def("oldField", schema.string_type())
+    |> schema.deprecate("Use newField instead")
+
+  case field.is_deprecated {
+    True -> Nil
+    False -> panic as "Field should be deprecated"
+  }
+
+  case field.deprecation_reason {
+    Some("Use newField instead") -> Nil
+    _ -> panic as "Deprecation reason should be set"
+  }
+}
+
+pub fn field_deprecation_no_reason_test() {
+  let field =
+    schema.field_def("oldField", schema.string_type())
+    |> schema.deprecate_field
+
+  case field.is_deprecated {
+    True -> Nil
+    False -> panic as "Field should be deprecated"
+  }
+
+  case field.deprecation_reason {
+    None -> Nil
+    Some(_) -> panic as "Deprecation reason should not be set"
+  }
+}
+
+pub fn enum_value_deprecation_test() {
+  let role_enum =
+    types.enum_type("Status")
+    |> types.value("ACTIVE")
+    |> types.deprecated_value("PENDING")
+    |> types.deprecated_value_with_reason("LEGACY", "Use ARCHIVED instead")
+    |> types.build_enum
+
+  case dict.get(role_enum.values, "ACTIVE") {
+    Ok(v) ->
+      case v.is_deprecated {
+        False -> Nil
+        True -> panic as "ACTIVE should not be deprecated"
+      }
+    Error(_) -> panic as "ACTIVE should exist"
+  }
+
+  case dict.get(role_enum.values, "PENDING") {
+    Ok(v) ->
+      case v.is_deprecated && v.deprecation_reason == None {
+        True -> Nil
+        False -> panic as "PENDING should be deprecated without reason"
+      }
+    Error(_) -> panic as "PENDING should exist"
+  }
+
+  case dict.get(role_enum.values, "LEGACY") {
+    Ok(v) ->
+      case
+        v.is_deprecated && v.deprecation_reason == Some("Use ARCHIVED instead")
+      {
+        True -> Nil
+        False -> panic as "LEGACY should be deprecated with reason"
+      }
+    Error(_) -> panic as "LEGACY should exist"
+  }
+}

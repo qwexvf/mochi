@@ -38,6 +38,8 @@ pub type FieldDefinition {
     field_type: FieldType,
     arguments: Dict(String, ArgumentDefinition),
     resolver: Option(Resolver),
+    is_deprecated: Bool,
+    deprecation_reason: Option(String),
   )
 }
 
@@ -75,7 +77,13 @@ pub type EnumType {
 }
 
 pub type EnumValueDefinition {
-  EnumValueDefinition(name: String, description: Option(String), value: Dynamic)
+  EnumValueDefinition(
+    name: String,
+    description: Option(String),
+    value: Dynamic,
+    is_deprecated: Bool,
+    deprecation_reason: Option(String),
+  )
 }
 
 /// Type resolver function that determines the concrete type at runtime
@@ -239,7 +247,23 @@ pub fn field_def(name: String, field_type: FieldType) -> FieldDefinition {
     field_type: field_type,
     arguments: dict.new(),
     resolver: None,
+    is_deprecated: False,
+    deprecation_reason: None,
   )
+}
+
+/// Mark a field as deprecated
+pub fn deprecate(field: FieldDefinition, reason: String) -> FieldDefinition {
+  FieldDefinition(
+    ..field,
+    is_deprecated: True,
+    deprecation_reason: Some(reason),
+  )
+}
+
+/// Mark a field as deprecated without a reason
+pub fn deprecate_field(field: FieldDefinition) -> FieldDefinition {
+  FieldDefinition(..field, is_deprecated: True, deprecation_reason: None)
 }
 
 pub fn field_description(

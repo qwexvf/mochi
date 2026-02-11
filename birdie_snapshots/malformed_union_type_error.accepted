@@ -1,7 +1,7 @@
 ---
 version: 1.3.2
 title: Malformed union type error
-file: ./test/geql_snapshot_test.gleam
+file: ./test/mochi_snapshot_test.gleam
 test_name: malformed_union_error_test
 ---
 Error(UnexpectedToken("name", Pipe, Position(1, 22)))

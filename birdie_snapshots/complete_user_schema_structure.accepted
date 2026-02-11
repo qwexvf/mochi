@@ -1,7 +1,7 @@
 ---
 version: 1.3.2
 title: Complete User schema structure
-file: ./test/geql_snapshot_test.gleam
+file: ./test/mochi_snapshot_test.gleam
 test_name: user_schema_structure_test
 ---
-Schema(Some(ObjectType("Query", None, dict.from_list([#("user", FieldDefinition("user", None, Named("User"), dict.from_list([#("id", ArgumentDefinition("id", Some("User ID"), NonNull(Named("ID")), None))]), None))]), [])), None, None, dict.from_list([#("User", ObjectTypeDef(ObjectType("User", Some("A user in the system"), dict.from_list([#("email", FieldDefinition("email", Some("User's email address"), NonNull(Named("String")), dict.from_list([]), None)), #("id", FieldDefinition("id", Some("Unique identifier"), NonNull(Named("ID")), dict.from_list([]), None)), #("name", FieldDefinition("name", Some("User's full name"), NonNull(Named("String")), dict.from_list([]), None))]), [])))]))
+Schema(Some(ObjectType("Query", None, dict.from_list([#("user", FieldDefinition("user", None, Named("User"), dict.from_list([#("id", ArgumentDefinition("id", Some("User ID"), NonNull(Named("ID")), None))]), None, False, None))]), [])), None, None, dict.from_list([#("User", ObjectTypeDef(ObjectType("User", Some("A user in the system"), dict.from_list([#("email", FieldDefinition("email", Some("User's email address"), NonNull(Named("String")), dict.from_list([]), None, False, None)), #("id", FieldDefinition("id", Some("Unique identifier"), NonNull(Named("ID")), dict.from_list([]), None, False, None)), #("name", FieldDefinition("name", Some("User's full name"), NonNull(Named("String")), dict.from_list([]), None, False, None))]), [])))]))
