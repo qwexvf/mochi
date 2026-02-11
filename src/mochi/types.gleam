@@ -370,10 +370,7 @@ pub fn value_with_desc(
   name: String,
   desc: String,
 ) -> EnumBuilder {
-  EnumBuilder(
-    ..builder,
-    values: [EnumValue(name, Some(desc)), ..builder.values],
-  )
+  EnumBuilder(..builder, values: [EnumValue(name, Some(desc)), ..builder.values])
 }
 
 /// Build the enum type

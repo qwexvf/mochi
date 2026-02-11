@@ -1,5 +1,5 @@
-import mochi
 import gleeunit
+import mochi
 
 pub fn main() -> Nil {
   gleeunit.main()

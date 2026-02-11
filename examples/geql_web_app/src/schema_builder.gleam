@@ -1,9 +1,9 @@
 import database
-import mochi/schema
-import mochi/schema_gen
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
 import gleam/result
+import mochi/schema
+import mochi/schema_gen
 
 /// Application data types
 pub type User {

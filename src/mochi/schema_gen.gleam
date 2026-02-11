@@ -1,6 +1,6 @@
-import mochi/schema
 import gleam/dynamic.{type Dynamic}
 import gleam/option
+import mochi/schema
 
 // Schema generation from Gleam types
 // This module provides utilities to automatically create GraphQL schemas

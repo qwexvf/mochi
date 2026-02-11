@@ -274,9 +274,7 @@ pub fn mutation_to_field_def(m: MutationDef(args, result)) -> FieldDefinition {
 }
 
 /// Convert a FieldDef to a schema FieldDefinition
-pub fn field_def_to_schema(
-  f: FieldDef(parent, args, result),
-) -> FieldDefinition {
+pub fn field_def_to_schema(f: FieldDef(parent, args, result)) -> FieldDefinition {
   let resolver: Resolver = fn(info: ResolverInfo) {
     case info.parent {
       Some(parent_dyn) ->
@@ -355,10 +353,10 @@ pub fn add_mutation(
   builder: SchemaBuilder,
   m: MutationDef(args, result),
 ) -> SchemaBuilder {
-  SchemaBuilder(
-    ..builder,
-    mutations: [mutation_to_field_def(m), ..builder.mutations],
-  )
+  SchemaBuilder(..builder, mutations: [
+    mutation_to_field_def(m),
+    ..builder.mutations
+  ])
 }
 
 /// Add a type definition
@@ -393,9 +391,10 @@ pub fn build(builder: SchemaBuilder) -> Schema {
     }
   }
 
-  let with_types = list.fold(builder.types, with_mutation, fn(s, t) {
-    schema.add_type(s, schema.ObjectTypeDef(t))
-  })
+  let with_types =
+    list.fold(builder.types, with_mutation, fn(s, t) {
+      schema.add_type(s, schema.ObjectTypeDef(t))
+    })
 
   list.fold(builder.enums, with_types, fn(s, e) {
     schema.add_type(s, schema.EnumTypeDef(e))
