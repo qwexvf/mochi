@@ -34,6 +34,7 @@ pub type QueryExecutionContext {
     root_value: Option(Dynamic),
     execution_context: schema.ExecutionContext,
     variable_values: Dict(String, Dynamic),
+    fragments: Dict(String, ast.Fragment),
   )
 }
 
@@ -81,17 +82,38 @@ pub fn execute(
   execution_context: schema.ExecutionContext,
   variable_values: Dict(String, Dynamic),
 ) -> ExecutionResult {
+  // Extract fragment definitions from the document
+  let fragments = extract_fragments(document)
+
   let context = QueryExecutionContext(
     schema: schema_def,
     root_value: root_value,
     execution_context: execution_context,
     variable_values: variable_values,
+    fragments: fragments,
   )
 
+  // Find the first operation definition (skip fragment definitions)
   document.definitions
-  |> list.first
+  |> list.find(fn(def) {
+    case def {
+      ast.OperationDefinition(_) -> True
+      ast.FragmentDefinition(_) -> False
+    }
+  })
   |> result.map(execute_definition(context, _))
   |> result.unwrap(validation_error("Document must contain at least one operation", []))
+}
+
+fn extract_fragments(document: ast.Document) -> Dict(String, ast.Fragment) {
+  document.definitions
+  |> list.filter_map(fn(def) {
+    case def {
+      ast.FragmentDefinition(fragment) -> Ok(#(fragment.name, fragment))
+      ast.OperationDefinition(_) -> Error(Nil)
+    }
+  })
+  |> dict.from_list
 }
 
 fn execute_definition(
@@ -174,11 +196,60 @@ fn execute_selection(
   case selection {
     ast.FieldSelection(field) ->
       execute_field(context, field, object_type, field_context)
-    ast.FragmentSpread(_) ->
-      validation_error("Fragment spreads not yet supported", field_context.path)
-    ast.InlineFragment(_) ->
-      validation_error("Inline fragments not yet supported", field_context.path)
+    ast.FragmentSpread(spread) ->
+      execute_fragment_spread(context, spread, object_type, field_context)
+    ast.InlineFragment(inline) ->
+      execute_inline_fragment(context, inline, object_type, field_context)
   }
+}
+
+fn execute_fragment_spread(
+  context: QueryExecutionContext,
+  spread: ast.FragmentSpreadValue,
+  object_type: schema.ObjectType,
+  field_context: FieldContext,
+) -> ExecutionResult {
+  case dict.get(context.fragments, spread.name) {
+    Ok(fragment) -> {
+      // Check if the type condition matches
+      case does_type_apply(object_type.name, fragment.type_condition) {
+        True ->
+          execute_selection_set(context, fragment.selection_set, object_type, field_context)
+        False ->
+          // Type doesn't match, return empty result (not an error)
+          ok_result(types.to_dynamic(dict.new()))
+      }
+    }
+    Error(_) ->
+      validation_error(
+        "Fragment '" <> spread.name <> "' is not defined",
+        field_context.path,
+      )
+  }
+}
+
+fn execute_inline_fragment(
+  context: QueryExecutionContext,
+  inline: ast.InlineFragmentValue,
+  object_type: schema.ObjectType,
+  field_context: FieldContext,
+) -> ExecutionResult {
+  // Check type condition if present
+  let should_execute = case inline.type_condition {
+    Some(type_name) -> does_type_apply(object_type.name, type_name)
+    None -> True  // No type condition means always execute
+  }
+
+  case should_execute {
+    True -> execute_selection_set(context, inline.selection_set, object_type, field_context)
+    False -> ok_result(types.to_dynamic(dict.new()))
+  }
+}
+
+fn does_type_apply(object_type_name: String, type_condition: String) -> Bool {
+  // Simple type matching - exact match
+  // TODO: Support interface/union type matching
+  object_type_name == type_condition
 }
 
 // ============================================================================
@@ -215,7 +286,7 @@ fn execute_regular_field(
   let field_args = coerce_arguments(field.arguments, field_def.arguments, context.variable_values)
 
   case field_def.resolver {
-    Some(resolver) -> resolve_field(context, field, field_def, field_args, response_name, field_path, resolver)
+    Some(resolver) -> resolve_field(context, field, field_def, field_args, response_name, field_path, resolver, field_context.parent_value)
     None -> resolve_from_parent(field_context.parent_value, field.name, response_name, field_path)
   }
 }
@@ -243,9 +314,10 @@ fn resolve_field(
   response_name: String,
   field_path: List(String),
   resolver: schema.Resolver,
+  parent_value: Option(Dynamic),
 ) -> ExecutionResult {
   let resolver_info = schema.ResolverInfo(
-    parent: None,
+    parent: parent_value,
     arguments: field_args,
     context: context.execution_context,
     info: types.to_dynamic(dict.new()),

@@ -49,8 +49,46 @@ fn parse_definitions(
 fn parse_definition(
   parser: Parser,
 ) -> Result(#(ast.Definition, Parser), ParseError) {
-  parse_operation_definition(parser)
-  |> result.map(fn(result) { #(ast.OperationDefinition(result.0), result.1) })
+  case peek_token(parser) {
+    Ok(lexer.TokenWithPosition(lexer.Fragment, _)) ->
+      parse_fragment_definition(parser)
+      |> result.map(fn(result) { #(ast.FragmentDefinition(result.0), result.1) })
+    _ ->
+      parse_operation_definition(parser)
+      |> result.map(fn(result) { #(ast.OperationDefinition(result.0), result.1) })
+  }
+}
+
+fn parse_fragment_definition(
+  parser: Parser,
+) -> Result(#(ast.Fragment, Parser), ParseError) {
+  // Consume 'fragment' keyword
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    lexer.Fragment,
+    "'fragment' keyword",
+  ))
+  // Parse fragment name
+  use #(name, parser) <- result.try(parse_name_from_parser(parser))
+  // Expect 'on' keyword
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    lexer.On,
+    "'on' keyword",
+  ))
+  // Parse type condition
+  use #(type_condition, parser) <- result.try(parse_name_from_parser(parser))
+  // Parse selection set
+  use #(selection_set, parser) <- result.try(parse_selection_set(parser))
+  Ok(#(
+    ast.Fragment(
+      name: name,
+      type_condition: type_condition,
+      directives: [],
+      selection_set: selection_set,
+    ),
+    parser,
+  ))
 }
 
 fn parse_operation_definition(
@@ -151,8 +189,67 @@ fn parse_selections(
 }
 
 fn parse_selection(parser: Parser) -> Result(#(Selection, Parser), ParseError) {
-  parse_field(parser)
-  |> result.map(fn(result) { #(ast.FieldSelection(result.0), result.1) })
+  case peek_token(parser) {
+    Ok(lexer.TokenWithPosition(lexer.Spread, _)) ->
+      parse_fragment_spread_or_inline(parser)
+    _ ->
+      parse_field(parser)
+      |> result.map(fn(result) { #(ast.FieldSelection(result.0), result.1) })
+  }
+}
+
+fn parse_fragment_spread_or_inline(
+  parser: Parser,
+) -> Result(#(Selection, Parser), ParseError) {
+  // Consume '...'
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    lexer.Spread,
+    "'...' for fragment",
+  ))
+
+  case peek_token(parser) {
+    // Inline fragment with type condition: ... on TypeName { ... }
+    Ok(lexer.TokenWithPosition(lexer.On, _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("'on'") }))
+      use #(type_name, parser) <- result.try(parse_name_from_parser(parser))
+      use #(selection_set, parser) <- result.try(parse_selection_set(parser))
+      Ok(#(
+        ast.InlineFragment(ast.InlineFragmentValue(
+          type_condition: Some(type_name),
+          directives: [],
+          selection_set: selection_set,
+        )),
+        parser,
+      ))
+    }
+    // Inline fragment without type condition: ... { ... }
+    Ok(lexer.TokenWithPosition(lexer.LeftBrace, _)) -> {
+      use #(selection_set, parser) <- result.try(parse_selection_set(parser))
+      Ok(#(
+        ast.InlineFragment(ast.InlineFragmentValue(
+          type_condition: None,
+          directives: [],
+          selection_set: selection_set,
+        )),
+        parser,
+      ))
+    }
+    // Fragment spread: ...FragmentName
+    Ok(lexer.TokenWithPosition(lexer.Name(name), _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("fragment name") }))
+      Ok(#(
+        ast.FragmentSpread(ast.FragmentSpreadValue(
+          name: name,
+          directives: [],
+        )),
+        parser,
+      ))
+    }
+    Ok(lexer.TokenWithPosition(token, position)) ->
+      Error(UnexpectedToken("fragment name or 'on' or '{'", token, position))
+    Error(_) -> Error(UnexpectedEOF("fragment name or 'on' or '{'"))
+  }
 }
 
 fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
