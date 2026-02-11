@@ -164,9 +164,10 @@ pub fn main() {
     schema.object("Mutation")
     |> schema.field(
       schema.field_def("createUser", schema.named_type("User"))
-      |> schema.argument(
-        schema.arg("name", schema.non_null(schema.string_type())),
-      )
+      |> schema.argument(schema.arg(
+        "name",
+        schema.non_null(schema.string_type()),
+      ))
       |> schema.argument(schema.arg("email", schema.string_type()))
       |> schema.resolver(fn(_) { Error("test") }),
     )

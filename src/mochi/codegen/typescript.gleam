@@ -155,8 +155,7 @@ fn generate_scalars(config: Config) -> String {
     False -> ""
   }
 
-  export_prefix
-  <> "type Scalars = {
+  export_prefix <> "type Scalars = {
   ID: string;
   String: string;
   Int: number;
@@ -350,8 +349,7 @@ fn generate_operations(
       let #(field_name, field_def) = kv
       case dict.size(field_def.arguments) > 0 {
         True -> {
-          let type_name =
-            name <> capitalize(field_name) <> "Args"
+          let type_name = name <> capitalize(field_name) <> "Args"
           Ok(generate_args_type(type_name, field_def, config))
         }
         False -> Error(Nil)
@@ -389,12 +387,7 @@ fn generate_operations(
     |> string.join("\n")
 
   let ops_type =
-    export_prefix
-    <> "interface "
-    <> name
-    <> " {\n"
-    <> fields
-    <> "\n}"
+    export_prefix <> "interface " <> name <> " {\n" <> fields <> "\n}"
 
   case arg_types {
     "" -> ops_type

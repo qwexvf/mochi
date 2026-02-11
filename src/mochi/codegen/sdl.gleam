@@ -339,13 +339,7 @@ fn generate_description(
     True, Some(desc) -> {
       case string.contains(desc, "\n") {
         True ->
-          indent
-          <> "\"\"\"\n"
-          <> indent
-          <> desc
-          <> "\n"
-          <> indent
-          <> "\"\"\"\n"
+          indent <> "\"\"\"\n" <> indent <> desc <> "\n" <> indent <> "\"\"\"\n"
         False -> indent <> "\"" <> escape_string(desc) <> "\"\n"
       }
     }

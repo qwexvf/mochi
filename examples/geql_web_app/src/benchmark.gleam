@@ -1,16 +1,16 @@
 // GeQL Benchmarking Module - Performance testing for Gleam GraphQL
 // Provides internal benchmarks and load testing utilities
 
-import mochi/ast
-import mochi/executor
-import mochi/parser
-import mochi/schema
 import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
+import mochi/ast
+import mochi/executor
+import mochi/parser
+import mochi/schema
 import schema_builder
 
 /// Benchmark configuration
