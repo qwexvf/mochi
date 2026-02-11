@@ -78,16 +78,26 @@ pub type EnumValueDefinition {
   EnumValueDefinition(name: String, description: Option(String), value: Dynamic)
 }
 
+/// Type resolver function that determines the concrete type at runtime
+pub type TypeResolver =
+  fn(Dynamic) -> Result(String, String)
+
 pub type InterfaceType {
   InterfaceType(
     name: String,
     description: Option(String),
     fields: Dict(String, FieldDefinition),
+    resolve_type: Option(TypeResolver),
   )
 }
 
 pub type UnionType {
-  UnionType(name: String, description: Option(String), types: List(ObjectType))
+  UnionType(
+    name: String,
+    description: Option(String),
+    types: List(ObjectType),
+    resolve_type: Option(TypeResolver),
+  )
 }
 
 pub type InputObjectType {
@@ -374,4 +384,58 @@ pub fn boolean_scalar() -> ScalarType {
 pub fn id_scalar() -> ScalarType {
   scalar("ID")
   |> scalar_description("The ID scalar type represents a unique identifier")
+}
+
+// Interface type builder
+pub fn interface(name: String) -> InterfaceType {
+  InterfaceType(
+    name: name,
+    description: None,
+    fields: dict.new(),
+    resolve_type: None,
+  )
+}
+
+pub fn interface_description(
+  iface: InterfaceType,
+  desc: String,
+) -> InterfaceType {
+  InterfaceType(..iface, description: Some(desc))
+}
+
+pub fn interface_field(
+  iface: InterfaceType,
+  field_def: FieldDefinition,
+) -> InterfaceType {
+  InterfaceType(
+    ..iface,
+    fields: dict.insert(iface.fields, field_def.name, field_def),
+  )
+}
+
+pub fn interface_resolve_type(
+  iface: InterfaceType,
+  resolver: TypeResolver,
+) -> InterfaceType {
+  InterfaceType(..iface, resolve_type: Some(resolver))
+}
+
+// Union type builder
+pub fn union(name: String) -> UnionType {
+  UnionType(name: name, description: None, types: [], resolve_type: None)
+}
+
+pub fn union_description(union_type: UnionType, desc: String) -> UnionType {
+  UnionType(..union_type, description: Some(desc))
+}
+
+pub fn union_member(union_type: UnionType, member: ObjectType) -> UnionType {
+  UnionType(..union_type, types: [member, ..union_type.types])
+}
+
+pub fn union_resolve_type(
+  union_type: UnionType,
+  resolver: TypeResolver,
+) -> UnionType {
+  UnionType(..union_type, resolve_type: Some(resolver))
 }

@@ -332,12 +332,21 @@ pub type SchemaBuilder {
     mutations: List(FieldDefinition),
     types: List(ObjectType),
     enums: List(schema.EnumType),
+    interfaces: List(schema.InterfaceType),
+    unions: List(schema.UnionType),
   )
 }
 
 /// Create a new schema builder
 pub fn new() -> SchemaBuilder {
-  SchemaBuilder(queries: [], mutations: [], types: [], enums: [])
+  SchemaBuilder(
+    queries: [],
+    mutations: [],
+    types: [],
+    enums: [],
+    interfaces: [],
+    unions: [],
+  )
 }
 
 /// Add a query to the schema
@@ -369,6 +378,19 @@ pub fn add_enum(builder: SchemaBuilder, e: schema.EnumType) -> SchemaBuilder {
   SchemaBuilder(..builder, enums: [e, ..builder.enums])
 }
 
+/// Add an interface type
+pub fn add_interface(
+  builder: SchemaBuilder,
+  i: schema.InterfaceType,
+) -> SchemaBuilder {
+  SchemaBuilder(..builder, interfaces: [i, ..builder.interfaces])
+}
+
+/// Add a union type
+pub fn add_union(builder: SchemaBuilder, u: schema.UnionType) -> SchemaBuilder {
+  SchemaBuilder(..builder, unions: [u, ..builder.unions])
+}
+
 /// Build the final schema
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
@@ -396,7 +418,17 @@ pub fn build(builder: SchemaBuilder) -> Schema {
       schema.add_type(s, schema.ObjectTypeDef(t))
     })
 
-  list.fold(builder.enums, with_types, fn(s, e) {
-    schema.add_type(s, schema.EnumTypeDef(e))
+  let with_enums =
+    list.fold(builder.enums, with_types, fn(s, e) {
+      schema.add_type(s, schema.EnumTypeDef(e))
+    })
+
+  let with_interfaces =
+    list.fold(builder.interfaces, with_enums, fn(s, i) {
+      schema.add_type(s, schema.InterfaceTypeDef(i))
+    })
+
+  list.fold(builder.unions, with_interfaces, fn(s, u) {
+    schema.add_type(s, schema.UnionTypeDef(u))
   })
 }

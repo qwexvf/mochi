@@ -219,6 +219,38 @@ fn execute_selection(
   }
 }
 
+fn execute_inline_fragment(
+  context: QueryExecutionContext,
+  inline: ast.InlineFragmentValue,
+  object_type: schema.ObjectType,
+  field_context: FieldContext,
+) -> ExecutionResult {
+  case inline.type_condition {
+    None ->
+      // No type condition - always include
+      execute_selection_set(
+        context,
+        inline.selection_set,
+        object_type,
+        field_context,
+      )
+    Some(type_name) ->
+      // Check if type applies
+      case does_type_apply(context.schema, object_type.name, type_name) {
+        True ->
+          execute_selection_set(
+            context,
+            inline.selection_set,
+            object_type,
+            field_context,
+          )
+        False ->
+          // Type doesn't match - return empty result
+          ok_result(types.to_dynamic(dict.new()))
+      }
+  }
+}
+
 fn execute_fragment_spread(
   context: QueryExecutionContext,
   spread: ast.FragmentSpreadValue,
@@ -228,7 +260,13 @@ fn execute_fragment_spread(
   case dict.get(context.fragments, spread.name) {
     Ok(fragment) -> {
       // Check if the type condition matches
-      case does_type_apply(object_type.name, fragment.type_condition) {
+      case
+        does_type_apply(
+          context.schema,
+          object_type.name,
+          fragment.type_condition,
+        )
+      {
         True ->
           execute_selection_set(
             context,
@@ -249,35 +287,22 @@ fn execute_fragment_spread(
   }
 }
 
-fn execute_inline_fragment(
-  context: QueryExecutionContext,
-  inline: ast.InlineFragmentValue,
-  object_type: schema.ObjectType,
-  field_context: FieldContext,
-) -> ExecutionResult {
-  // Check type condition if present
-  let should_execute = case inline.type_condition {
-    Some(type_name) -> does_type_apply(object_type.name, type_name)
-    None -> True
-    // No type condition means always execute
+fn does_type_apply(
+  schema_def: schema.Schema,
+  object_type_name: String,
+  type_condition: String,
+) -> Bool {
+  case object_type_name == type_condition {
+    True -> True
+    False -> {
+      // Check if object_type implements the interface
+      case dict.get(schema_def.types, object_type_name) {
+        Ok(schema.ObjectTypeDef(obj)) ->
+          list.any(obj.interfaces, fn(iface) { iface.name == type_condition })
+        _ -> False
+      }
+    }
   }
-
-  case should_execute {
-    True ->
-      execute_selection_set(
-        context,
-        inline.selection_set,
-        object_type,
-        field_context,
-      )
-    False -> ok_result(types.to_dynamic(dict.new()))
-  }
-}
-
-fn does_type_apply(object_type_name: String, type_condition: String) -> Bool {
-  // Simple type matching - exact match
-  // TODO: Support interface/union type matching
-  object_type_name == type_condition
 }
 
 // ============================================================================
@@ -522,9 +547,75 @@ fn execute_sub_selection(
         )
       execute_selection_set(context, sub_selection_set, sub_type, sub_ctx)
     }
+    Ok(schema.InterfaceTypeDef(iface)) ->
+      execute_abstract_type(
+        context,
+        sub_selection_set,
+        field_args,
+        field_path,
+        resolved_value,
+        iface.resolve_type,
+      )
+    Ok(schema.UnionTypeDef(union)) ->
+      execute_abstract_type(
+        context,
+        sub_selection_set,
+        field_args,
+        field_path,
+        resolved_value,
+        union.resolve_type,
+      )
     Ok(_) ->
       type_error("Cannot execute selection set on non-object type", field_path)
     Error(msg) -> type_error(msg, field_path)
+  }
+}
+
+fn execute_abstract_type(
+  context: QueryExecutionContext,
+  sub_selection_set: ast.SelectionSet,
+  field_args: Dict(String, Dynamic),
+  field_path: List(String),
+  resolved_value: Dynamic,
+  resolve_type: Option(schema.TypeResolver),
+) -> ExecutionResult {
+  case resolve_type {
+    None ->
+      type_error("Abstract type requires a resolve_type function", field_path)
+    Some(resolver) -> {
+      case resolver(resolved_value) {
+        Ok(type_name) -> {
+          case dict.get(context.schema.types, type_name) {
+            Ok(schema.ObjectTypeDef(concrete_type)) -> {
+              let sub_ctx =
+                FieldContext(
+                  parent_value: Some(resolved_value),
+                  field_name: "",
+                  field_args: field_args,
+                  path: field_path,
+                )
+              execute_selection_set(
+                context,
+                sub_selection_set,
+                concrete_type,
+                sub_ctx,
+              )
+            }
+            Ok(_) ->
+              type_error(
+                "resolve_type returned non-object type: " <> type_name,
+                field_path,
+              )
+            Error(_) ->
+              type_error(
+                "resolve_type returned unknown type: " <> type_name,
+                field_path,
+              )
+          }
+        }
+        Error(msg) -> resolver_error("resolve_type failed: " <> msg, field_path)
+      }
+    }
   }
 }
 

@@ -199,7 +199,7 @@ fn parse_selection(parser: Parser) -> Result(#(Selection, Parser), ParseError) {
 fn parse_fragment_spread_or_inline(
   parser: Parser,
 ) -> Result(#(Selection, Parser), ParseError) {
-  // Consume '...'
+  // Consume the '...'
   use #(_, parser) <- result.try(expect_token(
     parser,
     lexer.Spread,
@@ -207,11 +207,11 @@ fn parse_fragment_spread_or_inline(
   ))
 
   case peek_token(parser) {
-    // Inline fragment with type condition: ... on TypeName { ... }
+    // Inline fragment with type condition: ... on Type { ... }
     Ok(lexer.TokenWithPosition(lexer.On, _)) -> {
       use #(_, parser) <- result.try(
         consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("'on'") }),
+        |> result.map_error(fn(_) { UnexpectedEOF("'on' keyword") }),
       )
       use #(type_name, parser) <- result.try(parse_name_from_parser(parser))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
@@ -248,8 +248,12 @@ fn parse_fragment_spread_or_inline(
       ))
     }
     Ok(lexer.TokenWithPosition(token, position)) ->
-      Error(UnexpectedToken("fragment name or 'on' or '{'", token, position))
-    Error(_) -> Error(UnexpectedEOF("fragment name or 'on' or '{'"))
+      Error(UnexpectedToken(
+        "'on', '{', or fragment name after '...'",
+        token,
+        position,
+      ))
+    Error(_) -> Error(UnexpectedEOF("'on', '{', or fragment name after '...'"))
   }
 }
 
