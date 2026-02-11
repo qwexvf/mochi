@@ -258,13 +258,14 @@ fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
 
   case peek_token(parser) {
     Ok(lexer.TokenWithPosition(lexer.Colon, _)) -> {
-      // Field with alias: alias: fieldName(args) { ... }
+      // Field with alias: alias: fieldName(args) @directives { ... }
       use #(_, parser) <- result.try(
         consume_token(parser)
         |> result.map_error(fn(_) { UnexpectedEOF("colon") }),
       )
       use #(second_name, parser) <- result.try(parse_name_from_parser(parser))
       use #(arguments, parser) <- result.try(parse_arguments(parser))
+      use #(directives, parser) <- result.try(parse_directives(parser))
       let #(selection_set, parser) = parse_optional_selection_set(parser)
 
       Ok(#(
@@ -272,15 +273,16 @@ fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
           alias: Some(first_name),
           name: second_name,
           arguments: arguments,
-          directives: [],
+          directives: directives,
           selection_set: selection_set,
         ),
         parser,
       ))
     }
     _ -> {
-      // Field without alias: fieldName(args) { ... }
+      // Field without alias: fieldName(args) @directives { ... }
       use #(arguments, parser) <- result.try(parse_arguments(parser))
+      use #(directives, parser) <- result.try(parse_directives(parser))
       let #(selection_set, parser) = parse_optional_selection_set(parser)
 
       Ok(#(
@@ -288,13 +290,53 @@ fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
           alias: None,
           name: first_name,
           arguments: arguments,
-          directives: [],
+          directives: directives,
           selection_set: selection_set,
         ),
         parser,
       ))
     }
   }
+}
+
+// ============================================================================
+// Directive Parsing
+// ============================================================================
+
+fn parse_directives(
+  parser: Parser,
+) -> Result(#(List(ast.Directive), Parser), ParseError) {
+  parse_directives_list(parser, [])
+}
+
+fn parse_directives_list(
+  parser: Parser,
+  acc: List(ast.Directive),
+) -> Result(#(List(ast.Directive), Parser), ParseError) {
+  case peek_token(parser) {
+    Ok(lexer.TokenWithPosition(lexer.At, _)) -> {
+      use #(directive, parser) <- result.try(parse_directive(parser))
+      parse_directives_list(parser, [directive, ..acc])
+    }
+    _ -> Ok(#(list.reverse(acc), parser))
+  }
+}
+
+fn parse_directive(
+  parser: Parser,
+) -> Result(#(ast.Directive, Parser), ParseError) {
+  // Consume '@'
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    lexer.At,
+    "'@' for directive",
+  ))
+  // Parse directive name
+  use #(name, parser) <- result.try(parse_name_from_parser(parser))
+  // Parse optional arguments
+  use #(arguments, parser) <- result.try(parse_arguments(parser))
+
+  Ok(#(ast.Directive(name: name, arguments: arguments), parser))
 }
 
 fn parse_optional_selection_set(
