@@ -173,7 +173,10 @@ fn posts_query() -> query.QueryDef(query.NoArgs, List(Post)) {
 // ============================================================================
 
 /// Mutation: createUser - Create a new user
-fn create_user_mutation() -> query.MutationDef(CreateUserInput, CreateUserPayload) {
+fn create_user_mutation() -> query.MutationDef(
+  CreateUserInput,
+  CreateUserPayload,
+) {
   query.mutation(
     "createUser",
     [
@@ -188,7 +191,11 @@ fn create_user_mutation() -> query.MutationDef(CreateUserInput, CreateUserPayloa
       // Simplified decoder - in practice use proper dynamic decoding
       case dict.get(args, "input") {
         Ok(_) ->
-          Ok(CreateUserInput(name: "New User", email: "new@example.com", age: 20))
+          Ok(CreateUserInput(
+            name: "New User",
+            email: "new@example.com",
+            age: 20,
+          ))
         Error(_) -> Error("Missing input")
       }
     },

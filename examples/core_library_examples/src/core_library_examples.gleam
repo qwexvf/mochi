@@ -1,8 +1,8 @@
 import dataloader_example
 import example_execution
 import examples
-import mochi
 import gleam/io
+import mochi
 import person_example
 
 /// Demonstrates core GeQL GraphQL library functionality
