@@ -81,17 +81,20 @@ pub fn execute(
   execution_context: schema.ExecutionContext,
   variable_values: Dict(String, Dynamic),
 ) -> ExecutionResult {
-  let context = QueryExecutionContext(
-    schema: schema_def,
-    root_value: root_value,
-    execution_context: execution_context,
-    variable_values: variable_values,
-  )
+  let context =
+    QueryExecutionContext(
+      schema: schema_def,
+      root_value: root_value,
+      execution_context: execution_context,
+      variable_values: variable_values,
+    )
 
   document.definitions
   |> list.first
   |> result.map(execute_definition(context, _))
-  |> result.unwrap(validation_error("Document must contain at least one operation", []))
+  |> result.unwrap(
+    validation_error("Document must contain at least one operation", []),
+  )
 }
 
 fn execute_definition(
@@ -114,22 +117,32 @@ fn execute_operation(
 
   root_type
   |> option.map(fn(obj_type) {
-    let field_ctx = FieldContext(
-      parent_value: context.root_value,
-      field_name: "root",
-      field_args: dict.new(),
-      path: [],
-    )
+    let field_ctx =
+      FieldContext(
+        parent_value: context.root_value,
+        field_name: "root",
+        field_args: dict.new(),
+        path: [],
+      )
     execute_selection_set(context, selection_set, obj_type, field_ctx)
   })
-  |> option.unwrap(validation_error("Schema does not define a root type for this operation", []))
+  |> option.unwrap(
+    validation_error(
+      "Schema does not define a root type for this operation",
+      [],
+    ),
+  )
 }
 
-fn get_root_type(schema_def: schema.Schema, operation: ast.Operation) -> Option(schema.ObjectType) {
+fn get_root_type(
+  schema_def: schema.Schema,
+  operation: ast.Operation,
+) -> Option(schema.ObjectType) {
   case operation {
     ast.Operation(operation_type: ast.Query, ..) -> schema_def.query
     ast.Operation(operation_type: ast.Mutation, ..) -> schema_def.mutation
-    ast.Operation(operation_type: ast.Subscription, ..) -> schema_def.subscription
+    ast.Operation(operation_type: ast.Subscription, ..) ->
+      schema_def.subscription
     ast.ShorthandQuery(..) -> schema_def.query
   }
 }
@@ -151,17 +164,20 @@ fn execute_selection_set(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  let results = list.map(selection_set.selections, fn(selection) {
-    execute_selection(context, selection, object_type, field_context)
-  })
+  let results =
+    list.map(selection_set.selections, fn(selection) {
+      execute_selection(context, selection, object_type, field_context)
+    })
 
   let errors = list.flat_map(results, fn(r) { r.errors })
-  let data_list = list.filter_map(results, fn(r) { option.to_result(r.data, Nil) })
+  let data_list =
+    list.filter_map(results, fn(r) { option.to_result(r.data, Nil) })
 
   case data_list, errors {
     [], [] -> ok_result(types.to_dynamic(dict.new()))
     [], _ -> ExecutionResult(data: None, errors: errors)
-    _, _ -> ExecutionResult(data: Some(merge_results(data_list)), errors: errors)
+    _, _ ->
+      ExecutionResult(data: Some(merge_results(data_list)), errors: errors)
   }
 }
 
@@ -176,8 +192,58 @@ fn execute_selection(
       execute_field(context, field, object_type, field_context)
     ast.FragmentSpread(_) ->
       validation_error("Fragment spreads not yet supported", field_context.path)
-    ast.InlineFragment(_) ->
-      validation_error("Inline fragments not yet supported", field_context.path)
+    ast.InlineFragment(inline) ->
+      execute_inline_fragment(context, inline, object_type, field_context)
+  }
+}
+
+fn execute_inline_fragment(
+  context: QueryExecutionContext,
+  inline: ast.InlineFragmentValue,
+  object_type: schema.ObjectType,
+  field_context: FieldContext,
+) -> ExecutionResult {
+  case inline.type_condition {
+    None ->
+      // No type condition - always include
+      execute_selection_set(
+        context,
+        inline.selection_set,
+        object_type,
+        field_context,
+      )
+    Some(type_name) ->
+      // Check if type applies
+      case does_type_apply(context.schema, object_type.name, type_name) {
+        True ->
+          execute_selection_set(
+            context,
+            inline.selection_set,
+            object_type,
+            field_context,
+          )
+        False ->
+          // Type doesn't match - return empty result
+          ok_result(types.to_dynamic(dict.new()))
+      }
+  }
+}
+
+fn does_type_apply(
+  schema_def: schema.Schema,
+  object_type_name: String,
+  type_condition: String,
+) -> Bool {
+  case object_type_name == type_condition {
+    True -> True
+    False -> {
+      // Check if object_type implements the interface
+      case dict.get(schema_def.types, object_type_name) {
+        Ok(schema.ObjectTypeDef(obj)) ->
+          list.any(obj.interfaces, fn(iface) { iface.name == type_condition })
+        _ -> False
+      }
+    }
   }
 }
 
@@ -195,10 +261,20 @@ fn execute_field(
   let field_path = list.append(field_context.path, [response_name])
 
   case field.name {
-    "__typename" -> ok_result(make_field(response_name, types.to_dynamic(object_type.name)))
+    "__typename" ->
+      ok_result(make_field(response_name, types.to_dynamic(object_type.name)))
     "__schema" -> execute_introspection_schema(context, field, response_name)
-    "__type" -> execute_introspection_type(context, field, field_path, response_name)
-    _ -> execute_regular_field(context, field, object_type, field_context, response_name, field_path)
+    "__type" ->
+      execute_introspection_type(context, field, field_path, response_name)
+    _ ->
+      execute_regular_field(
+        context,
+        field,
+        object_type,
+        field_context,
+        response_name,
+        field_path,
+      )
   }
 }
 
@@ -212,11 +288,32 @@ fn execute_regular_field(
 ) -> ExecutionResult {
   use field_def <- require_field(object_type, field.name, field_path)
 
-  let field_args = coerce_arguments(field.arguments, field_def.arguments, context.variable_values)
+  let field_args =
+    coerce_arguments(
+      field.arguments,
+      field_def.arguments,
+      context.variable_values,
+    )
 
   case field_def.resolver {
-    Some(resolver) -> resolve_field(context, field, field_def, field_args, response_name, field_path, resolver)
-    None -> resolve_from_parent(field_context.parent_value, field.name, response_name, field_path)
+    Some(resolver) ->
+      resolve_field(
+        context,
+        field,
+        field_def,
+        field_args,
+        response_name,
+        field_path,
+        resolver,
+        field_context.parent_value,
+      )
+    None ->
+      resolve_from_parent(
+        field_context.parent_value,
+        field.name,
+        response_name,
+        field_path,
+      )
   }
 }
 
@@ -228,10 +325,15 @@ fn require_field(
 ) -> ExecutionResult {
   case dict.get(object_type.fields, field_name) {
     Ok(field_def) -> next(field_def)
-    Error(_) -> validation_error(
-      "Field '" <> field_name <> "' not found on type '" <> object_type.name <> "'",
-      path,
-    )
+    Error(_) ->
+      validation_error(
+        "Field '"
+          <> field_name
+          <> "' not found on type '"
+          <> object_type.name
+          <> "'",
+        path,
+      )
   }
 }
 
@@ -243,16 +345,27 @@ fn resolve_field(
   response_name: String,
   field_path: List(String),
   resolver: schema.Resolver,
+  parent_value: Option(Dynamic),
 ) -> ExecutionResult {
-  let resolver_info = schema.ResolverInfo(
-    parent: None,
-    arguments: field_args,
-    context: context.execution_context,
-    info: types.to_dynamic(dict.new()),
-  )
+  let resolver_info =
+    schema.ResolverInfo(
+      parent: parent_value,
+      arguments: field_args,
+      context: context.execution_context,
+      info: types.to_dynamic(dict.new()),
+    )
 
   case resolver(resolver_info) {
-    Ok(resolved) -> handle_resolved_value(context, field, field_def, field_args, response_name, field_path, resolved)
+    Ok(resolved) ->
+      handle_resolved_value(
+        context,
+        field,
+        field_def,
+        field_args,
+        response_name,
+        field_path,
+        resolved,
+      )
     Error(msg) -> resolver_error(msg, field_path)
   }
 }
@@ -268,7 +381,15 @@ fn handle_resolved_value(
 ) -> ExecutionResult {
   case field.selection_set {
     None -> ok_result(make_field(response_name, resolved))
-    Some(sub_ss) -> execute_sub_selection(context, sub_ss, field_def, field_args, field_path, resolved)
+    Some(sub_ss) ->
+      execute_sub_selection(
+        context,
+        sub_ss,
+        field_def,
+        field_args,
+        field_path,
+        resolved,
+      )
   }
 }
 
@@ -282,16 +403,84 @@ fn execute_sub_selection(
 ) -> ExecutionResult {
   case get_field_type_definition(context.schema, field_def.field_type) {
     Ok(schema.ObjectTypeDef(sub_type)) -> {
-      let sub_ctx = FieldContext(
-        parent_value: Some(resolved_value),
-        field_name: field_def.name,
-        field_args: field_args,
-        path: field_path,
-      )
+      let sub_ctx =
+        FieldContext(
+          parent_value: Some(resolved_value),
+          field_name: field_def.name,
+          field_args: field_args,
+          path: field_path,
+        )
       execute_selection_set(context, sub_selection_set, sub_type, sub_ctx)
     }
-    Ok(_) -> type_error("Cannot execute selection set on non-object type", field_path)
+    Ok(schema.InterfaceTypeDef(iface)) ->
+      execute_abstract_type(
+        context,
+        sub_selection_set,
+        field_args,
+        field_path,
+        resolved_value,
+        iface.resolve_type,
+      )
+    Ok(schema.UnionTypeDef(union)) ->
+      execute_abstract_type(
+        context,
+        sub_selection_set,
+        field_args,
+        field_path,
+        resolved_value,
+        union.resolve_type,
+      )
+    Ok(_) ->
+      type_error("Cannot execute selection set on non-object type", field_path)
     Error(msg) -> type_error(msg, field_path)
+  }
+}
+
+fn execute_abstract_type(
+  context: QueryExecutionContext,
+  sub_selection_set: ast.SelectionSet,
+  field_args: Dict(String, Dynamic),
+  field_path: List(String),
+  resolved_value: Dynamic,
+  resolve_type: Option(schema.TypeResolver),
+) -> ExecutionResult {
+  case resolve_type {
+    None ->
+      type_error("Abstract type requires a resolve_type function", field_path)
+    Some(resolver) -> {
+      case resolver(resolved_value) {
+        Ok(type_name) -> {
+          case dict.get(context.schema.types, type_name) {
+            Ok(schema.ObjectTypeDef(concrete_type)) -> {
+              let sub_ctx =
+                FieldContext(
+                  parent_value: Some(resolved_value),
+                  field_name: "",
+                  field_args: field_args,
+                  path: field_path,
+                )
+              execute_selection_set(
+                context,
+                sub_selection_set,
+                concrete_type,
+                sub_ctx,
+              )
+            }
+            Ok(_) ->
+              type_error(
+                "resolve_type returned non-object type: " <> type_name,
+                field_path,
+              )
+            Error(_) ->
+              type_error(
+                "resolve_type returned unknown type: " <> type_name,
+                field_path,
+              )
+          }
+        }
+        Error(msg) -> resolver_error("resolve_type failed: " <> msg, field_path)
+      }
+    }
   }
 }
 
@@ -302,7 +491,9 @@ fn resolve_from_parent(
   field_path: List(String),
 ) -> ExecutionResult {
   parent
-  |> option.map(fn(_p) { ok_result(make_field(response_name, types.to_dynamic(Nil))) })
+  |> option.map(fn(_p) {
+    ok_result(make_field(response_name, types.to_dynamic(Nil)))
+  })
   |> option.unwrap(resolver_error("No resolver and no parent value", field_path))
 }
 
@@ -363,9 +554,11 @@ fn coerce_value(value: ast.Value, variables: Dict(String, Dynamic)) -> Dynamic {
     ast.ListValue(values) ->
       types.to_dynamic(list.map(values, coerce_value(_, variables)))
     ast.ObjectValue(fields) ->
-      types.to_dynamic(list.fold(fields, dict.new(), fn(acc, f) {
-        dict.insert(acc, f.name, coerce_value(f.value, variables))
-      }))
+      types.to_dynamic(
+        list.fold(fields, dict.new(), fn(acc, f) {
+          dict.insert(acc, f.name, coerce_value(f.value, variables))
+        }),
+      )
   }
 }
 
@@ -378,7 +571,10 @@ fn execute_introspection_schema(
   field: ast.Field,
   response_name: String,
 ) -> ExecutionResult {
-  ok_result(make_field(response_name, build_schema_introspection(context.schema, field)))
+  ok_result(make_field(
+    response_name,
+    build_schema_introspection(context.schema, field),
+  ))
 }
 
 fn execute_introspection_type(
@@ -389,9 +585,15 @@ fn execute_introspection_type(
 ) -> ExecutionResult {
   get_string_argument(field.arguments, "name", context.variable_values)
   |> option.map(fn(name) {
-    ok_result(make_field(response_name, build_type_introspection(context.schema, name)))
+    ok_result(make_field(
+      response_name,
+      build_type_introspection(context.schema, name),
+    ))
   })
-  |> option.unwrap(validation_error("Missing required argument 'name' for __type", field_path))
+  |> option.unwrap(validation_error(
+    "Missing required argument 'name' for __type",
+    field_path,
+  ))
 }
 
 fn get_string_argument(
@@ -404,7 +606,10 @@ fn get_string_argument(
   |> result.unwrap(None)
 }
 
-fn extract_string_value(value: ast.Value, variables: Dict(String, Dynamic)) -> Option(String) {
+fn extract_string_value(
+  value: ast.Value,
+  variables: Dict(String, Dynamic),
+) -> Option(String) {
   case value {
     ast.StringValue(s) -> Some(s)
     ast.VariableValue(var_name) ->
@@ -423,48 +628,86 @@ fn decode_string_from_dynamic(value: Dynamic) -> Option(String)
 // Introspection Builders
 // ============================================================================
 
-fn build_schema_introspection(schema_def: schema.Schema, _field: ast.Field) -> Dynamic {
-  types.to_dynamic(dict.from_list([
-    #("queryType", build_type_ref(schema_def.query)),
-    #("mutationType", build_type_ref(schema_def.mutation)),
-    #("subscriptionType", build_type_ref(schema_def.subscription)),
-    #("types", types.to_dynamic(list.map(get_all_type_names(schema_def), build_type_introspection(schema_def, _)))),
-    #("directives", types.to_dynamic([])),
-  ]))
+fn build_schema_introspection(
+  schema_def: schema.Schema,
+  _field: ast.Field,
+) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("queryType", build_type_ref(schema_def.query)),
+      #("mutationType", build_type_ref(schema_def.mutation)),
+      #("subscriptionType", build_type_ref(schema_def.subscription)),
+      #(
+        "types",
+        types.to_dynamic(
+          list.map(get_all_type_names(schema_def), build_type_introspection(
+            schema_def,
+            _,
+          )),
+        ),
+      ),
+      #("directives", types.to_dynamic([])),
+    ]),
+  )
 }
 
 fn build_type_ref(obj: Option(schema.ObjectType)) -> Dynamic {
   obj
-  |> option.map(fn(o) { types.to_dynamic(dict.from_list([#("name", types.to_dynamic(o.name))])) })
+  |> option.map(fn(o) {
+    types.to_dynamic(dict.from_list([#("name", types.to_dynamic(o.name))]))
+  })
   |> option.unwrap(types.to_dynamic(Nil))
 }
 
 fn get_all_type_names(schema_def: schema.Schema) -> List(String) {
   let builtin = ["String", "Int", "Float", "Boolean", "ID"]
-  let introspection = ["__Schema", "__Type", "__Field", "__InputValue", "__EnumValue", "__Directive", "__DirectiveLocation", "__TypeKind"]
+  let introspection = [
+    "__Schema",
+    "__Type",
+    "__Field",
+    "__InputValue",
+    "__EnumValue",
+    "__Directive",
+    "__DirectiveLocation",
+    "__TypeKind",
+  ]
   let user_types = dict.keys(schema_def.types)
-  let root_types = [schema_def.query, schema_def.mutation, schema_def.subscription]
-    |> list.filter_map(fn(opt) { option.map(opt, fn(o) { o.name }) |> option.to_result(Nil) })
+  let root_types =
+    [schema_def.query, schema_def.mutation, schema_def.subscription]
+    |> list.filter_map(fn(opt) {
+      option.map(opt, fn(o) { o.name }) |> option.to_result(Nil)
+    })
 
   list.flatten([builtin, user_types, root_types, introspection]) |> list.unique
 }
 
 fn build_type_introspection(schema_def: schema.Schema, name: String) -> Dynamic {
   case name {
-    "String" | "Int" | "Float" | "Boolean" | "ID" -> build_scalar_introspection(name)
+    "String" | "Int" | "Float" | "Boolean" | "ID" ->
+      build_scalar_introspection(name)
     _ -> lookup_type_introspection(schema_def, name)
   }
 }
 
 fn build_scalar_introspection(name: String) -> Dynamic {
-  make_type_object("SCALAR", name, get_scalar_description(name), None, None, None, None)
+  make_type_object(
+    "SCALAR",
+    name,
+    get_scalar_description(name),
+    None,
+    None,
+    None,
+    None,
+  )
 }
 
 fn get_scalar_description(name: String) -> String {
   case name {
     "String" -> "The String scalar type represents textual data"
-    "Int" -> "The Int scalar type represents non-fractional signed whole numeric values"
-    "Float" -> "The Float scalar type represents signed double-precision fractional values"
+    "Int" ->
+      "The Int scalar type represents non-fractional signed whole numeric values"
+    "Float" ->
+      "The Float scalar type represents signed double-precision fractional values"
     "Boolean" -> "The Boolean scalar type represents true or false"
     "ID" -> "The ID scalar type represents a unique identifier"
     _ -> ""
@@ -480,8 +723,13 @@ fn lookup_type_introspection(schema_def: schema.Schema, name: String) -> Dynamic
 
 fn lookup_root_type(schema_def: schema.Schema, name: String) -> Dynamic {
   [schema_def.query, schema_def.mutation, schema_def.subscription]
-  |> list.find(fn(opt) { option.map(opt, fn(o) { o.name == name }) |> option.unwrap(False) })
-  |> result.map(fn(opt) { option.map(opt, build_object_introspection) |> option.unwrap(types.to_dynamic(Nil)) })
+  |> list.find(fn(opt) {
+    option.map(opt, fn(o) { o.name == name }) |> option.unwrap(False)
+  })
+  |> result.map(fn(opt) {
+    option.map(opt, build_object_introspection)
+    |> option.unwrap(types.to_dynamic(Nil))
+  })
   |> result.unwrap(build_meta_type_introspection(name))
 }
 
@@ -489,7 +737,15 @@ fn build_type_def_introspection(type_def: schema.TypeDefinition) -> Dynamic {
   case type_def {
     schema.ObjectTypeDef(obj) -> build_object_introspection(obj)
     schema.ScalarTypeDef(scalar) ->
-      make_type_object("SCALAR", scalar.name, option.unwrap(scalar.description, ""), None, None, None, None)
+      make_type_object(
+        "SCALAR",
+        scalar.name,
+        option.unwrap(scalar.description, ""),
+        None,
+        None,
+        None,
+        None,
+      )
     schema.EnumTypeDef(enum) -> build_enum_introspection(enum)
     schema.InterfaceTypeDef(iface) -> build_interface_introspection(iface)
     schema.UnionTypeDef(union) -> build_union_introspection(union)
@@ -499,66 +755,141 @@ fn build_type_def_introspection(type_def: schema.TypeDefinition) -> Dynamic {
 
 fn build_object_introspection(obj: schema.ObjectType) -> Dynamic {
   let fields = build_fields_introspection(obj.fields)
-  let interfaces = list.map(obj.interfaces, fn(i) {
-    types.to_dynamic(dict.from_list([#("kind", types.to_dynamic("INTERFACE")), #("name", types.to_dynamic(i.name))]))
-  })
-  make_type_object("OBJECT", obj.name, option.unwrap(obj.description, ""), Some(fields), Some(interfaces), None, None)
+  let interfaces =
+    list.map(obj.interfaces, fn(i) {
+      types.to_dynamic(
+        dict.from_list([
+          #("kind", types.to_dynamic("INTERFACE")),
+          #("name", types.to_dynamic(i.name)),
+        ]),
+      )
+    })
+  make_type_object(
+    "OBJECT",
+    obj.name,
+    option.unwrap(obj.description, ""),
+    Some(fields),
+    Some(interfaces),
+    None,
+    None,
+  )
 }
 
 fn build_enum_introspection(enum: schema.EnumType) -> Dynamic {
-  let values = dict.to_list(enum.values) |> list.map(fn(kv) {
-    let #(name, def) = kv
-    types.to_dynamic(dict.from_list([
-      #("name", types.to_dynamic(name)),
-      #("description", types.to_dynamic(option.unwrap(def.description, ""))),
-      #("isDeprecated", types.to_dynamic(False)),
-      #("deprecationReason", types.to_dynamic(Nil)),
-    ]))
-  })
-  make_type_object("ENUM", enum.name, option.unwrap(enum.description, ""), None, None, Some(values), None)
+  let values =
+    dict.to_list(enum.values)
+    |> list.map(fn(kv) {
+      let #(name, def) = kv
+      types.to_dynamic(
+        dict.from_list([
+          #("name", types.to_dynamic(name)),
+          #("description", types.to_dynamic(option.unwrap(def.description, ""))),
+          #("isDeprecated", types.to_dynamic(False)),
+          #("deprecationReason", types.to_dynamic(Nil)),
+        ]),
+      )
+    })
+  make_type_object(
+    "ENUM",
+    enum.name,
+    option.unwrap(enum.description, ""),
+    None,
+    None,
+    Some(values),
+    None,
+  )
 }
 
 fn build_interface_introspection(iface: schema.InterfaceType) -> Dynamic {
   let fields = build_fields_introspection(iface.fields)
-  make_type_object("INTERFACE", iface.name, option.unwrap(iface.description, ""), Some(fields), None, None, None)
+  make_type_object(
+    "INTERFACE",
+    iface.name,
+    option.unwrap(iface.description, ""),
+    Some(fields),
+    None,
+    None,
+    None,
+  )
 }
 
 fn build_union_introspection(union: schema.UnionType) -> Dynamic {
-  let possible = list.map(union.types, fn(t) {
-    types.to_dynamic(dict.from_list([#("kind", types.to_dynamic("OBJECT")), #("name", types.to_dynamic(t.name))]))
-  })
-  types.to_dynamic(dict.from_list([
-    #("kind", types.to_dynamic("UNION")),
-    #("name", types.to_dynamic(union.name)),
-    #("description", types.to_dynamic(option.unwrap(union.description, ""))),
-    #("possibleTypes", types.to_dynamic(possible)),
-    #("fields", types.to_dynamic(Nil)),
-    #("interfaces", types.to_dynamic(Nil)),
-    #("enumValues", types.to_dynamic(Nil)),
-    #("inputFields", types.to_dynamic(Nil)),
-    #("ofType", types.to_dynamic(Nil)),
-  ]))
+  let possible =
+    list.map(union.types, fn(t) {
+      types.to_dynamic(
+        dict.from_list([
+          #("kind", types.to_dynamic("OBJECT")),
+          #("name", types.to_dynamic(t.name)),
+        ]),
+      )
+    })
+  types.to_dynamic(
+    dict.from_list([
+      #("kind", types.to_dynamic("UNION")),
+      #("name", types.to_dynamic(union.name)),
+      #("description", types.to_dynamic(option.unwrap(union.description, ""))),
+      #("possibleTypes", types.to_dynamic(possible)),
+      #("fields", types.to_dynamic(Nil)),
+      #("interfaces", types.to_dynamic(Nil)),
+      #("enumValues", types.to_dynamic(Nil)),
+      #("inputFields", types.to_dynamic(Nil)),
+      #("ofType", types.to_dynamic(Nil)),
+    ]),
+  )
 }
 
 fn build_input_introspection(input: schema.InputObjectType) -> Dynamic {
-  let fields = dict.to_list(input.fields) |> list.map(fn(kv) {
-    let #(name, def) = kv
-    types.to_dynamic(dict.from_list([
-      #("name", types.to_dynamic(name)),
-      #("description", types.to_dynamic(option.unwrap(def.description, ""))),
-      #("type", build_field_type_introspection(def.field_type)),
-      #("defaultValue", types.to_dynamic(Nil)),
-    ]))
-  })
-  make_type_object("INPUT_OBJECT", input.name, option.unwrap(input.description, ""), None, None, None, Some(fields))
+  let fields =
+    dict.to_list(input.fields)
+    |> list.map(fn(kv) {
+      let #(name, def) = kv
+      types.to_dynamic(
+        dict.from_list([
+          #("name", types.to_dynamic(name)),
+          #("description", types.to_dynamic(option.unwrap(def.description, ""))),
+          #("type", build_field_type_introspection(def.field_type)),
+          #("defaultValue", types.to_dynamic(Nil)),
+        ]),
+      )
+    })
+  make_type_object(
+    "INPUT_OBJECT",
+    input.name,
+    option.unwrap(input.description, ""),
+    None,
+    None,
+    None,
+    Some(fields),
+  )
 }
 
 fn build_meta_type_introspection(name: String) -> Dynamic {
   case name {
-    "__Schema" | "__Type" | "__Field" | "__InputValue" | "__EnumValue" | "__Directive" ->
-      make_type_object("OBJECT", name, "Introspection type", Some([]), Some([]), None, None)
+    "__Schema"
+    | "__Type"
+    | "__Field"
+    | "__InputValue"
+    | "__EnumValue"
+    | "__Directive" ->
+      make_type_object(
+        "OBJECT",
+        name,
+        "Introspection type",
+        Some([]),
+        Some([]),
+        None,
+        None,
+      )
     "__TypeKind" | "__DirectiveLocation" ->
-      make_type_object("ENUM", name, "Introspection enum", None, None, Some([]), None)
+      make_type_object(
+        "ENUM",
+        name,
+        "Introspection enum",
+        None,
+        None,
+        Some([]),
+        None,
+      )
     _ -> types.to_dynamic(Nil)
   }
 }
@@ -572,59 +903,98 @@ fn make_type_object(
   enum_values: Option(List(Dynamic)),
   input_fields: Option(List(Dynamic)),
 ) -> Dynamic {
-  types.to_dynamic(dict.from_list([
-    #("kind", types.to_dynamic(kind)),
-    #("name", types.to_dynamic(name)),
-    #("description", types.to_dynamic(description)),
-    #("fields", option.map(fields, types.to_dynamic) |> option.unwrap(types.to_dynamic(Nil))),
-    #("interfaces", option.map(interfaces, types.to_dynamic) |> option.unwrap(types.to_dynamic(Nil))),
-    #("possibleTypes", types.to_dynamic(Nil)),
-    #("enumValues", option.map(enum_values, types.to_dynamic) |> option.unwrap(types.to_dynamic(Nil))),
-    #("inputFields", option.map(input_fields, types.to_dynamic) |> option.unwrap(types.to_dynamic(Nil))),
-    #("ofType", types.to_dynamic(Nil)),
-  ]))
+  types.to_dynamic(
+    dict.from_list([
+      #("kind", types.to_dynamic(kind)),
+      #("name", types.to_dynamic(name)),
+      #("description", types.to_dynamic(description)),
+      #(
+        "fields",
+        option.map(fields, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #(
+        "interfaces",
+        option.map(interfaces, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #("possibleTypes", types.to_dynamic(Nil)),
+      #(
+        "enumValues",
+        option.map(enum_values, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #(
+        "inputFields",
+        option.map(input_fields, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #("ofType", types.to_dynamic(Nil)),
+    ]),
+  )
 }
 
-fn build_fields_introspection(fields: Dict(String, schema.FieldDefinition)) -> List(Dynamic) {
-  dict.to_list(fields) |> list.map(fn(kv) {
+fn build_fields_introspection(
+  fields: Dict(String, schema.FieldDefinition),
+) -> List(Dynamic) {
+  dict.to_list(fields)
+  |> list.map(fn(kv) {
     let #(name, def) = kv
-    let args = dict.to_list(def.arguments) |> list.map(fn(arg_kv) {
-      let #(arg_name, arg_def) = arg_kv
-      types.to_dynamic(dict.from_list([
-        #("name", types.to_dynamic(arg_name)),
-        #("description", types.to_dynamic(option.unwrap(arg_def.description, ""))),
-        #("type", build_field_type_introspection(arg_def.arg_type)),
-        #("defaultValue", types.to_dynamic(Nil)),
-      ]))
-    })
-    types.to_dynamic(dict.from_list([
-      #("name", types.to_dynamic(name)),
-      #("description", types.to_dynamic(option.unwrap(def.description, ""))),
-      #("args", types.to_dynamic(args)),
-      #("type", build_field_type_introspection(def.field_type)),
-      #("isDeprecated", types.to_dynamic(False)),
-      #("deprecationReason", types.to_dynamic(Nil)),
-    ]))
+    let args =
+      dict.to_list(def.arguments)
+      |> list.map(fn(arg_kv) {
+        let #(arg_name, arg_def) = arg_kv
+        types.to_dynamic(
+          dict.from_list([
+            #("name", types.to_dynamic(arg_name)),
+            #(
+              "description",
+              types.to_dynamic(option.unwrap(arg_def.description, "")),
+            ),
+            #("type", build_field_type_introspection(arg_def.arg_type)),
+            #("defaultValue", types.to_dynamic(Nil)),
+          ]),
+        )
+      })
+    types.to_dynamic(
+      dict.from_list([
+        #("name", types.to_dynamic(name)),
+        #("description", types.to_dynamic(option.unwrap(def.description, ""))),
+        #("args", types.to_dynamic(args)),
+        #("type", build_field_type_introspection(def.field_type)),
+        #("isDeprecated", types.to_dynamic(False)),
+        #("deprecationReason", types.to_dynamic(Nil)),
+      ]),
+    )
   })
 }
 
 fn build_field_type_introspection(field_type: schema.FieldType) -> Dynamic {
   case field_type {
-    schema.NonNull(inner) -> types.to_dynamic(dict.from_list([
-      #("kind", types.to_dynamic("NON_NULL")),
-      #("name", types.to_dynamic(Nil)),
-      #("ofType", build_field_type_introspection(inner)),
-    ]))
-    schema.List(inner) -> types.to_dynamic(dict.from_list([
-      #("kind", types.to_dynamic("LIST")),
-      #("name", types.to_dynamic(Nil)),
-      #("ofType", build_field_type_introspection(inner)),
-    ]))
-    schema.Named(name) -> types.to_dynamic(dict.from_list([
-      #("kind", types.to_dynamic(get_type_kind(name))),
-      #("name", types.to_dynamic(name)),
-      #("ofType", types.to_dynamic(Nil)),
-    ]))
+    schema.NonNull(inner) ->
+      types.to_dynamic(
+        dict.from_list([
+          #("kind", types.to_dynamic("NON_NULL")),
+          #("name", types.to_dynamic(Nil)),
+          #("ofType", build_field_type_introspection(inner)),
+        ]),
+      )
+    schema.List(inner) ->
+      types.to_dynamic(
+        dict.from_list([
+          #("kind", types.to_dynamic("LIST")),
+          #("name", types.to_dynamic(Nil)),
+          #("ofType", build_field_type_introspection(inner)),
+        ]),
+      )
+    schema.Named(name) ->
+      types.to_dynamic(
+        dict.from_list([
+          #("kind", types.to_dynamic(get_type_kind(name))),
+          #("name", types.to_dynamic(name)),
+          #("ofType", types.to_dynamic(Nil)),
+        ]),
+      )
   }
 }
 
@@ -654,7 +1024,10 @@ fn merge_results(results: List(Dynamic)) -> Dynamic {
 // Public API
 // ============================================================================
 
-pub fn execute_query(schema_def: schema.Schema, query: String) -> ExecutionResult {
+pub fn execute_query(
+  schema_def: schema.Schema,
+  query: String,
+) -> ExecutionResult {
   execute_query_with_variables(schema_def, query, dict.new())
 }
 
@@ -679,7 +1052,10 @@ pub type DebugContext {
   DebugContext(enabled: Bool, indent_level: Int, step_counter: Int)
 }
 
-pub fn execute_query_debug(schema_def: schema.Schema, query: String) -> ExecutionResult {
+pub fn execute_query_debug(
+  schema_def: schema.Schema,
+  query: String,
+) -> ExecutionResult {
   execute_query_debug_with_variables(schema_def, query, dict.new())
 }
 
@@ -697,14 +1073,23 @@ pub fn execute_query_debug_with_variables(
   case parser.parse(query) {
     Ok(document) -> {
       log_success(debug, "Parse successful")
-      log_info(debug, "Definitions: " <> int.to_string(list.length(document.definitions)))
+      log_info(
+        debug,
+        "Definitions: " <> int.to_string(list.length(document.definitions)),
+      )
       log_step(debug, "Executing Query")
 
       let result = execute_query_with_variables(schema_def, query, variables)
 
       case result.data {
         Some(_) -> log_success(debug, "Query executed successfully!")
-        None -> log_error(debug, "Query execution failed: " <> int.to_string(list.length(result.errors)) <> " errors")
+        None ->
+          log_error(
+            debug,
+            "Query execution failed: "
+              <> int.to_string(list.length(result.errors))
+              <> " errors",
+          )
       }
       result
     }

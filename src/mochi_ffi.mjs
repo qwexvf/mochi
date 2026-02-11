@@ -11,3 +11,14 @@ export function dynamic_to_string(value) {
   }
   return new None();
 }
+
+export function dict_has_key(value, key) {
+  // Handle both Map and plain objects
+  if (value instanceof Map) {
+    return value.has(key);
+  }
+  if (value && typeof value === "object") {
+    return key in value;
+  }
+  return false;
+}
