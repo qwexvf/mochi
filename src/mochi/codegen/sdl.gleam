@@ -10,9 +10,9 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import mochi/schema.{
-  type ArgumentDefinition, type EnumType, type FieldDefinition, type FieldType,
-  type InputObjectType, type InterfaceType, type ObjectType, type ScalarType,
-  type Schema, type UnionType,
+  type ArgumentDefinition, type DirectiveDefinition, type EnumType,
+  type FieldDefinition, type FieldType, type InputObjectType, type InterfaceType,
+  type ObjectType, type ScalarType, type Schema, type UnionType,
 }
 
 // ============================================================================
@@ -171,6 +171,19 @@ pub fn generate_with_config(schema: Schema, config: Config) -> String {
   let parts = case needs_schema_definition(schema) {
     True -> list.append(parts, [generate_schema_definition(schema), ""])
     False -> parts
+  }
+
+  // Custom directive definitions
+  let custom_directives = get_custom_directives(schema)
+  let parts = case custom_directives {
+    [] -> parts
+    _ -> {
+      let directives_sdl =
+        custom_directives
+        |> list.map(fn(d) { generate_directive(d, config) })
+        |> string.join("\n\n")
+      list.append(parts, [directives_sdl, ""])
+    }
   }
 
   parts
@@ -467,4 +480,47 @@ fn get_object_types(schema: Schema) -> List(ObjectType) {
       _ -> Error(Nil)
     }
   })
+}
+
+fn get_custom_directives(schema: Schema) -> List(DirectiveDefinition) {
+  let builtin = ["skip", "include", "deprecated"]
+  dict.to_list(schema.directives)
+  |> list.filter_map(fn(kv) {
+    let #(name, directive) = kv
+    case list.contains(builtin, name) {
+      True -> Error(Nil)
+      False -> Ok(directive)
+    }
+  })
+}
+
+// ============================================================================
+// Directive Generation
+// ============================================================================
+
+fn generate_directive(directive: DirectiveDefinition, config: Config) -> String {
+  let desc = generate_description(directive.description, "", config)
+
+  let args = case dict.size(directive.arguments) > 0 {
+    True -> "(" <> generate_arguments(directive.arguments) <> ")"
+    False -> ""
+  }
+
+  let repeatable = case directive.is_repeatable {
+    True -> " repeatable"
+    False -> ""
+  }
+
+  let locations =
+    directive.locations
+    |> list.map(schema.directive_location_to_string)
+    |> string.join(" | ")
+
+  desc
+  <> "directive @"
+  <> directive.name
+  <> args
+  <> repeatable
+  <> " on "
+  <> locations
 }
