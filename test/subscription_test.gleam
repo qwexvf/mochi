@@ -425,7 +425,11 @@ pub fn subscription_executor_basic_test() {
     })
 
   case result {
-    subscription_executor.SubscriptionResult(_subscription_id, topic, new_pubsub) -> {
+    subscription_executor.SubscriptionResult(
+      _subscription_id,
+      topic,
+      new_pubsub,
+    ) -> {
       case subscription.subscription_count(new_pubsub) == 1 {
         True -> Nil
         False -> panic as "Should have 1 active subscription"

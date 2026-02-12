@@ -10,14 +10,43 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gleam-version: ["1.14.0"]
+        otp-version: ["27.3", "28.3"]
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "27.1.2"
-          gleam-version: "1.11.1"
+          otp-version: ${{ matrix.otp-version }}
+          gleam-version: ${{ matrix.gleam-version }}
           rebar3-version: "3"
-          # elixir-version: "1"
-      - run: gleam deps download
-      - run: gleam test
-      - run: gleam format --check src test
+      - name: Download dependencies
+        run: gleam deps download
+      - name: Check formatting
+        run: gleam format --check src test
+      - name: Build
+        run: gleam build
+      - name: Run tests
+        run: gleam test
+      - name: Check for warnings
+        run: gleam check 2>&1 | tee check_output.txt && ! grep -q "warning:" check_output.txt
+
+  test-javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.3"
+          gleam-version: "1.14.0"
+          rebar3-version: "3"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Download dependencies
+        run: gleam deps download
+      - name: Build for JavaScript
+        run: gleam build --target javascript
+      - name: Run tests on JavaScript
+        run: gleam test --target javascript

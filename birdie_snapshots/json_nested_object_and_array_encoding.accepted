@@ -1,0 +1,18 @@
+---
+version: 1.3.2
+title: JSON nested object and array encoding
+file: ./test/mochi_snapshot_test.gleam
+test_name: json_nested_encoding_test
+---
+{
+  "user": "Bob",
+  "tags": [
+    "dev",
+    "gleam",
+    "graphql"
+  ],
+  "address": {
+    "country": "Japan",
+    "city": "Tokyo"
+  }
+}

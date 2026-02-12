@@ -1,11 +1,16 @@
 // GeQL Snapshot Tests - Using Birdie for comprehensive testing
-// Tests SDL parsing, schema building, and query structures
+// Tests SDL parsing, schema building, query structures, and new features
 
 import birdie
+import gleam/dict
 import gleam/string
 import gleeunit
+import mochi/error
+import mochi/json
+import mochi/response
 import mochi/schema
 import mochi/sdl_parser
+import mochi/types
 
 pub fn main() {
   // Run a simple test to verify snapshots are working
@@ -18,6 +23,14 @@ pub fn main() {
   field_type_variations_test()
   sdl_parsing_error_test()
   malformed_union_error_test()
+
+  // New feature snapshots
+  json_object_encoding_test()
+  json_nested_encoding_test()
+  error_with_extensions_test()
+  error_with_path_and_location_test()
+  response_success_test()
+  response_with_errors_test()
 
   // If we get here, all snapshots matched
   gleeunit.main()
@@ -185,4 +198,120 @@ pub fn malformed_union_error_test() {
   sdl_parser.parse_sdl(invalid_sdl)
   |> string.inspect
   |> birdie.snap(title: "Malformed union type error")
+}
+
+// ============================================================================
+// JSON Serialization Snapshot Tests
+// ============================================================================
+
+pub fn json_object_encoding_test() {
+  let data =
+    dict.from_list([
+      #("name", types.to_dynamic("Alice")),
+      #("age", types.to_dynamic(30)),
+      #("active", types.to_dynamic(True)),
+    ])
+
+  data
+  |> types.to_dynamic
+  |> json.encode_pretty(2)
+  |> birdie.snap(title: "JSON object encoding with mixed types")
+}
+
+pub fn json_nested_encoding_test() {
+  let inner =
+    dict.from_list([
+      #("city", types.to_dynamic("Tokyo")),
+      #("country", types.to_dynamic("Japan")),
+    ])
+
+  let data =
+    dict.from_list([
+      #("user", types.to_dynamic("Bob")),
+      #("address", types.to_dynamic(inner)),
+      #("tags", types.to_dynamic(["dev", "gleam", "graphql"])),
+    ])
+
+  data
+  |> types.to_dynamic
+  |> json.encode_pretty(2)
+  |> birdie.snap(title: "JSON nested object and array encoding")
+}
+
+// ============================================================================
+// Error Extensions Snapshot Tests
+// ============================================================================
+
+pub fn error_with_extensions_test() {
+  let err =
+    error.error("Authentication required")
+    |> error.with_code("UNAUTHENTICATED")
+    |> error.with_category(error.AuthenticationErrorCategory)
+    |> error.with_extension("retryAfter", types.to_dynamic(60))
+
+  err
+  |> error.to_dynamic
+  |> json.encode_pretty(2)
+  |> birdie.snap(title: "GraphQL error with extensions")
+}
+
+pub fn error_with_path_and_location_test() {
+  let err =
+    error.error("Field 'email' is not valid")
+    |> error.at_location(10, 15)
+    |> error.with_path([
+      error.FieldSegment("query"),
+      error.FieldSegment("users"),
+      error.IndexSegment(0),
+      error.FieldSegment("email"),
+    ])
+    |> error.with_code("VALIDATION_ERROR")
+
+  err
+  |> error.to_dynamic
+  |> json.encode_pretty(2)
+  |> birdie.snap(title: "GraphQL error with path and location")
+}
+
+// ============================================================================
+// Response Serialization Snapshot Tests
+// ============================================================================
+
+pub fn response_success_test() {
+  let data =
+    dict.from_list([
+      #(
+        "user",
+        types.to_dynamic(
+          dict.from_list([
+            #("id", types.to_dynamic("123")),
+            #("name", types.to_dynamic("Alice")),
+          ]),
+        ),
+      ),
+    ])
+
+  let resp =
+    response.success(types.to_dynamic(data))
+    |> response.with_extension("requestId", types.to_dynamic("req-abc-123"))
+
+  resp
+  |> response.to_json_pretty
+  |> birdie.snap(title: "GraphQL success response with extensions")
+}
+
+pub fn response_with_errors_test() {
+  let data = dict.from_list([#("user", types.to_dynamic(Nil))])
+
+  let errors = [
+    error.error("User not found")
+    |> error.with_path([error.FieldSegment("query"), error.FieldSegment("user")])
+    |> error.with_code("NOT_FOUND"),
+  ]
+
+  let resp = response.partial(types.to_dynamic(data), errors)
+
+  resp
+  |> response.to_json_pretty
+  |> birdie.snap(title: "GraphQL partial response with errors")
 }

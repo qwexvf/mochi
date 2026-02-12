@@ -12,7 +12,7 @@ Inspired by [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b).
 
 ```bash
 gleam build              # Build the library
-gleam test               # Run all tests (278 tests)
+gleam test               # Run all tests (284 tests)
 gleam run                # Run main demo
 ```
 
