@@ -20,6 +20,7 @@ declare -A SERVERS=(
   ["apollo"]=3003
   ["yoga"]=3004
   ["graphql-js"]=3005
+  ["bun"]=3006
 )
 
 echo "## Simple Query: { users { id name } }"
@@ -27,7 +28,7 @@ echo ""
 echo "| Server | Req/sec | Latency (avg) |"
 echo "|--------|---------|---------------|"
 
-for name in mochi mercurius apollo yoga graphql-js; do
+for name in mochi mercurius apollo yoga graphql-js bun; do
   port=${SERVERS[$name]}
   url="http://localhost:${port}/graphql"
 
@@ -62,7 +63,7 @@ echo ""
 echo "| Server | Req/sec | Latency (avg) |"
 echo "|--------|---------|---------------|"
 
-for name in mochi mercurius apollo yoga graphql-js; do
+for name in mochi mercurius apollo yoga graphql-js bun; do
   port=${SERVERS[$name]}
   url="http://localhost:${port}/graphql"
 

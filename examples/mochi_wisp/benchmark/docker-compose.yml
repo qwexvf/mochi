@@ -88,6 +88,21 @@ services:
           cpus: '2'
           memory: 512M
 
+  # Bun + graphql-yoga
+  bun:
+    build:
+      context: .
+      dockerfile: Dockerfile.bun
+    ports:
+      - "3006:4000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
   # Benchmark runner
   benchmark:
     build:
@@ -99,6 +114,7 @@ services:
       - apollo
       - yoga
       - graphql-js
+      - bun
     networks:
       - graphql-bench
     volumes:

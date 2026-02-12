@@ -1,0 +1,19 @@
+# Dockerfile for Bun GraphQL server
+FROM oven/bun:1.1-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY graphql_js_bench/package.json ./
+
+# Install dependencies with Bun
+RUN bun install
+
+# Copy source files
+COPY graphql_js_bench/ ./
+
+# Expose port
+EXPOSE 4000
+
+# Run the Bun server
+CMD ["bun", "run", "servers/bun.js"]

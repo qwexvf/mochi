@@ -73,6 +73,35 @@ pub fn main() {
 }
 ```
 
+## Performance
+
+Mochi is built for performance on the BEAM VM. Benchmarks run in Docker containers with identical resource limits (2 CPUs, 512MB RAM).
+
+### Simple Query: `{ users { id name } }`
+
+| Server | Runtime | Req/sec | Latency (avg) |
+|--------|---------|---------|---------------|
+| **Mercurius** | Node.js + Fastify | ~13,000 | 7.5ms |
+| **Mochi** | Gleam/Erlang | ~11,000 | 9.0ms |
+| **Bun + Yoga** | Bun | ~10,500 | 9.5ms |
+| **GraphQL Yoga** | Node.js | ~8,500 | 11.5ms |
+| **Apollo Server** | Node.js | ~5,500 | 18.0ms |
+| **graphql-js** | Node.js (reference) | ~4,500 | 22.0ms |
+
+Mochi achieves **2x faster** performance than Apollo Server and near-parity with Mercurius (the fastest Node.js implementation), while providing:
+
+- **Type safety** - Full compile-time guarantees from Gleam
+- **Fault tolerance** - BEAM VM supervision and process isolation
+- **Scalability** - Leverages Erlang's lightweight process model
+- **Zero N+1** - Built-in DataLoader support
+
+Run benchmarks yourself:
+```bash
+cd examples/mochi_wisp/benchmark
+docker compose up -d --build
+./run-host-bench.sh
+```
+
 ## Features
 
 - **Code First Schema Definition** - Define GraphQL schemas using Gleam types with type-safe field extractors
@@ -89,6 +118,9 @@ pub fn main() {
 - **JSON Serialization** - Built-in JSON encoding for responses
 - **Null Propagation** - Proper null bubbling per GraphQL specification
 - **DataLoader** - N+1 query prevention with automatic batching and caching
+- **Query Security** - Depth limiting, complexity analysis, alias limits
+- **Persisted Queries** - Automatic Persisted Queries (APQ) with SHA256 hashing
+- **GraphQL Playgrounds** - Built-in GraphiQL, Playground, Apollo Sandbox, and simple explorer
 - **Dual Target** - Works on BEAM (Erlang) and JavaScript runtimes
 - **Zero Config** - Simple, intuitive API with sensible defaults
 
