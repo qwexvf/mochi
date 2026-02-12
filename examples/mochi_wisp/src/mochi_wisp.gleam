@@ -13,16 +13,23 @@
 //   -H "Content-Type: application/json" \
 //   -d '{"query": "{ users { id name email } }"}'
 
+import gleam/bytes_tree
 import gleam/erlang/process
+import gleam/http/request
+import gleam/http/response
 import gleam/int
 import gleam/io
+import gleam/list
+import gleam/option.{None, Some}
+import gleam/string
 import logging
-import mist
+import mist.{type Connection, type ResponseData}
 import wisp
 import wisp/wisp_mist
 
 import mochi_wisp/router
 import mochi_wisp/supervisor
+import mochi_wisp/websocket_handler
 
 const port = 8000
 
@@ -69,18 +76,38 @@ pub fn main() {
 }
 
 fn start_http_server(app_state: supervisor.AppState) -> Nil {
+  // Initialize WebSocket PubSub
+  websocket_handler.init_pubsub()
+
   // Create the router
-  let handler = router.handle_request
+  let wisp_handler = router.handle_request
 
   // Create a secret key for signing cookies (not used in this example)
   let secret_key_base = wisp.random_string(64)
 
+  // Get the GraphQL schema for WebSocket handler
+  let gql_schema = router.get_schema()
+
   logging.log(logging.Info, "Configuring HTTP server...")
+
+  // Create a combined handler that routes WebSocket upgrades separately
+  let handler = fn(req: request.Request(Connection)) -> response.Response(ResponseData) {
+    // Check if this is a WebSocket upgrade request to /graphql
+    case is_websocket_upgrade(req), request.path_segments(req) {
+      True, ["graphql"] -> {
+        // Handle WebSocket upgrade for GraphQL subscriptions
+        websocket_handler.upgrade_websocket(req, gql_schema)
+      }
+      _, _ -> {
+        // Regular HTTP request - pass to wisp
+        wisp_mist.handler(wisp_handler, secret_key_base)(req)
+      }
+    }
+  }
 
   // Start the server (bind to 0.0.0.0 for Docker)
   let assert Ok(_) =
-    wisp_mist.handler(handler, secret_key_base)
-    |> mist.new
+    mist.new(handler)
     |> mist.port(port)
     |> mist.bind("0.0.0.0")
     |> mist.start
@@ -89,6 +116,7 @@ fn start_http_server(app_state: supervisor.AppState) -> Nil {
   logging.log(logging.Info, "")
   logging.log(logging.Info, "Endpoints:")
   logging.log(logging.Info, "  POST /graphql     - Execute GraphQL queries")
+  logging.log(logging.Info, "  WS /graphql       - WebSocket subscriptions (graphql-ws)")
   logging.log(logging.Info, "  OPTIONS /graphql  - CORS preflight")
   logging.log(logging.Info, "  GET /health       - Health check")
   logging.log(logging.Info, "")
@@ -145,4 +173,23 @@ fn common_queries() -> List(String) {
     "{ __schema { types { name } } }",
     "{ __type(name: \"User\") { name fields { name type { name } } } }",
   ]
+}
+
+// ============================================================================
+// WebSocket Helpers
+// ============================================================================
+
+/// Check if a request is a WebSocket upgrade request
+fn is_websocket_upgrade(req: request.Request(Connection)) -> Bool {
+  let headers = req.headers
+  let upgrade_header =
+    list.find(headers, fn(h) {
+      let #(name, _) = h
+      string.lowercase(name) == "upgrade"
+    })
+
+  case upgrade_header {
+    Ok(#(_, value)) -> string.lowercase(value) == "websocket"
+    Error(_) -> False
+  }
 }

@@ -22,6 +22,11 @@ fn get_cached_schema() -> mochi_schema.Schema
 @external(erlang, "mochi_router_ffi", "set_schema")
 fn set_cached_schema(schema: mochi_schema.Schema) -> Nil
 
+/// Get the cached GraphQL schema (for use by WebSocket handler)
+pub fn get_schema() -> mochi_schema.Schema {
+  get_cached_schema()
+}
+
 /// Initialize the schema cache - call once at startup
 pub fn init_schema() -> Nil {
   let graphql_schema = schema.build_schema()

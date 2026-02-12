@@ -14,11 +14,15 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import mochi/error.{type GraphQLError}
 import mochi/executor.{type ExecutionResult}
+import mochi/json
 import mochi/schema.{type Schema}
 import mochi/subscription.{type PubSub, type SubscriptionId}
+import mochi/types
 
 // ============================================================================
 // Protocol Types - Client Messages
@@ -348,5 +352,266 @@ pub fn client_message_type(message: ClientMessage) -> String {
     Complete(_) -> msg_type_complete
     Ping(_) -> msg_type_ping
     Pong(_) -> msg_type_pong
+  }
+}
+
+// ============================================================================
+// JSON Encoding - Server Messages
+// ============================================================================
+
+/// Encode a server message to JSON string
+pub fn encode_server_message(message: ServerMessage) -> String {
+  message
+  |> server_message_to_dynamic
+  |> json.encode
+}
+
+/// Convert a server message to Dynamic for JSON encoding
+pub fn server_message_to_dynamic(message: ServerMessage) -> Dynamic {
+  case message {
+    ConnectionAck(payload) -> encode_connection_ack(payload)
+    Next(id, result) -> encode_next(id, result)
+    SubscriptionError(id, errors) -> encode_error(id, errors)
+    ServerComplete(id) -> encode_complete(id)
+    ServerPing(payload) -> encode_ping_pong(msg_type_ping, payload)
+    ServerPong(payload) -> encode_ping_pong(msg_type_pong, payload)
+  }
+}
+
+fn encode_connection_ack(payload: Option(Dict(String, Dynamic))) -> Dynamic {
+  case payload {
+    Some(p) ->
+      types.to_dynamic(
+        dict.from_list([
+          #("type", types.to_dynamic(msg_type_connection_ack)),
+          #("payload", types.to_dynamic(p)),
+        ]),
+      )
+    None ->
+      types.to_dynamic(
+        dict.from_list([#("type", types.to_dynamic(msg_type_connection_ack))]),
+      )
+  }
+}
+
+fn encode_next(id: String, result: ExecutionResult) -> Dynamic {
+  let payload_dict = case result.data, result.errors {
+    Some(data), [] ->
+      dict.from_list([#("data", data)])
+    Some(data), errors ->
+      dict.from_list([
+        #("data", data),
+        #("errors", encode_execution_errors(errors)),
+      ])
+    None, errors ->
+      dict.from_list([
+        #("data", types.to_dynamic(Nil)),
+        #("errors", encode_execution_errors(errors)),
+      ])
+  }
+
+  types.to_dynamic(
+    dict.from_list([
+      #("type", types.to_dynamic(msg_type_next)),
+      #("id", types.to_dynamic(id)),
+      #("payload", types.to_dynamic(payload_dict)),
+    ]),
+  )
+}
+
+fn encode_execution_errors(errors: List(executor.ExecutionError)) -> Dynamic {
+  types.to_dynamic(
+    list.map(errors, fn(err) {
+      let #(msg, path) = case err {
+        executor.ValidationError(m, p) -> #(m, p)
+        executor.ResolverError(m, p) -> #(m, p)
+        executor.TypeError(m, p) -> #(m, p)
+        executor.NullValueError(m, p) -> #(m, p)
+      }
+      types.to_dynamic(
+        dict.from_list([
+          #("message", types.to_dynamic(msg)),
+          #("path", types.to_dynamic(path)),
+        ]),
+      )
+    }),
+  )
+}
+
+fn encode_error(id: String, errors: List(GraphQLError)) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("type", types.to_dynamic(msg_type_error)),
+      #("id", types.to_dynamic(id)),
+      #("payload", error.errors_to_dynamic(errors)),
+    ]),
+  )
+}
+
+fn encode_complete(id: String) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("type", types.to_dynamic(msg_type_complete)),
+      #("id", types.to_dynamic(id)),
+    ]),
+  )
+}
+
+fn encode_ping_pong(
+  msg_type: String,
+  payload: Option(Dict(String, Dynamic)),
+) -> Dynamic {
+  case payload {
+    Some(p) ->
+      types.to_dynamic(
+        dict.from_list([
+          #("type", types.to_dynamic(msg_type)),
+          #("payload", types.to_dynamic(p)),
+        ]),
+      )
+    None ->
+      types.to_dynamic(dict.from_list([#("type", types.to_dynamic(msg_type))]))
+  }
+}
+
+// ============================================================================
+// JSON Decoding - Client Messages
+// ============================================================================
+
+/// Error type for message decoding
+pub type DecodeError {
+  InvalidJson(String)
+  MissingField(String)
+  InvalidMessageType(String)
+  InvalidPayload(String)
+}
+
+/// Decode a JSON string to a client message
+pub fn decode_client_message(json_str: String) -> Result(ClientMessage, DecodeError) {
+  case parse_json(json_str) {
+    Ok(dyn) -> decode_client_message_dynamic(dyn)
+    Error(_) -> Error(InvalidJson("Failed to parse JSON"))
+  }
+}
+
+/// Decode a Dynamic value to a client message
+pub fn decode_client_message_dynamic(
+  dyn: Dynamic,
+) -> Result(ClientMessage, DecodeError) {
+  use msg_type <- result.try(get_string_field(dyn, "type"))
+
+  case msg_type {
+    "connection_init" -> decode_connection_init(dyn)
+    "subscribe" -> decode_subscribe(dyn)
+    "complete" -> decode_complete_msg(dyn)
+    "ping" -> decode_ping(dyn)
+    "pong" -> decode_pong(dyn)
+    other -> Error(InvalidMessageType(other))
+  }
+}
+
+fn decode_connection_init(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
+  let payload = get_optional_dict_field(dyn, "payload")
+  Ok(ConnectionInit(payload))
+}
+
+fn decode_subscribe(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
+  use id <- result.try(get_string_field(dyn, "id"))
+  use payload_dyn <- result.try(get_field(dyn, "payload"))
+  use query <- result.try(get_string_field(payload_dyn, "query"))
+
+  let variables = get_optional_dict_field(payload_dyn, "variables")
+  let operation_name = get_optional_string_field(payload_dyn, "operationName")
+  let extensions = get_optional_dict_field(payload_dyn, "extensions")
+
+  Ok(Subscribe(
+    id,
+    SubscriptionPayload(
+      query: query,
+      variables: variables,
+      operation_name: operation_name,
+      extensions: extensions,
+    ),
+  ))
+}
+
+fn decode_complete_msg(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
+  use id <- result.try(get_string_field(dyn, "id"))
+  Ok(Complete(id))
+}
+
+fn decode_ping(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
+  let payload = get_optional_dict_field(dyn, "payload")
+  Ok(Ping(payload))
+}
+
+fn decode_pong(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
+  let payload = get_optional_dict_field(dyn, "payload")
+  Ok(Pong(payload))
+}
+
+// ============================================================================
+// JSON Parsing Helpers (FFI)
+// ============================================================================
+
+@external(erlang, "mochi_websocket_ffi", "parse_json")
+@external(javascript, "../../mochi_websocket_ffi.mjs", "parse_json")
+fn parse_json(json_str: String) -> Result(Dynamic, String)
+
+@external(erlang, "mochi_websocket_ffi", "get_field")
+@external(javascript, "../../mochi_websocket_ffi.mjs", "get_field")
+fn get_field_raw(dyn: Dynamic, field: String) -> Result(Dynamic, Nil)
+
+@external(erlang, "mochi_websocket_ffi", "get_string")
+@external(javascript, "../../mochi_websocket_ffi.mjs", "get_string")
+fn get_string_raw(dyn: Dynamic) -> Result(String, Nil)
+
+@external(erlang, "mochi_websocket_ffi", "get_dict")
+@external(javascript, "../../mochi_websocket_ffi.mjs", "get_dict")
+fn get_dict_raw(dyn: Dynamic) -> Result(Dict(String, Dynamic), Nil)
+
+fn get_field(dyn: Dynamic, field: String) -> Result(Dynamic, DecodeError) {
+  get_field_raw(dyn, field)
+  |> result.map_error(fn(_) { MissingField(field) })
+}
+
+fn get_string_field(dyn: Dynamic, field: String) -> Result(String, DecodeError) {
+  use field_dyn <- result.try(get_field(dyn, field))
+  get_string_raw(field_dyn)
+  |> result.map_error(fn(_) { InvalidPayload("Expected string for " <> field) })
+}
+
+fn get_optional_string_field(dyn: Dynamic, field: String) -> Option(String) {
+  case get_field_raw(dyn, field) {
+    Ok(field_dyn) ->
+      case get_string_raw(field_dyn) {
+        Ok(s) -> Some(s)
+        Error(_) -> None
+      }
+    Error(_) -> None
+  }
+}
+
+fn get_optional_dict_field(
+  dyn: Dynamic,
+  field: String,
+) -> Option(Dict(String, Dynamic)) {
+  case get_field_raw(dyn, field) {
+    Ok(field_dyn) ->
+      case get_dict_raw(field_dyn) {
+        Ok(d) -> Some(d)
+        Error(_) -> None
+      }
+    Error(_) -> None
+  }
+}
+
+/// Format a decode error as a string
+pub fn format_decode_error(err: DecodeError) -> String {
+  case err {
+    InvalidJson(msg) -> "Invalid JSON: " <> msg
+    MissingField(field) -> "Missing required field: " <> field
+    InvalidMessageType(t) -> "Invalid message type: " <> t
+    InvalidPayload(msg) -> "Invalid payload: " <> msg
   }
 }

@@ -238,10 +238,118 @@ pub fn build_schema() -> schema.Schema {
     )
     |> query.query_description("Get a user by ID")
 
+  // Subscription for real-time user events
+  let on_user_created =
+    query.subscription(
+      "onUserCreated",
+      schema.Named("User"),
+      "userCreated",
+      // topic name
+      user_encoder,
+    )
+    |> query.subscription_description("Subscribe to new user creation events")
+
+  let on_message =
+    query.subscription_with_args(
+      "onMessage",
+      [query.arg("channel", schema.NonNull(schema.string_type()))],
+      schema.Named("Message"),
+      decode_channel_args,
+      on_message_topic_resolver,
+      message_encoder,
+    )
+    |> query.subscription_description("Subscribe to messages on a channel")
+
   query.new()
   |> query.add_query(users_query)
   |> query.add_query(user_query)
+  |> query.add_subscription(on_user_created)
+  |> query.add_subscription(on_message)
   |> query.add_type(user_t)
+  |> query.add_type(message_type())
   |> query.add_enum(role_enum())
   |> query.build
+}
+
+// ============================================================================
+// Message Type for Subscriptions
+// ============================================================================
+
+pub type Message {
+  Message(id: String, content: String, channel: String, timestamp: Int)
+}
+
+pub fn message_type() -> schema.ObjectType {
+  schema.object("Message")
+  |> schema.description("A message in a channel")
+  |> schema.field(
+    schema.field_def("id", schema.non_null(schema.id_type()))
+    |> schema.resolver(fn(info: schema.ResolverInfo) {
+      extract_field(info.parent, "id")
+    }),
+  )
+  |> schema.field(
+    schema.field_def("content", schema.non_null(schema.string_type()))
+    |> schema.resolver(fn(info: schema.ResolverInfo) {
+      extract_field(info.parent, "content")
+    }),
+  )
+  |> schema.field(
+    schema.field_def("channel", schema.non_null(schema.string_type()))
+    |> schema.resolver(fn(info: schema.ResolverInfo) {
+      extract_field(info.parent, "channel")
+    }),
+  )
+  |> schema.field(
+    schema.field_def("timestamp", schema.non_null(schema.int_type()))
+    |> schema.resolver(fn(info: schema.ResolverInfo) {
+      extract_field(info.parent, "timestamp")
+    }),
+  )
+}
+
+pub fn message_to_dynamic(msg: Message) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("id", types.to_dynamic(msg.id)),
+      #("content", types.to_dynamic(msg.content)),
+      #("channel", types.to_dynamic(msg.channel)),
+      #("timestamp", types.to_dynamic(msg.timestamp)),
+    ]),
+  )
+}
+
+pub fn message_encoder(msg: Message) -> Dynamic {
+  message_to_dynamic(msg)
+}
+
+// ============================================================================
+// Subscription Topic Resolvers
+// ============================================================================
+
+pub type ChannelArgs {
+  ChannelArgs(channel: String)
+}
+
+pub fn decode_channel_args(
+  args: Dict(String, Dynamic),
+) -> Result(ChannelArgs, String) {
+  case dict.get(args, "channel") {
+    Ok(ch_dyn) -> {
+      case decode.run(ch_dyn, decode.string) {
+        Ok(ch) -> Ok(ChannelArgs(channel: ch))
+        Error(_) -> Error("Invalid channel argument")
+      }
+    }
+    Error(_) -> Error("Missing required argument: channel")
+  }
+}
+
+/// Resolve the topic for onMessage subscription based on channel argument
+pub fn on_message_topic_resolver(
+  args: ChannelArgs,
+  _ctx: schema.ExecutionContext,
+) -> Result(String, String) {
+  // Return the topic name based on the channel argument
+  Ok("message:" <> args.channel)
 }
