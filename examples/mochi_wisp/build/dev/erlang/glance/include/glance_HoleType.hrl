@@ -1,1 +1,0 @@
--record(hole_type, {location :: glance:span(), name :: binary()}).

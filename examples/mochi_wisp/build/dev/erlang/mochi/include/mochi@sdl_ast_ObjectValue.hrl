@@ -1,1 +1,0 @@
--record(object_value, {fields :: list(mochi@sdl_ast:object_field_value())}).

@@ -1,1 +1,0 @@
--record(stale, {subcommand :: birdie@internal@cli:stale_subcommand()}).

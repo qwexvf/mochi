@@ -1,1 +1,0 @@
--record(unexpected_token, {expected :: binary(), got :: binary()}).

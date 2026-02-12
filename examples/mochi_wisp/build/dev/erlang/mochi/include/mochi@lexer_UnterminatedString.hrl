@@ -1,1 +1,0 @@
--record(unterminated_string, {position :: mochi@lexer:position()}).

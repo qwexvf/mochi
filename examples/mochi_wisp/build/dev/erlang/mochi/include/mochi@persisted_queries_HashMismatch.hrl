@@ -1,1 +1,0 @@
--record(hash_mismatch, {expected :: binary(), actual :: binary()}).

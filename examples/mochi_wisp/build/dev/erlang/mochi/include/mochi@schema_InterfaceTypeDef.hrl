@@ -1,1 +1,0 @@
--record(interface_type_def, {interface_type :: mochi@schema:interface_type()}).

@@ -1,1 +1,0 @@
--record(variable, {location :: glance:span(), name :: binary()}).

@@ -1,1 +1,0 @@
--record(duplicate_operation_name, {name :: binary()}).

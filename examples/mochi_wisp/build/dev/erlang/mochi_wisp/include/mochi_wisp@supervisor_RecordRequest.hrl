@@ -1,1 +1,0 @@
--record(record_request, {duration_us :: integer(), success :: boolean()}).

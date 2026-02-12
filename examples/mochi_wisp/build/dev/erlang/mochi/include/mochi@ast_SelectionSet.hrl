@@ -1,1 +1,0 @@
--record(selection_set, {selections :: list(mochi@ast:selection())}).

@@ -1,1 +1,0 @@
--record(unknown_command, {command :: binary()}).

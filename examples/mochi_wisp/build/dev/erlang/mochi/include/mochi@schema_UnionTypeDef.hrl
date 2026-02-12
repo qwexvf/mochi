@@ -1,1 +1,0 @@
--record(union_type_def, {union_type :: mochi@schema:union_type()}).

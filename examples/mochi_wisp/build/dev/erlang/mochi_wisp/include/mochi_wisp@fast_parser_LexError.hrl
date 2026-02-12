@@ -1,1 +1,0 @@
--record(lex_error, {message :: binary()}).

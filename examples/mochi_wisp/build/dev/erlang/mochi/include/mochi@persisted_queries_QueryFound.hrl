@@ -1,1 +1,0 @@
--record(query_found, {'query' :: binary()}).

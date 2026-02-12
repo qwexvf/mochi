@@ -1,1 +1,0 @@
--record(user_by_id_args, {id :: binary()}).

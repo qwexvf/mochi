@@ -1,1 +1,0 @@
--record(undefined_variable, {variable_name :: binary()}).

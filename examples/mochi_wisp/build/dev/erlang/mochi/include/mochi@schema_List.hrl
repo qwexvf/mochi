@@ -1,1 +1,0 @@
--record(list, {inner :: mochi@schema:field_type()}).

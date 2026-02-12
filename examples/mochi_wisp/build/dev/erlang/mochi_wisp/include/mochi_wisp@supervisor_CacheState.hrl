@@ -1,1 +1,0 @@
--record(cache_state, {initialized :: boolean()}).

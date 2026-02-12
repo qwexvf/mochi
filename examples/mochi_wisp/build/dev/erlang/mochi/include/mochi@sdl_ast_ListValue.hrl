@@ -1,1 +1,0 @@
--record(list_value, {values :: list(mochi@sdl_ast:s_d_l_value())}).

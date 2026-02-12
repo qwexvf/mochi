@@ -1,1 +1,0 @@
--record(handle_close, {reason :: binary()}).

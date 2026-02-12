@@ -1,1 +1,0 @@
--record(attribute, {name :: binary(), arguments :: list(glance:expression())}).

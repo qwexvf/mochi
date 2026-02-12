@@ -1,1 +1,0 @@
--record(unknown_directive, {directive_name :: binary()}).

@@ -1,1 +1,0 @@
--record(server_complete, {id :: binary()}).

@@ -1,1 +1,0 @@
--record(resolver_error, {message :: binary(), path :: list(binary())}).

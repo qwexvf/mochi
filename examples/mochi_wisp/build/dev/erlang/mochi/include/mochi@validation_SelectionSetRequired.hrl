@@ -1,1 +1,0 @@
--record(selection_set_required, {field_name :: binary(), type_name :: binary()}).

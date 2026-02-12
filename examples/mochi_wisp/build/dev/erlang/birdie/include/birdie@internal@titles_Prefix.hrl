@@ -1,1 +1,0 @@
--record(prefix, {info :: birdie@internal@titles:test_info(), prefix :: binary()}).

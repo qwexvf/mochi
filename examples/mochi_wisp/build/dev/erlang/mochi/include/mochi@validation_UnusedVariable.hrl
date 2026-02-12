@@ -1,1 +1,0 @@
--record(unused_variable, {variable_name :: binary()}).

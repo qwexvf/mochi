@@ -1,1 +1,0 @@
--record(document, {definitions :: list(mochi@ast:definition())}).

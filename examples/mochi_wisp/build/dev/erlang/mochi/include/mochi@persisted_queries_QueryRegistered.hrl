@@ -1,1 +1,0 @@
--record(query_registered, {hash :: binary()}).

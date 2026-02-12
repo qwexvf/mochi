@@ -1,1 +1,0 @@
--record(object_field, {name :: binary(), value :: mochi@ast:value()}).

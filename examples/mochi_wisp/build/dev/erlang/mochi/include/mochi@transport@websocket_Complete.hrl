@@ -1,1 +1,0 @@
--record(complete, {id :: binary()}).
