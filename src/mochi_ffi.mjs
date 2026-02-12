@@ -63,3 +63,8 @@ export function extract_field(data, field) {
   }
   return null;
 }
+
+// Check if a value is null or undefined (for null propagation)
+export function is_null(value) {
+  return value === null || value === undefined;
+}

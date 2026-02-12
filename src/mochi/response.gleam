@@ -172,6 +172,10 @@ pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
     executor.TypeError(message, path) ->
       error.error_at(message, path)
       |> error.with_category(error.TypeErrorCategory)
+    executor.NullValueError(message, path) ->
+      error.error_at(message, path)
+      |> error.with_code("NULL_VALUE_ERROR")
+      |> error.with_category(error.ResolverErrorCategory)
   }
 }
 
