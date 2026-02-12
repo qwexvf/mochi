@@ -1,0 +1,1 @@
+-record(non_null, {inner :: mochi@schema:field_type()}).

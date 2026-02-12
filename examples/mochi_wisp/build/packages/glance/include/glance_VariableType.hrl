@@ -1,0 +1,1 @@
+-record(variable_type, {location :: glance:span(), name :: binary()}).

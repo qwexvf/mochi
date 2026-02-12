@@ -1,0 +1,1 @@
+-record(directive, {name :: binary(), arguments :: list(mochi@ast:argument())}).

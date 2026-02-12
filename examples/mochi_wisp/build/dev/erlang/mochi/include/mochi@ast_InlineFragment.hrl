@@ -1,0 +1,1 @@
+-record(inline_fragment, {inline_fragment :: mochi@ast:inline_fragment_value()}).

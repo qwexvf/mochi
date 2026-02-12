@@ -1,0 +1,1 @@
+-record(persisted_query_store, {queries :: gleam@dict:dict(binary(), binary())}).

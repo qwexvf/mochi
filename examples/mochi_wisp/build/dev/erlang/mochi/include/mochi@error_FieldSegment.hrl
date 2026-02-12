@@ -1,0 +1,1 @@
+-record(field_segment, {name :: binary()}).

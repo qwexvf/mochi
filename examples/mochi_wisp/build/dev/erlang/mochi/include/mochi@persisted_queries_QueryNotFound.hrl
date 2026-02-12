@@ -1,0 +1,1 @@
+-record(query_not_found, {hash :: binary()}).

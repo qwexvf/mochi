@@ -1,0 +1,32 @@
+# Mochi GraphQL Server (Gleam/Erlang)
+FROM erlang:27-alpine AS builder
+
+# Install Gleam 1.14.0
+RUN apk add --no-cache curl && \
+    curl -fsSL https://github.com/gleam-lang/gleam/releases/download/v1.14.0/gleam-v1.14.0-x86_64-unknown-linux-musl.tar.gz | tar -xzC /usr/local/bin
+
+WORKDIR /app
+
+# Copy the entire project
+COPY . .
+
+# Clean any existing build artifacts and build
+WORKDIR /app/examples/mochi_wisp
+RUN rm -rf build && gleam deps download && gleam build
+
+# Runtime stage
+FROM erlang:27-alpine
+
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app /app
+COPY --from=builder /usr/local/bin/gleam /usr/local/bin/gleam
+
+WORKDIR /app/examples/mochi_wisp
+
+# Expose port
+EXPOSE 8000
+
+# Run the server
+CMD ["gleam", "run"]

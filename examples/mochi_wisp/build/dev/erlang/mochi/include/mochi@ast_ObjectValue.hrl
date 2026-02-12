@@ -1,0 +1,1 @@
+-record(object_value, {fields :: list(mochi@ast:object_field())}).

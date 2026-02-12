@@ -1,0 +1,1 @@
+-record(get_size, {reply_to :: gleam@erlang@process:subject(integer())}).

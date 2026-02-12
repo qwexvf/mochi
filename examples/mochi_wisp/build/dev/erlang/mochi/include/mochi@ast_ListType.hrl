@@ -1,0 +1,1 @@
+-record(list_type, {inner_type :: mochi@ast:type()}).

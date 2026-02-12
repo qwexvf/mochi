@@ -1,0 +1,1 @@
+-record(warm_cache, {queries :: list(binary())}).

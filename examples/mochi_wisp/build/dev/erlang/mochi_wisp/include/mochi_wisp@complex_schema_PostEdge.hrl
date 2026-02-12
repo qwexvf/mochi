@@ -1,0 +1,1 @@
+-record(post_edge, {node :: mochi_wisp@complex_schema:post(), cursor :: binary()}).

@@ -1,0 +1,1 @@
+-record(string, {location :: glance:span(), value :: binary()}).

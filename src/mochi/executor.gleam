@@ -8,6 +8,7 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/set
 import gleam/string
 import mochi/ast
 import mochi/parser
@@ -191,21 +192,27 @@ fn execute_selection_set(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  let results =
-    list.map(selection_set.selections, fn(selection) {
-      execute_selection(context, selection, object_type, field_context)
+  // Single-pass collection: gather data, errors, and null-check simultaneously
+  let #(data_acc, errors_acc, has_none) =
+    list.fold(selection_set.selections, #([], [], False), fn(acc, selection) {
+      let #(data_list, errors_list, none_found) = acc
+      let result = execute_selection(context, selection, object_type, field_context)
+
+      let new_data = case result.data {
+        Some(d) -> [d, ..data_list]
+        None -> data_list
+      }
+      let new_none = none_found || option.is_none(result.data)
+
+      #(new_data, list.append(result.errors, errors_list), new_none)
     })
 
-  let errors = list.flat_map(results, fn(r) { r.errors })
-  let data_list =
-    list.filter_map(results, fn(r) { option.to_result(r.data, Nil) })
-
-  // Check if any results have None data due to null propagation
-  // This means a child field propagated null up, and we need to propagate it further
-  let has_none_data = list.any(results, fn(r) { option.is_none(r.data) })
+  // Reverse accumulated lists to preserve order
+  let data_list = list.reverse(data_acc)
+  let errors = list.reverse(errors_acc)
 
   // If any child propagated null (returned None data), this selection set is null
-  case has_none_data {
+  case has_none {
     True -> ExecutionResult(data: None, errors: errors)
     False -> {
       case data_list, errors {
@@ -467,35 +474,48 @@ fn apply_single_directive(
   variables: Dict(String, Dynamic),
   _path: List(String),
 ) -> Result(Dynamic, String) {
-  // Skip built-in directives - they're handled elsewhere
-  case directive.name {
+  use <- skip_builtin_directive(directive.name, value)
+  use directive_def <- with_directive_def(schema_def, directive.name, value)
+  use handler <- with_directive_handler(directive_def, value)
+
+  let args = coerce_directive_arguments(directive.arguments, variables)
+  handler(args, value)
+}
+
+/// Skip built-in directives and call continuation for custom ones
+fn skip_builtin_directive(
+  name: String,
+  value: Dynamic,
+  next: fn() -> Result(Dynamic, String),
+) -> Result(Dynamic, String) {
+  case name {
     "skip" | "include" | "deprecated" -> Ok(value)
-    _ -> {
-      // Look up the directive definition in the schema
-      case dict.get(schema_def.directives, directive.name) {
-        Ok(directive_def) -> {
-          // Check if the directive has a handler
-          case directive_def.handler {
-            Some(handler) -> {
-              // Coerce directive arguments
-              let args =
-                coerce_directive_arguments(directive.arguments, variables)
-              // Call the handler with arguments and current value
-              handler(args, value)
-            }
-            None -> {
-              // No handler defined - just pass through the value
-              Ok(value)
-            }
-          }
-        }
-        Error(_) -> {
-          // Directive not found in schema - pass through (could also error here)
-          // For now, we'll be lenient and just pass through unknown directives
-          Ok(value)
-        }
-      }
-    }
+    _ -> next()
+  }
+}
+
+/// Get directive definition or pass through value if not found
+fn with_directive_def(
+  schema_def: schema.Schema,
+  name: String,
+  value: Dynamic,
+  next: fn(schema.DirectiveDefinition) -> Result(Dynamic, String),
+) -> Result(Dynamic, String) {
+  case dict.get(schema_def.directives, name) {
+    Ok(directive_def) -> next(directive_def)
+    Error(_) -> Ok(value)
+  }
+}
+
+/// Get directive handler or pass through value if none defined
+fn with_directive_handler(
+  directive_def: schema.DirectiveDefinition,
+  value: Dynamic,
+  next: fn(schema.DirectiveHandler) -> Result(Dynamic, String),
+) -> Result(Dynamic, String) {
+  case directive_def.handler {
+    Some(handler) -> next(handler)
+    None -> Ok(value)
   }
 }
 
@@ -633,75 +653,100 @@ fn handle_resolved_value(
   field_path: List(String),
   resolved: Dynamic,
 ) -> ExecutionResult {
-  // Check for null value on non-null field - this is the core of null propagation
-  case is_null(resolved), is_non_null_type(field_def.field_type) {
-    True, True -> {
-      // Non-null field returned null - this is an error per GraphQL spec
-      // Return an error result that signals null propagation should occur
+  use resolved_value <- with_non_null_check(
+    resolved,
+    field_def.field_type,
+    response_name,
+    field_path,
+  )
+
+  case field.selection_set {
+    None -> ok_result(make_field(response_name, resolved_value))
+    Some(sub_ss) ->
+      handle_selection_set(
+        context,
+        sub_ss,
+        field_def,
+        field_args,
+        response_name,
+        field_path,
+        resolved_value,
+      )
+  }
+}
+
+/// Check for null values and handle non-null field constraints
+fn with_non_null_check(
+  resolved: Dynamic,
+  field_type: schema.FieldType,
+  response_name: String,
+  field_path: List(String),
+  next: fn(Dynamic) -> ExecutionResult,
+) -> ExecutionResult {
+  case is_null(resolved), is_non_null_type(field_type) {
+    True, True ->
       null_value_error(
         "Cannot return null for non-null field '" <> response_name <> "'",
         field_path,
       )
+    True, False -> ok_result(make_field(response_name, types.to_dynamic(Nil)))
+    False, _ -> next(resolved)
+  }
+}
+
+/// Handle selection set execution for a field with a resolved value
+fn handle_selection_set(
+  context: QueryExecutionContext,
+  sub_ss: ast.SelectionSet,
+  field_def: schema.FieldDefinition,
+  field_args: Dict(String, Dynamic),
+  response_name: String,
+  field_path: List(String),
+  resolved: Dynamic,
+) -> ExecutionResult {
+  case is_list_field_type(field_def.field_type) {
+    True ->
+      execute_list_sub_selection(
+        context,
+        sub_ss,
+        field_def,
+        field_args,
+        response_name,
+        field_path,
+        resolved,
+      )
+    False -> {
+      let sub_result =
+        execute_sub_selection(
+          context,
+          sub_ss,
+          field_def,
+          field_args,
+          field_path,
+          resolved,
+        )
+      handle_sub_selection_result(sub_result, field_def.field_type, response_name)
     }
-    True, False -> {
-      // Nullable field returned null - this is fine, just return null
-      ok_result(make_field(response_name, types.to_dynamic(Nil)))
-    }
-    False, _ -> {
-      // Non-null value, proceed normally
-      case field.selection_set {
-        None -> ok_result(make_field(response_name, resolved))
-        Some(sub_ss) -> {
-          // Check if the field type is a list type
-          case is_list_field_type(field_def.field_type) {
-            True ->
-              execute_list_sub_selection(
-                context,
-                sub_ss,
-                field_def,
-                field_args,
-                response_name,
-                field_path,
-                resolved,
-              )
-            False -> {
-              let sub_result =
-                execute_sub_selection(
-                  context,
-                  sub_ss,
-                  field_def,
-                  field_args,
-                  field_path,
-                  resolved,
-                )
-              // Handle null propagation from sub-selection
-              case sub_result.data {
-                Some(_) -> wrap_result_in_field(sub_result, response_name)
-                None -> {
-                  // Check if this field can absorb the null
-                  case is_non_null_type(field_def.field_type) {
-                    True -> {
-                      // Non-null field - propagate null up
-                      sub_result
-                    }
-                    False -> {
-                      // Nullable field - absorb null here, return null for this field
-                      ExecutionResult(
-                        data: Some(make_field(
-                          response_name,
-                          types.to_dynamic(Nil),
-                        )),
-                        errors: sub_result.errors,
-                      )
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+  }
+}
+
+/// Handle null propagation from sub-selection results
+fn handle_sub_selection_result(
+  sub_result: ExecutionResult,
+  field_type: schema.FieldType,
+  response_name: String,
+) -> ExecutionResult {
+  case sub_result.data {
+    Some(_) -> wrap_result_in_field(sub_result, response_name)
+    None ->
+      case is_non_null_type(field_type) {
+        True -> sub_result
+        False ->
+          ExecutionResult(
+            data: Some(make_field(response_name, types.to_dynamic(Nil))),
+            errors: sub_result.errors,
+          )
       }
-    }
   }
 }
 
@@ -743,99 +788,28 @@ fn execute_list_sub_selection(
 ) -> ExecutionResult {
   case get_list_elements(resolved_value) {
     Some(elements) -> {
-      // Create a modified field_def with the inner type for list item resolution
       let inner_type = get_list_inner_type(field_def.field_type)
       let inner_field_def =
         schema.FieldDefinition(..field_def, field_type: inner_type)
-
-      // Check if the inner type is non-null (e.g., [User!] has non-null items)
       let items_are_non_null = is_non_null_type(inner_type)
 
-      // Execute selection set on each list item, checking for null values
       let results =
         list.index_map(elements, fn(element, index) {
-          let item_path = list.append(field_path, [int.to_string(index)])
-
-          // Check if list element itself is null
-          case is_null(element), items_are_non_null {
-            True, True -> {
-              // Non-null item in list is null - error
-              null_value_error(
-                "Cannot return null for non-null list item at index "
-                  <> int.to_string(index),
-                item_path,
-              )
-            }
-            True, False -> {
-              // Nullable item is null - OK, return null
-              ok_result(types.to_dynamic(Nil))
-            }
-            False, _ -> {
-              // Non-null element, proceed with selection
-              execute_sub_selection(
-                context,
-                sub_selection_set,
-                inner_field_def,
-                field_args,
-                item_path,
-                element,
-              )
-            }
-          }
+          execute_list_item(
+            context,
+            sub_selection_set,
+            inner_field_def,
+            field_args,
+            element,
+            index,
+            field_path,
+            items_are_non_null,
+          )
         })
 
-      // Collect errors from all results
-      let errors = list.flat_map(results, fn(r) { r.errors })
-
-      // Check if any item had a null error - if so, the entire list becomes null
-      let has_null_error =
-        list.any(errors, fn(e) {
-          case e {
-            NullValueError(_, _) -> True
-            _ -> False
-          }
-        })
-
-      case has_null_error {
-        True -> {
-          // A list item had a null value error
-          // Check if the list field itself is nullable to absorb the null
-          case is_non_null_type(field_def.field_type) {
-            True -> {
-              // Non-null list - propagate null up
-              ExecutionResult(data: None, errors: errors)
-            }
-            False -> {
-              // Nullable list - absorb null, return null for this field
-              ExecutionResult(
-                data: Some(make_field(response_name, types.to_dynamic(Nil))),
-                errors: errors,
-              )
-            }
-          }
-        }
-        False -> {
-          // Collect data from all results (as a list)
-          let data_list =
-            list.filter_map(results, fn(r) { option.to_result(r.data, Nil) })
-
-          case errors {
-            [] ->
-              ok_result(make_field(response_name, types.to_dynamic(data_list)))
-            _ ->
-              ExecutionResult(
-                data: Some(make_field(
-                  response_name,
-                  types.to_dynamic(data_list),
-                )),
-                errors: errors,
-              )
-          }
-        }
-      }
+      aggregate_list_results(results, field_def.field_type, response_name)
     }
     None -> {
-      // Not actually a list - fall back to single item execution
       let sub_result =
         execute_sub_selection(
           context,
@@ -845,21 +819,98 @@ fn execute_list_sub_selection(
           field_path,
           resolved_value,
         )
-      // Handle null propagation
-      case sub_result.data {
-        Some(_) -> wrap_result_in_field(sub_result, response_name)
-        None -> {
-          case is_non_null_type(field_def.field_type) {
-            True -> sub_result
-            False ->
-              ExecutionResult(
-                data: Some(make_field(response_name, types.to_dynamic(Nil))),
-                errors: sub_result.errors,
-              )
-          }
+      handle_sub_selection_result(sub_result, field_def.field_type, response_name)
+    }
+  }
+}
+
+/// Execute selection set on a single list item
+fn execute_list_item(
+  context: QueryExecutionContext,
+  selection_set: ast.SelectionSet,
+  field_def: schema.FieldDefinition,
+  field_args: Dict(String, Dynamic),
+  element: Dynamic,
+  index: Int,
+  field_path: List(String),
+  items_non_null: Bool,
+) -> ExecutionResult {
+  let item_path = list.append(field_path, [int.to_string(index)])
+
+  case is_null(element), items_non_null {
+    True, True ->
+      null_value_error(
+        "Cannot return null for non-null list item at index "
+          <> int.to_string(index),
+        item_path,
+      )
+    True, False -> ok_result(types.to_dynamic(Nil))
+    False, _ ->
+      execute_sub_selection(
+        context,
+        selection_set,
+        field_def,
+        field_args,
+        item_path,
+        element,
+      )
+  }
+}
+
+/// Aggregate results from list item executions
+fn aggregate_list_results(
+  results: List(ExecutionResult),
+  field_type: schema.FieldType,
+  response_name: String,
+) -> ExecutionResult {
+  // Single-pass: collect data, errors, and check for null errors simultaneously
+  let #(data_acc, errors_acc, has_null_error) =
+    list.fold(results, #([], [], False), fn(acc, result) {
+      let #(data_list, error_list, null_found) = acc
+      let new_data = case result.data {
+        Some(d) -> [d, ..data_list]
+        None -> data_list
+      }
+      let new_null = null_found || list.any(result.errors, fn(e) {
+        case e {
+          NullValueError(_, _) -> True
+          _ -> False
         }
+      })
+      #(new_data, list.append(result.errors, error_list), new_null)
+    })
+
+  let errors = list.reverse(errors_acc)
+
+  case has_null_error {
+    True -> handle_list_null_error(field_type, response_name, errors)
+    False -> {
+      let data_list = list.reverse(data_acc)
+      case errors {
+        [] -> ok_result(make_field(response_name, types.to_dynamic(data_list)))
+        _ ->
+          ExecutionResult(
+            data: Some(make_field(response_name, types.to_dynamic(data_list))),
+            errors: errors,
+          )
       }
     }
+  }
+}
+
+/// Handle null errors in list results based on nullability
+fn handle_list_null_error(
+  field_type: schema.FieldType,
+  response_name: String,
+  errors: List(ExecutionError),
+) -> ExecutionResult {
+  case is_non_null_type(field_type) {
+    True -> ExecutionResult(data: None, errors: errors)
+    False ->
+      ExecutionResult(
+        data: Some(make_field(response_name, types.to_dynamic(Nil))),
+        errors: errors,
+      )
   }
 }
 
@@ -925,43 +976,58 @@ fn execute_abstract_type(
   resolved_value: Dynamic,
   resolve_type: Option(schema.TypeResolver),
 ) -> ExecutionResult {
+  use resolver <- require_type_resolver(resolve_type, field_path)
+  use type_name <- require_resolved_type(resolver, resolved_value, field_path)
+  use concrete_type <- require_object_type(context.schema, type_name, field_path)
+
+  let sub_ctx =
+    FieldContext(
+      parent_value: Some(resolved_value),
+      field_name: "",
+      field_args: field_args,
+      path: field_path,
+    )
+  execute_selection_set(context, sub_selection_set, concrete_type, sub_ctx)
+}
+
+/// Require a type resolver function exists
+fn require_type_resolver(
+  resolve_type: Option(schema.TypeResolver),
+  path: List(String),
+  next: fn(schema.TypeResolver) -> ExecutionResult,
+) -> ExecutionResult {
   case resolve_type {
-    None ->
-      type_error("Abstract type requires a resolve_type function", field_path)
-    Some(resolver) -> {
-      case resolver(resolved_value) {
-        Ok(type_name) -> {
-          case dict.get(context.schema.types, type_name) {
-            Ok(schema.ObjectTypeDef(concrete_type)) -> {
-              let sub_ctx =
-                FieldContext(
-                  parent_value: Some(resolved_value),
-                  field_name: "",
-                  field_args: field_args,
-                  path: field_path,
-                )
-              execute_selection_set(
-                context,
-                sub_selection_set,
-                concrete_type,
-                sub_ctx,
-              )
-            }
-            Ok(_) ->
-              type_error(
-                "resolve_type returned non-object type: " <> type_name,
-                field_path,
-              )
-            Error(_) ->
-              type_error(
-                "resolve_type returned unknown type: " <> type_name,
-                field_path,
-              )
-          }
-        }
-        Error(msg) -> resolver_error("resolve_type failed: " <> msg, field_path)
-      }
-    }
+    Some(resolver) -> next(resolver)
+    None -> type_error("Abstract type requires a resolve_type function", path)
+  }
+}
+
+/// Require the type resolver successfully returns a type name
+fn require_resolved_type(
+  resolver: schema.TypeResolver,
+  value: Dynamic,
+  path: List(String),
+  next: fn(String) -> ExecutionResult,
+) -> ExecutionResult {
+  case resolver(value) {
+    Ok(type_name) -> next(type_name)
+    Error(msg) -> resolver_error("resolve_type failed: " <> msg, path)
+  }
+}
+
+/// Require the type name resolves to an object type in the schema
+fn require_object_type(
+  schema_def: schema.Schema,
+  type_name: String,
+  path: List(String),
+  next: fn(schema.ObjectType) -> ExecutionResult,
+) -> ExecutionResult {
+  case dict.get(schema_def.types, type_name) {
+    Ok(schema.ObjectTypeDef(concrete_type)) -> next(concrete_type)
+    Ok(_) ->
+      type_error("resolve_type returned non-object type: " <> type_name, path)
+    Error(_) ->
+      type_error("resolve_type returned unknown type: " <> type_name, path)
   }
 }
 
@@ -1012,10 +1078,12 @@ fn add_default_values(
   arg_defs: Dict(String, schema.ArgumentDefinition),
   provided_args: List(ast.Argument),
 ) -> Dict(String, Dynamic) {
-  let provided_names = list.map(provided_args, fn(a) { a.name })
+  // Use a Set for O(1) lookups instead of O(n) list.contains
+  let provided_names =
+    list.fold(provided_args, set.new(), fn(acc, a) { set.insert(acc, a.name) })
 
   dict.fold(arg_defs, args, fn(acc, name, def) {
-    case list.contains(provided_names, name), def.default_value {
+    case set.contains(provided_names, name), def.default_value {
       False, Some(default) -> dict.insert(acc, name, default)
       _, _ -> acc
     }

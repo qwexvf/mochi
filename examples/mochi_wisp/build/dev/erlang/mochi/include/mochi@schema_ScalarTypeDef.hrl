@@ -1,0 +1,1 @@
+-record(scalar_type_def, {scalar_type :: mochi@schema:scalar_type()}).

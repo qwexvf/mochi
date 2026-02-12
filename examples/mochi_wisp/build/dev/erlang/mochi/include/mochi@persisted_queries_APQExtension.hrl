@@ -1,0 +1,1 @@
+-record(a_p_q_extension, {version :: integer(), sha256_hash :: binary()}).

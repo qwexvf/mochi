@@ -1,0 +1,1 @@
+-record(operation_definition, {operation :: mochi@ast:operation()}).

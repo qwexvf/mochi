@@ -1,0 +1,1 @@
+-record(index_segment, {index :: integer()}).

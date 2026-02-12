@@ -1,0 +1,31 @@
+# Build artifacts
+build/
+**/build/
+_build/
+**/_build/
+
+# Dependencies (will be downloaded fresh)
+# deps/
+# **/deps/
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Docker files in subdirs
+**/Dockerfile*
+**/docker-compose*.yml
+
+# Test artifacts
+*.log
+coverage/

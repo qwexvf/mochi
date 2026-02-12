@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Mochi GraphQL (Gleam/Erlang)
+  mochi:
+    build:
+      context: ../../..
+      dockerfile: examples/mochi_wisp/benchmark/Dockerfile.mochi
+    ports:
+      - "3001:8000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  # Mercurius (Fastify + graphql-jit)
+  mercurius:
+    build:
+      context: ./graphql_js_bench
+      dockerfile: ../Dockerfile.node
+    environment:
+      - PORT=4000
+      - SERVER=mercurius
+    ports:
+      - "3002:4000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  # Apollo Server
+  apollo:
+    build:
+      context: ./graphql_js_bench
+      dockerfile: ../Dockerfile.node
+    environment:
+      - PORT=4000
+      - SERVER=apollo
+    ports:
+      - "3003:4000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  # GraphQL Yoga
+  yoga:
+    build:
+      context: ./graphql_js_bench
+      dockerfile: ../Dockerfile.node
+    environment:
+      - PORT=4000
+      - SERVER=yoga
+    ports:
+      - "3004:4000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  # graphql-js (reference implementation)
+  graphql-js:
+    build:
+      context: ./graphql_js_bench
+      dockerfile: ../Dockerfile.node
+    environment:
+      - PORT=4000
+      - SERVER=graphql-js
+    ports:
+      - "3005:4000"
+    networks:
+      - graphql-bench
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+  # Benchmark runner
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile.benchmark
+    depends_on:
+      - mochi
+      - mercurius
+      - apollo
+      - yoga
+      - graphql-js
+    networks:
+      - graphql-bench
+    volumes:
+      - ./results:/results
+    profiles:
+      - bench
+
+networks:
+  graphql-bench:
+    driver: bridge

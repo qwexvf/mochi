@@ -1,0 +1,1 @@
+-record(enum_type_definition, {enum_def :: mochi@sdl_ast:enum_type_def()}).

@@ -309,38 +309,50 @@ fn validate_selection(
 }
 
 fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext {
-  let field_name = field.name
+  use ctx <- skip_introspection_field(field.name, ctx, field.arguments)
+  use obj_type <- require_current_type(ctx)
+  use field_def <- require_field_def(ctx, obj_type, field.name)
 
-  // Introspection fields are always valid (they have their own schema)
+  ctx
+  |> validate_field_arguments(field, field_def)
+  |> track_argument_variables(field.arguments)
+  |> validate_field_selection_set(field, field_def)
+}
+
+/// Skip validation for introspection fields, just track variables
+fn skip_introspection_field(
+  field_name: String,
+  ctx: ValidationContext,
+  arguments: List(ast.Argument),
+  next: fn(ValidationContext) -> ValidationContext,
+) -> ValidationContext {
   case string.starts_with(field_name, "__") {
-    True -> {
-      // Track variable usage in arguments only
-      // Don't validate nested selection set - introspection has its own schema
-      track_argument_variables(ctx, field.arguments)
-    }
-    False -> {
-      case ctx.current_type {
-        None -> ctx
-        Some(obj_type) -> {
-          // Check if field exists on type
-          case dict.get(obj_type.fields, field_name) {
-            Ok(field_def) -> {
-              // Validate arguments
-              let ctx = validate_field_arguments(ctx, field, field_def)
+    True -> track_argument_variables(ctx, arguments)
+    False -> next(ctx)
+  }
+}
 
-              // Track variable usage
-              let ctx = track_argument_variables(ctx, field.arguments)
+/// Require a current type exists in context
+fn require_current_type(
+  ctx: ValidationContext,
+  next: fn(ObjectType) -> ValidationContext,
+) -> ValidationContext {
+  case ctx.current_type {
+    Some(obj_type) -> next(obj_type)
+    None -> ctx
+  }
+}
 
-              // Validate selection set if field has object type
-              let ctx = validate_field_selection_set(ctx, field, field_def)
-
-              ctx
-            }
-            Error(_) -> add_error(ctx, UnknownField(field_name, obj_type.name))
-          }
-        }
-      }
-    }
+/// Require a field definition exists on the object type
+fn require_field_def(
+  ctx: ValidationContext,
+  obj_type: ObjectType,
+  field_name: String,
+  next: fn(FieldDefinition) -> ValidationContext,
+) -> ValidationContext {
+  case dict.get(obj_type.fields, field_name) {
+    Ok(field_def) -> next(field_def)
+    Error(_) -> add_error(ctx, UnknownField(field_name, obj_type.name))
   }
 }
 
@@ -389,29 +401,19 @@ fn validate_field_selection_set(
   field_def: FieldDefinition,
 ) -> ValidationContext {
   let inner_type_name = get_base_type_name(field_def.field_type)
+  let is_leaf = is_leaf_type(ctx.schema, inner_type_name)
 
-  // Check if inner type is scalar/enum (leaf) or object (composite)
-  case is_leaf_type(ctx.schema, inner_type_name) {
-    True -> {
-      // Leaf types should not have selection sets
-      case field.selection_set {
-        Some(_) ->
-          add_error(ctx, SelectionSetNotAllowed(field.name, inner_type_name))
-        None -> ctx
-      }
-    }
-    False -> {
-      // Composite types require selection sets
-      case field.selection_set {
-        None ->
-          add_error(ctx, SelectionSetRequired(field.name, inner_type_name))
-        Some(ss) -> {
-          // Get the inner type and validate selection set
-          let inner_type = get_object_type(ctx.schema, inner_type_name)
-          let ctx = set_current_type(ctx, inner_type)
-          validate_selection_set(ctx, ss)
-        }
-      }
+  case is_leaf, field.selection_set {
+    True, Some(_) ->
+      add_error(ctx, SelectionSetNotAllowed(field.name, inner_type_name))
+    True, None -> ctx
+    False, None ->
+      add_error(ctx, SelectionSetRequired(field.name, inner_type_name))
+    False, Some(ss) -> {
+      let inner_type = get_object_type(ctx.schema, inner_type_name)
+      ctx
+      |> set_current_type(inner_type)
+      |> validate_selection_set(ss)
     }
   }
 }

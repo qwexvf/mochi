@@ -1,0 +1,1 @@
+-record(cursor, {remaining :: list(mochi_wisp@fast_parser:token_with_pos())}).

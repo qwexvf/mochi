@@ -1,0 +1,1 @@
+-record(type_definition, {type_def :: mochi@sdl_ast:type_def()}).

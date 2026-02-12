@@ -1,0 +1,1 @@
+-record(type_error, {message :: binary(), path :: list(binary())}).

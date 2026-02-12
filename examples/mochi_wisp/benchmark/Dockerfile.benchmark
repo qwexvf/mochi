@@ -1,0 +1,16 @@
+# Benchmark Runner
+FROM node:22-alpine
+
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Install autocannon globally
+RUN npm install -g autocannon
+
+# Copy benchmark script
+COPY run-bench.sh /app/
+
+RUN chmod +x /app/run-bench.sh
+
+CMD ["/app/run-bench.sh"]

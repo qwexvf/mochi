@@ -1,0 +1,1 @@
+-record(next, {id :: binary(), payload :: mochi@executor:execution_result()}).

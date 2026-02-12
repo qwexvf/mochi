@@ -119,65 +119,72 @@ fn execute_subscription(
   operation: ast.Operation,
   callback: SubscriptionCallback,
 ) -> SubscriptionResult {
-  // Get the subscription root type
-  case context.schema.subscription {
+  use subscription_type <- require_subscription_type(context.schema)
+
+  let selection_set = get_selection_set(operation)
+
+  use field <- require_single_root_field_result(selection_set)
+  use field_def <- require_subscription_field(subscription_type, field.name)
+
+  let args = coerce_arguments(field.arguments, context.variable_values)
+  let topic = field.name
+
+  let event_callback = fn(event_data: Dynamic) {
+    let result =
+      execute_subscription_event(context, document, field, field_def, event_data)
+    callback(result)
+  }
+
+  let result =
+    subscription.subscribe(
+      context.pubsub,
+      topic,
+      field.name,
+      args,
+      event_callback,
+    )
+
+  SubscriptionResult(
+    subscription_id: result.subscription_id,
+    topic: topic,
+    pubsub: result.pubsub,
+  )
+}
+
+/// Require the schema defines a subscription type
+fn require_subscription_type(
+  schema_def: schema.Schema,
+  next: fn(schema.ObjectType) -> SubscriptionResult,
+) -> SubscriptionResult {
+  case schema_def.subscription {
+    Some(subscription_type) -> next(subscription_type)
     None -> SubscriptionError("Schema does not define a Subscription type")
-    Some(subscription_type) -> {
-      // Get the selection set
-      let selection_set = get_selection_set(operation)
+  }
+}
 
-      // Subscriptions must have exactly one root field
-      case get_single_root_field(selection_set) {
-        Error(msg) -> SubscriptionError(msg)
-        Ok(field) -> {
-          // Get the field definition
-          case dict.get(subscription_type.fields, field.name) {
-            Error(_) ->
-              SubscriptionError(
-                "Field '" <> field.name <> "' not found on Subscription type",
-              )
-            Ok(field_def) -> {
-              // Resolve the topic from arguments
-              let args =
-                coerce_arguments(field.arguments, context.variable_values)
+/// Require exactly one root field in selection set
+fn require_single_root_field_result(
+  selection_set: ast.SelectionSet,
+  next: fn(ast.Field) -> SubscriptionResult,
+) -> SubscriptionResult {
+  case get_single_root_field(selection_set) {
+    Ok(field) -> next(field)
+    Error(msg) -> SubscriptionError(msg)
+  }
+}
 
-              // For now, use the field name as the topic
-              // In a full implementation, this would call the topic_resolver
-              let topic = field.name
-
-              // Create a callback wrapper that executes the selection set on events
-              let event_callback = fn(event_data: Dynamic) {
-                let result =
-                  execute_subscription_event(
-                    context,
-                    document,
-                    field,
-                    field_def,
-                    event_data,
-                  )
-                callback(result)
-              }
-
-              // Register the subscription
-              let result =
-                subscription.subscribe(
-                  context.pubsub,
-                  topic,
-                  field.name,
-                  args,
-                  event_callback,
-                )
-
-              SubscriptionResult(
-                subscription_id: result.subscription_id,
-                topic: topic,
-                pubsub: result.pubsub,
-              )
-            }
-          }
-        }
-      }
-    }
+/// Require the field exists on the subscription type
+fn require_subscription_field(
+  subscription_type: schema.ObjectType,
+  field_name: String,
+  next: fn(schema.FieldDefinition) -> SubscriptionResult,
+) -> SubscriptionResult {
+  case dict.get(subscription_type.fields, field_name) {
+    Ok(field_def) -> next(field_def)
+    Error(_) ->
+      SubscriptionError(
+        "Field '" <> field_name <> "' not found on Subscription type",
+      )
   }
 }
 

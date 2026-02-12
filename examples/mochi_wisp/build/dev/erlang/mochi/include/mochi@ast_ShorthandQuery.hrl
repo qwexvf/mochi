@@ -1,0 +1,1 @@
+-record(shorthand_query, {selection_set :: mochi@ast:selection_set()}).

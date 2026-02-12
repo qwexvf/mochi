@@ -1,0 +1,27 @@
+{
+  "name": "graphql-js-bench",
+  "version": "1.0.0",
+  "description": "Node.js GraphQL benchmark servers for comparison with Mochi",
+  "type": "module",
+  "scripts": {
+    "start:graphql-js": "node servers/graphql-js.js",
+    "start:apollo": "node servers/apollo.js",
+    "start:mercurius": "node servers/mercurius.js",
+    "start:yoga": "node servers/yoga.js",
+    "start:all": "concurrently \"npm:start:graphql-js\" \"npm:start:apollo\" \"npm:start:mercurius\" \"npm:start:yoga\"",
+    "bench": "node benchmark.js",
+    "bench:quick": "node benchmark.js --quick"
+  },
+  "dependencies": {
+    "@apollo/server": "^4.10.0",
+    "@graphql-yoga/node": "^3.9.1",
+    "autocannon": "^7.15.0",
+    "concurrently": "^8.2.2",
+    "express": "^4.18.2",
+    "fastify": "^4.26.0",
+    "graphql": "^16.8.1",
+    "graphql-http": "^1.22.0",
+    "graphql-yoga": "^5.1.1",
+    "mercurius": "^14.0.0"
+  }
+}

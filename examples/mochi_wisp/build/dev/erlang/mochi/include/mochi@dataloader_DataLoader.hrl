@@ -1,0 +1,1 @@
+-record(data_loader, {state :: mochi@dataloader:data_loader_state(any(), any())}).

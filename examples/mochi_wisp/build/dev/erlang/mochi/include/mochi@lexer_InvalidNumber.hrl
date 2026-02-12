@@ -1,0 +1,1 @@
+-record(invalid_number, {value :: binary(), position :: mochi@lexer:position()}).

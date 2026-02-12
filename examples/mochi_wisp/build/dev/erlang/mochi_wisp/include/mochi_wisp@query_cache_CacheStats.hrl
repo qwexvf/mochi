@@ -1,0 +1,1 @@
+-record(cache_stats, {hits :: integer(), misses :: integer(), size :: integer()}).
