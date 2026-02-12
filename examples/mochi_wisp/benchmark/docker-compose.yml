@@ -10,11 +10,6 @@ services:
       - "3001:8000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # Mercurius (Fastify + graphql-jit)
   mercurius:
@@ -28,11 +23,6 @@ services:
       - "3002:4000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # Apollo Server
   apollo:
@@ -46,11 +36,6 @@ services:
       - "3003:4000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # GraphQL Yoga
   yoga:
@@ -64,11 +49,6 @@ services:
       - "3004:4000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # graphql-js (reference implementation)
   graphql-js:
@@ -82,11 +62,6 @@ services:
       - "3005:4000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # Bun + graphql-yoga
   bun:
@@ -97,11 +72,6 @@ services:
       - "3006:4000"
     networks:
       - graphql-bench
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
   # Benchmark runner
   benchmark:

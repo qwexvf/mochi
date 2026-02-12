@@ -75,7 +75,7 @@ pub fn main() {
 
 ## Performance
 
-Mochi is built for performance on the BEAM VM. Benchmarks run in Docker containers with identical resource limits (2 CPUs, 512MB RAM).
+Mochi is built for performance on the BEAM VM. Benchmarks run in Docker containers with no resource limits, utilizing all available CPU and RAM.
 
 ### Simple Query: `{ users { id name } }`
 
