@@ -196,7 +196,8 @@ fn execute_selection_set(
   let #(data_acc, errors_acc, has_none) =
     list.fold(selection_set.selections, #([], [], False), fn(acc, selection) {
       let #(data_list, errors_list, none_found) = acc
-      let result = execute_selection(context, selection, object_type, field_context)
+      let result =
+        execute_selection(context, selection, object_type, field_context)
 
       let new_data = case result.data {
         Some(d) -> [d, ..data_list]
@@ -725,7 +726,11 @@ fn handle_selection_set(
           field_path,
           resolved,
         )
-      handle_sub_selection_result(sub_result, field_def.field_type, response_name)
+      handle_sub_selection_result(
+        sub_result,
+        field_def.field_type,
+        response_name,
+      )
     }
   }
 }
@@ -819,7 +824,11 @@ fn execute_list_sub_selection(
           field_path,
           resolved_value,
         )
-      handle_sub_selection_result(sub_result, field_def.field_type, response_name)
+      handle_sub_selection_result(
+        sub_result,
+        field_def.field_type,
+        response_name,
+      )
     }
   }
 }
@@ -871,12 +880,14 @@ fn aggregate_list_results(
         Some(d) -> [d, ..data_list]
         None -> data_list
       }
-      let new_null = null_found || list.any(result.errors, fn(e) {
-        case e {
-          NullValueError(_, _) -> True
-          _ -> False
-        }
-      })
+      let new_null =
+        null_found
+        || list.any(result.errors, fn(e) {
+          case e {
+            NullValueError(_, _) -> True
+            _ -> False
+          }
+        })
       #(new_data, list.append(result.errors, error_list), new_null)
     })
 
@@ -978,7 +989,11 @@ fn execute_abstract_type(
 ) -> ExecutionResult {
   use resolver <- require_type_resolver(resolve_type, field_path)
   use type_name <- require_resolved_type(resolver, resolved_value, field_path)
-  use concrete_type <- require_object_type(context.schema, type_name, field_path)
+  use concrete_type <- require_object_type(
+    context.schema,
+    type_name,
+    field_path,
+  )
 
   let sub_ctx =
     FieldContext(

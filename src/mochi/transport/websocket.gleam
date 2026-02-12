@@ -182,11 +182,7 @@ fn handle_connection_init(
       HandleClose("Too many initialization requests")
     False -> {
       let new_state =
-        ConnectionState(
-          ..state,
-          acknowledged: True,
-          connection_params: payload,
-        )
+        ConnectionState(..state, acknowledged: True, connection_params: payload)
       HandleOk(state: new_state, response: Some(ConnectionAck(None)))
     }
   }
@@ -304,11 +300,7 @@ pub fn cleanup(state: ConnectionState) -> ConnectionState {
       subscription.unsubscribe(pubsub, sub_id)
     })
 
-  ConnectionState(
-    ..state,
-    pubsub: new_pubsub,
-    active_subscriptions: dict.new(),
-  )
+  ConnectionState(..state, pubsub: new_pubsub, active_subscriptions: dict.new())
 }
 
 // ============================================================================
@@ -396,8 +388,7 @@ fn encode_connection_ack(payload: Option(Dict(String, Dynamic))) -> Dynamic {
 
 fn encode_next(id: String, result: ExecutionResult) -> Dynamic {
   let payload_dict = case result.data, result.errors {
-    Some(data), [] ->
-      dict.from_list([#("data", data)])
+    Some(data), [] -> dict.from_list([#("data", data)])
     Some(data), errors ->
       dict.from_list([
         #("data", data),
@@ -487,7 +478,9 @@ pub type DecodeError {
 }
 
 /// Decode a JSON string to a client message
-pub fn decode_client_message(json_str: String) -> Result(ClientMessage, DecodeError) {
+pub fn decode_client_message(
+  json_str: String,
+) -> Result(ClientMessage, DecodeError) {
   case parse_json(json_str) {
     Ok(dyn) -> decode_client_message_dynamic(dyn)
     Error(_) -> Error(InvalidJson("Failed to parse JSON"))

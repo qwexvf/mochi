@@ -31,14 +31,18 @@ pub fn alias_counting_test() {
 }
 
 pub fn root_field_counting_test() {
-  let assert Ok(doc) = parser.parse("{ users { id } posts { id } comments { id } }")
+  let assert Ok(doc) =
+    parser.parse("{ users { id } posts { id } comments { id } }")
   let analysis = security.analyze(doc)
   should.equal(analysis.root_field_count, 3)
 }
 
 pub fn depth_limit_validation_test() {
   // Query with depth 11
-  let assert Ok(doc) = parser.parse("{ a { b { c { d { e { f { g { h { i { j { k } } } } } } } } } } }")
+  let assert Ok(doc) =
+    parser.parse(
+      "{ a { b { c { d { e { f { g { h { i { j { k } } } } } } } } } } }",
+    )
 
   // With default config (max_depth: 10), should fail (depth is 11)
   let config = security.default_config()
@@ -46,43 +50,50 @@ pub fn depth_limit_validation_test() {
   should.be_error(result)
 
   // With permissive config (max_depth: 15), should pass
-  let permissive_config = security.SecurityConfig(
-    max_depth: Some(15),
-    max_complexity: None,
-    max_aliases: None,
-    max_root_fields: None,
-  )
+  let permissive_config =
+    security.SecurityConfig(
+      max_depth: Some(15),
+      max_complexity: None,
+      max_aliases: None,
+      max_root_fields: None,
+    )
   let result2 = security.validate(doc, permissive_config)
   should.be_ok(result2)
 
   // With strict config (max_depth: 5), should fail
-  let strict_config = security.SecurityConfig(
-    max_depth: Some(5),
-    max_complexity: None,
-    max_aliases: None,
-    max_root_fields: None,
-  )
+  let strict_config =
+    security.SecurityConfig(
+      max_depth: Some(5),
+      max_complexity: None,
+      max_aliases: None,
+      max_root_fields: None,
+    )
   let result3 = security.validate(doc, strict_config)
   should.be_error(result3)
 }
 
 pub fn complexity_limit_validation_test() {
   // Query with many fields
-  let assert Ok(doc) = parser.parse("{ users { id name email role status createdAt updatedAt } }")
+  let assert Ok(doc) =
+    parser.parse("{ users { id name email role status createdAt updatedAt } }")
 
-  let strict_config = security.SecurityConfig(
-    max_depth: None,
-    max_complexity: Some(5),
-    max_aliases: None,
-    max_root_fields: None,
-  )
+  let strict_config =
+    security.SecurityConfig(
+      max_depth: None,
+      max_complexity: Some(5),
+      max_aliases: None,
+      max_root_fields: None,
+    )
 
   let result = security.validate(doc, strict_config)
   should.be_error(result)
 }
 
 pub fn no_limits_validation_test() {
-  let assert Ok(doc) = parser.parse("{ a { b { c { d { e { f { g { h { i { j { k } } } } } } } } } } }")
+  let assert Ok(doc) =
+    parser.parse(
+      "{ a { b { c { d { e { f { g { h { i { j { k } } } } } } } } } } }",
+    )
 
   let config = security.no_limits()
   let result = security.validate(doc, config)

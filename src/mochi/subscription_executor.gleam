@@ -131,7 +131,13 @@ fn execute_subscription(
 
   let event_callback = fn(event_data: Dynamic) {
     let result =
-      execute_subscription_event(context, document, field, field_def, event_data)
+      execute_subscription_event(
+        context,
+        document,
+        field,
+        field_def,
+        event_data,
+      )
     callback(result)
   }
 

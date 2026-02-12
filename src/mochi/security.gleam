@@ -55,13 +55,25 @@ pub type SecurityError {
 pub fn error_message(error: SecurityError) -> String {
   case error {
     DepthLimitExceeded(depth, max) ->
-      "Query depth " <> int.to_string(depth) <> " exceeds maximum allowed depth of " <> int.to_string(max)
+      "Query depth "
+      <> int.to_string(depth)
+      <> " exceeds maximum allowed depth of "
+      <> int.to_string(max)
     ComplexityLimitExceeded(complexity, max) ->
-      "Query complexity " <> int.to_string(complexity) <> " exceeds maximum allowed complexity of " <> int.to_string(max)
+      "Query complexity "
+      <> int.to_string(complexity)
+      <> " exceeds maximum allowed complexity of "
+      <> int.to_string(max)
     AliasLimitExceeded(count, max) ->
-      "Query has " <> int.to_string(count) <> " field aliases, exceeding maximum of " <> int.to_string(max)
+      "Query has "
+      <> int.to_string(count)
+      <> " field aliases, exceeding maximum of "
+      <> int.to_string(max)
     RootFieldLimitExceeded(count, max) ->
-      "Query has " <> int.to_string(count) <> " root fields, exceeding maximum of " <> int.to_string(max)
+      "Query has "
+      <> int.to_string(count)
+      <> " root fields, exceeding maximum of "
+      <> int.to_string(max)
   }
 }
 
@@ -199,7 +211,8 @@ fn calculate_depth(
           }
           ast.FragmentSpread(spread) -> {
             case dict.get(fragments, spread.name) {
-              Ok(frag) -> calculate_depth(frag.selection_set, fragments, current_depth)
+              Ok(frag) ->
+                calculate_depth(frag.selection_set, fragments, current_depth)
               Error(_) -> current_depth
             }
           }

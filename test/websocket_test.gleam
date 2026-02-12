@@ -173,7 +173,9 @@ pub fn complete_existing_subscription_test() {
     )
 
   // Create subscription
-  let state2 = case websocket.handle_message(state, Subscribe("sub-1", payload)) {
+  let state2 = case
+    websocket.handle_message(state, Subscribe("sub-1", payload))
+  {
     HandleOk(s, _) -> s
     _ -> state
   }
@@ -266,11 +268,15 @@ pub fn cleanup_removes_all_subscriptions_test() {
     )
 
   // Create multiple subscriptions
-  let state2 = case websocket.handle_message(state, Subscribe("sub-1", payload)) {
+  let state2 = case
+    websocket.handle_message(state, Subscribe("sub-1", payload))
+  {
     HandleOk(s, _) -> s
     _ -> state
   }
-  let state3 = case websocket.handle_message(state2, Subscribe("sub-2", payload)) {
+  let state3 = case
+    websocket.handle_message(state2, Subscribe("sub-2", payload))
+  {
     HandleOk(s, _) -> s
     _ -> state2
   }
@@ -299,7 +305,9 @@ pub fn encode_connection_ack_test() {
 pub fn encode_next_test() {
   let result =
     executor.ExecutionResult(
-      data: Some(types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))]))),
+      data: Some(
+        types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))])),
+      ),
       errors: [],
     )
   let msg = Next("sub-1", result)

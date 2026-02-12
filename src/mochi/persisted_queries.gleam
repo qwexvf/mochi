@@ -63,10 +63,7 @@ pub fn register(
 }
 
 /// Look up a query by its hash
-pub fn lookup(
-  store: PersistedQueryStore,
-  hash: String,
-) -> Option(String) {
+pub fn lookup(store: PersistedQueryStore, hash: String) -> Option(String) {
   dict.get(store.queries, hash)
   |> option.from_result
 }
@@ -124,7 +121,8 @@ pub fn parse_extension(
     Ok(pq) -> {
       // Try to extract version and sha256Hash
       case extract_apq_fields(pq) {
-        Ok(#(version, hash)) -> Some(APQExtension(version: version, sha256_hash: hash))
+        Ok(#(version, hash)) ->
+          Some(APQExtension(version: version, sha256_hash: hash))
         Error(_) -> None
       }
     }
@@ -175,9 +173,7 @@ fn collapse_spaces(s: String) -> String {
 // Internal Helpers
 // ============================================================================
 
-fn extract_apq_fields(
-  _dyn: dynamic.Dynamic,
-) -> Result(#(Int, String), Nil) {
+fn extract_apq_fields(_dyn: dynamic.Dynamic) -> Result(#(Int, String), Nil) {
   // This would need proper dynamic decoding
   // For now, return error - actual implementation would decode the object
   Error(Nil)
