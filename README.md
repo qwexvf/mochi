@@ -526,6 +526,146 @@ let pretty_json = json.encode_pretty(dynamic_value, 2)
 // - Objects
 ```
 
+### Query Security (`mochi/security`)
+
+Protect against malicious queries with depth limiting, complexity analysis, and more:
+
+```gleam
+import mochi/security
+
+// Analyze a query
+let analysis = security.analyze(document)
+// Returns: SecurityAnalysis(depth: 4, complexity: 12, alias_count: 2, root_field_count: 3)
+
+// Validate against limits
+let config = security.SecurityConfig(
+  max_depth: Some(10),           // Maximum query depth
+  max_complexity: Some(100),     // Maximum field count
+  max_aliases: Some(20),         // Maximum alias count
+  max_root_fields: Some(10),     // Maximum root fields
+)
+
+case security.validate(document, config) {
+  Ok(_) -> execute_query(document)
+  Error(security.DepthLimitExceeded(actual, max)) ->
+    error_response("Query depth " <> int.to_string(actual) <> " exceeds max " <> int.to_string(max))
+  Error(security.ComplexityLimitExceeded(actual, max)) ->
+    error_response("Query too complex")
+  // ... other error types
+}
+
+// Convenience configs
+let strict = security.strict_config()    // Low limits for public APIs
+let default = security.default_config()  // Reasonable defaults (depth: 10, complexity: 100)
+let none = security.no_limits()          // No limits (use with caution)
+```
+
+### Persisted Queries (`mochi/persisted_queries`)
+
+Automatic Persisted Queries (APQ) for caching and security:
+
+```gleam
+import mochi/persisted_queries as apq
+
+// Create a persisted query store
+let store = apq.new_store()
+
+// Hash a query (SHA256)
+let hash = apq.hash_query("{ users { id name } }")
+// "abc123..." (64-char hex string)
+
+// Process incoming APQ request
+// Client sends: { "extensions": { "persistedQuery": { "sha256Hash": "abc123" } } }
+case apq.process_apq(store, query_opt, hash_opt) {
+  apq.ExecuteQuery(query, new_store) ->
+    // Execute the query and return result
+    execute(query)
+
+  apq.PersistedQueryNotFound ->
+    // Client needs to send full query with hash
+    error_response("PersistedQueryNotFound")
+
+  apq.HashMismatch(expected, got) ->
+    // Query hash doesn't match provided hash
+    error_response("Hash mismatch")
+}
+
+// Manual store management
+let store = apq.store_query(store, hash, query)
+let query_opt = apq.get_query(store, hash)
+let store = apq.remove_query(store, hash)
+let store = apq.clear_store(store)
+```
+
+### GraphQL Playgrounds (`mochi/playground`)
+
+Built-in interactive GraphQL explorers:
+
+```gleam
+import mochi/playground
+
+// GraphiQL - The classic GraphQL IDE
+let html = playground.graphiql("/graphql")
+
+// GraphQL Playground - Popular alternative (legacy)
+let html = playground.playground("/graphql")
+
+// Apollo Sandbox - Modern Apollo explorer
+let html = playground.apollo_sandbox("/graphql")
+
+// Simple Explorer - Lightweight, no external dependencies
+let html = playground.simple_explorer("/graphql")
+
+// Use with your web framework
+fn handle_request(req) {
+  case path {
+    "/graphiql" -> html_response(playground.graphiql("/graphql"))
+    "/playground" -> html_response(playground.playground("/graphql"))
+    "/sandbox" -> html_response(playground.apollo_sandbox("/graphql"))
+    "/explorer" -> html_response(playground.simple_explorer("/graphql"))
+    _ -> not_found()
+  }
+}
+```
+
+### WebSocket Transport (`mochi/transport/websocket`)
+
+Real-time subscriptions over WebSocket using the graphql-ws protocol:
+
+```gleam
+import mochi/transport/websocket
+
+// Create connection state
+let state = websocket.new_connection(schema, pubsub, execution_context)
+
+// Handle incoming client messages
+case websocket.decode_client_message(json_text) {
+  Ok(client_msg) -> {
+    let result = websocket.handle_message(state, client_msg)
+    case result {
+      websocket.HandleOk(new_state, Some(response)) -> {
+        let json = websocket.encode_server_message(response)
+        send_to_client(json)
+        new_state
+      }
+      websocket.HandleClose(reason) -> close_connection(reason)
+      // ...
+    }
+  }
+  Error(err) -> log_error(websocket.format_decode_error(err))
+}
+
+// Message types supported:
+// Client -> Server: ConnectionInit, Subscribe, Complete, Ping, Pong
+// Server -> Client: ConnectionAck, Next, Error, Complete, Ping, Pong
+
+// Helper functions
+websocket.send_next(id, result)      // Send subscription data
+websocket.send_error(id, errors)     // Send subscription errors
+websocket.send_complete(id)          // Complete a subscription
+websocket.cleanup(state)             // Clean up on disconnect
+```
+
 ### DataLoader (`mochi/dataloader`)
 
 Prevent N+1 queries with automatic batching:
@@ -696,9 +836,14 @@ mochi/
 |-- response.gleam           # Response construction and serialization
 |-- json.gleam               # JSON encoding
 |-- dataloader.gleam         # N+1 query prevention
+|-- security.gleam           # Query security (depth, complexity limits)
+|-- persisted_queries.gleam  # Automatic Persisted Queries (APQ)
+|-- playground.gleam         # GraphQL IDE HTML generators
 |-- codegen/
 |   |-- typescript.gleam     # TypeScript .d.ts generation
 |   +-- sdl.gleam            # GraphQL SDL generation
+|-- transport/
+|   +-- websocket.gleam      # WebSocket transport (graphql-ws protocol)
 +-- ...
 ```
 
