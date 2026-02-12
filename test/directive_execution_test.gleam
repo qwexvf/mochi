@@ -26,12 +26,12 @@ fn decode_message(_dyn: Dynamic) -> Result(Message, String) {
 
 // Helper to try to extract a string from Dynamic using FFI
 @external(erlang, "mochi_ffi", "try_extract_string")
-@external(javascript, "../mochi_ffi.mjs", "try_extract_string")
+@external(javascript, "./mochi_ffi.mjs", "try_extract_string")
 fn try_get_string(value: Dynamic) -> Result(String, String)
 
 // Helper to try to extract an int from Dynamic using FFI
 @external(erlang, "mochi_ffi", "try_extract_int")
-@external(javascript, "../mochi_ffi.mjs", "try_extract_int")
+@external(javascript, "./mochi_ffi.mjs", "try_extract_int")
 fn try_get_int(value: Dynamic) -> Result(Int, String)
 
 // ============================================================================

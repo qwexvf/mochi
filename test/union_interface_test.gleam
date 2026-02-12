@@ -32,7 +32,7 @@ fn resolve_animal_type(value: dynamic.Dynamic) -> Result(String, String) {
 }
 
 @external(erlang, "mochi_ffi", "dict_has_key")
-@external(javascript, "../mochi_ffi.mjs", "dict_has_key")
+@external(javascript, "./mochi_ffi.mjs", "dict_has_key")
 fn decode_dict_has_key(value: dynamic.Dynamic, key: String) -> Bool
 
 fn build_interface_schema() -> schema.Schema {

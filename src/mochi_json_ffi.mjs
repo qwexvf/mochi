@@ -1,6 +1,7 @@
 // FFI helpers for JSON encoding in mochi
-import { Some, None } from "./gleam.mjs";
 import { toList } from "./gleam.mjs";
+import { Some, None } from "../gleam_stdlib/gleam/option.mjs";
+import Dict from "../gleam_stdlib/dict.mjs";
 
 // Check if value is null/undefined/Nil
 export function is_null(value) {
@@ -49,7 +50,11 @@ export function is_list(value) {
 
 // Check if value is a dict/map/object
 export function is_dict(value) {
-  // Gleam dicts are Map objects
+  // Gleam dicts are Dict class instances
+  if (value instanceof Dict) {
+    return true;
+  }
+  // Also check for Map objects (fallback)
   if (value instanceof Map) {
     return true;
   }
@@ -112,6 +117,10 @@ export function get_list(value) {
 
 // Get dict entries as list of tuples
 export function get_dict_entries(value) {
+  // Gleam Dict class
+  if (value instanceof Dict) {
+    return toList(value.entries());
+  }
   const entries = [];
   if (value instanceof Map) {
     for (const [k, v] of value.entries()) {

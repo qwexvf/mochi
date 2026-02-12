@@ -1,5 +1,6 @@
 // FFI helpers for mochi
-import { Some, None, Ok, Error } from "./gleam.mjs";
+import { Ok, Error } from "./gleam.mjs";
+import { Some, None } from "../gleam_stdlib/gleam/option.mjs";
 
 export function identity(x) {
   return x;
