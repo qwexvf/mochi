@@ -14,6 +14,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import mochi/error.{type GraphQLError}
 import mochi/executor.{type ExecutionError, type ExecutionResult}
+import mochi/json
 import mochi/types
 
 // ============================================================================
@@ -139,6 +140,20 @@ pub fn to_dynamic(response: GraphQLResponse) -> Dynamic {
 /// This returns the Dynamic representation - use with a JSON library
 pub fn serialize(response: GraphQLResponse) -> Dynamic {
   to_dynamic(response)
+}
+
+/// Convert a GraphQLResponse to a JSON string
+pub fn to_json(response: GraphQLResponse) -> String {
+  response
+  |> to_dynamic
+  |> json.encode
+}
+
+/// Convert a GraphQLResponse to a pretty-printed JSON string
+pub fn to_json_pretty(response: GraphQLResponse) -> String {
+  response
+  |> to_dynamic
+  |> json.encode_pretty(2)
 }
 
 // ============================================================================
