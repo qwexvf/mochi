@@ -493,6 +493,10 @@ fn coerce_directive_arguments(
   })
 }
 
+@external(erlang, "mochi_ffi", "get_list_elements")
+@external(javascript, "../mochi_ffi.mjs", "get_list_elements")
+fn get_list_elements(value: Dynamic) -> Option(List(Dynamic))
+
 fn execute_regular_field(
   context: QueryExecutionContext,
   field: ast.Field,
@@ -611,15 +615,122 @@ fn handle_resolved_value(
 ) -> ExecutionResult {
   case field.selection_set {
     None -> ok_result(make_field(response_name, resolved))
-    Some(sub_ss) ->
+    Some(sub_ss) -> {
+      // Check if the field type is a list type
+      case is_list_field_type(field_def.field_type) {
+        True ->
+          execute_list_sub_selection(
+            context,
+            sub_ss,
+            field_def,
+            field_args,
+            response_name,
+            field_path,
+            resolved,
+          )
+        False ->
+          execute_sub_selection(
+            context,
+            sub_ss,
+            field_def,
+            field_args,
+            field_path,
+            resolved,
+          )
+          |> wrap_result_in_field(response_name)
+      }
+    }
+  }
+}
+
+/// Check if a field type is a list type (unwrapping NonNull)
+fn is_list_field_type(field_type: schema.FieldType) -> Bool {
+  case field_type {
+    schema.List(_) -> True
+    schema.NonNull(inner) -> is_list_field_type(inner)
+    schema.Named(_) -> False
+  }
+}
+
+/// Get the inner type of a list field type
+fn get_list_inner_type(field_type: schema.FieldType) -> schema.FieldType {
+  case field_type {
+    schema.List(inner) -> inner
+    schema.NonNull(inner) -> get_list_inner_type(inner)
+    _ -> field_type
+  }
+}
+
+/// Execute selection set on a list of items
+fn execute_list_sub_selection(
+  context: QueryExecutionContext,
+  sub_selection_set: ast.SelectionSet,
+  field_def: schema.FieldDefinition,
+  field_args: Dict(String, Dynamic),
+  response_name: String,
+  field_path: List(String),
+  resolved_value: Dynamic,
+) -> ExecutionResult {
+  case get_list_elements(resolved_value) {
+    Some(elements) -> {
+      // Create a modified field_def with the inner type for list item resolution
+      let inner_type = get_list_inner_type(field_def.field_type)
+      let inner_field_def =
+        schema.FieldDefinition(..field_def, field_type: inner_type)
+
+      // Execute selection set on each list item
+      let results =
+        list.index_map(elements, fn(element, index) {
+          let item_path =
+            list.append(field_path, [int.to_string(index)])
+          execute_sub_selection(
+            context,
+            sub_selection_set,
+            inner_field_def,
+            field_args,
+            item_path,
+            element,
+          )
+        })
+
+      // Collect errors from all results
+      let errors = list.flat_map(results, fn(r) { r.errors })
+
+      // Collect data from all results (as a list)
+      let data_list =
+        list.filter_map(results, fn(r) { option.to_result(r.data, Nil) })
+
+      case errors {
+        [] ->
+          ok_result(make_field(response_name, types.to_dynamic(data_list)))
+        _ ->
+          ExecutionResult(
+            data: Some(make_field(response_name, types.to_dynamic(data_list))),
+            errors: errors,
+          )
+      }
+    }
+    None -> {
+      // Not actually a list - fall back to single item execution
       execute_sub_selection(
         context,
-        sub_ss,
+        sub_selection_set,
         field_def,
         field_args,
         field_path,
-        resolved,
+        resolved_value,
       )
+      |> wrap_result_in_field(response_name)
+    }
+  }
+}
+
+/// Wrap an execution result's data in a field
+fn wrap_result_in_field(result: ExecutionResult, name: String) -> ExecutionResult {
+  case result.data {
+    Some(data) ->
+      ExecutionResult(..result, data: Some(make_field(name, data)))
+    None -> result
   }
 }
 

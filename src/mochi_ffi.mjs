@@ -45,3 +45,10 @@ export function try_extract_int(value) {
   }
   return new Error("Expected int");
 }
+
+export function get_list_elements(value) {
+  if (Array.isArray(value)) {
+    return new Some(value);
+  }
+  return new None();
+}
