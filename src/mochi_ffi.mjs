@@ -29,3 +29,10 @@ export function dict_has_key(value, key) {
   }
   return false;
 }
+
+export function get_list_elements(value) {
+  if (Array.isArray(value)) {
+    return new Some(value);
+  }
+  return new None();
+}
