@@ -1,20 +1,11 @@
-# 🍡 mochi - Code First GraphQL for Gleam
+# mochi - Code First GraphQL for Gleam
 
 [![Package Version](https://img.shields.io/hexpm/v/mochi)](https://hex.pm/packages/mochi)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/mochi/)
 
-**mochi** is a type-safe, Code First GraphQL library for Gleam. Define your types in Gleam and automatically generate GraphQL schemas, TypeScript types, and SDL.
+**mochi** is a type-safe, Code First GraphQL library for Gleam. Define your GraphQL schemas using Gleam types and automatically generate TypeScript types and GraphQL SDL.
 
 Inspired by [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b).
-
-## Features
-
-- **Code First** - Define GraphQL schemas using Gleam types
-- **Type Safe** - Full compile-time type checking
-- **TypeScript Codegen** - Generate `.d.ts` files from your schema
-- **SDL Generation** - Generate `.graphql` schema files
-- **Zero Config** - Simple, intuitive API
-- **Dual Target** - Works on BEAM (Erlang) and JavaScript
 
 ## Installation
 
@@ -74,7 +65,28 @@ pub fn create_schema() -> schema.Schema {
   |> query.add_type(user_type())
   |> query.build
 }
+
+// 5. Execute queries
+pub fn main() {
+  let my_schema = create_schema()
+  let result = mochi.execute(my_schema, "{ users { id name } }")
+}
 ```
+
+## Features
+
+- **Code First Schema Definition** - Define GraphQL schemas using Gleam types with type-safe field extractors
+- **TypeScript Codegen** - Generate `.d.ts` type definitions from your schema
+- **SDL Generation** - Generate `.graphql` schema files
+- **Query Validation** - Validate GraphQL queries against your schema
+- **Custom Directives** - Define and execute custom directives with handlers
+- **@deprecated Support** - Mark fields and enum values as deprecated
+- **Interface Types** - Define GraphQL interfaces with type resolution
+- **Union Types** - Define union types with runtime type resolution
+- **Fragment Support** - Full support for GraphQL fragments
+- **DataLoader** - N+1 query prevention with automatic batching and caching
+- **Dual Target** - Works on BEAM (Erlang) and JavaScript runtimes
+- **Zero Config** - Simple, intuitive API with sensible defaults
 
 ## TypeScript Codegen
 
@@ -155,77 +167,295 @@ type Query {
 
 ### Type Builders (`mochi/types`)
 
+Build GraphQL object types with type-safe field extractors:
+
 ```gleam
+import mochi/types
+import mochi/schema
+
 // Create object type
-types.object("User")
-|> types.description("A user")
-|> types.id("id", fn(u) { u.id })
-|> types.string("name", fn(u) { u.name })
-|> types.int("age", fn(u) { u.age })
-|> types.float("score", fn(u) { u.score })
-|> types.bool("active", fn(u) { u.active })
-|> types.list_string("tags", fn(u) { u.tags })
-|> types.build(decoder)
+let user_type = types.object("User")
+  |> types.description("A user in the system")
+  |> types.id("id", fn(u: User) { u.id })
+  |> types.string("name", fn(u: User) { u.name })
+  |> types.string_with_desc("email", "User's email address", fn(u: User) { u.email })
+  |> types.int("age", fn(u: User) { u.age })
+  |> types.float("score", fn(u: User) { u.score })
+  |> types.bool("active", fn(u: User) { u.active })
+  |> types.list_string("tags", fn(u: User) { u.tags })
+  |> types.list_int("scores", fn(u: User) { u.scores })
+  |> types.optional_string("nickname", fn(u: User) { u.nickname })
+  |> types.object_field("profile", "Profile", fn(u: User) { types.to_dynamic(u.profile) })
+  |> types.list_object("posts", "Post", fn(u: User) { types.to_dynamic(u.posts) })
+  |> types.build(decode_user)
 
 // Create enum type
-types.enum_type("Role")
-|> types.value("ADMIN")
-|> types.value_with_desc("USER", "Standard user")
-|> types.build_enum
+let role_enum = types.enum_type("Role")
+  |> types.enum_description("User roles in the system")
+  |> types.value("ADMIN")
+  |> types.value_with_desc("USER", "Standard user access")
+  |> types.deprecated_value("GUEST")
+  |> types.deprecated_value_with_reason("LEGACY", "Use MEMBER instead")
+  |> types.build_enum
 ```
 
 ### Query Builders (`mochi/query`)
 
+Define queries and mutations with type-safe resolvers:
+
 ```gleam
-// Simple query (no args)
-query.query("users", return_type, resolver, encoder)
+import mochi/query
+import mochi/schema
+
+// Simple query (no arguments)
+let users_query = query.query(
+  "users",
+  schema.list_type(schema.named_type("User")),
+  fn(ctx) { Ok(get_users()) },
+  types.to_dynamic,
+)
+|> query.query_description("Get all users")
 
 // Query with arguments
-query.query_with_args("user", args, return_type, args_decoder, resolver, encoder)
+let user_query = query.query_with_args(
+  "user",
+  [
+    query.arg("id", schema.non_null(schema.id_type())),
+    query.arg_with_desc("includeProfile", schema.boolean_type(), "Include user profile"),
+  ],
+  schema.named_type("User"),
+  decode_args,
+  fn(args, ctx) { get_user_by_id(args.id) },
+  types.to_dynamic,
+)
 
-// Mutation
-query.mutation("createUser", args, return_type, args_decoder, resolver, encoder)
+// Mutation with arguments
+let create_user = query.mutation(
+  "createUser",
+  [query.arg("input", schema.non_null(schema.named_type("CreateUserInput")))],
+  schema.named_type("User"),
+  decode_input,
+  fn(input, ctx) { create_user(input) },
+  types.to_dynamic,
+)
+|> query.mutation_description("Create a new user")
 
 // Build schema
-query.new()
-|> query.add_query(users_query)
-|> query.add_mutation(create_user_mutation)
-|> query.add_type(user_type)
-|> query.build
+let my_schema = query.new()
+  |> query.add_query(users_query)
+  |> query.add_query(user_query)
+  |> query.add_mutation(create_user)
+  |> query.add_type(user_type)
+  |> query.add_enum(role_enum)
+  |> query.build
 ```
 
-### Codegen
+### Schema Module (`mochi/schema`)
+
+Low-level schema building and type definitions:
 
 ```gleam
-// TypeScript
+import mochi/schema
+
+// Field types
+schema.string_type()      // String
+schema.int_type()         // Int
+schema.float_type()       // Float
+schema.boolean_type()     // Boolean
+schema.id_type()          // ID
+schema.named_type("User") // Custom type reference
+schema.list_type(inner)   // [Type]
+schema.non_null(inner)    // Type!
+
+// Field definitions with deprecation
+let field = schema.field_def("oldField", schema.string_type())
+  |> schema.field_description("This field is deprecated")
+  |> schema.deprecate("Use newField instead")
+
+// Interface types
+let node_interface = schema.interface("Node")
+  |> schema.interface_description("An object with an ID")
+  |> schema.interface_field(schema.field_def("id", schema.non_null(schema.id_type())))
+  |> schema.interface_resolve_type(fn(value) {
+    // Return the concrete type name
+    Ok("User")
+  })
+
+// Union types
+let search_result = schema.union("SearchResult")
+  |> schema.union_description("Search result types")
+  |> schema.union_member(user_type)
+  |> schema.union_member(post_type)
+  |> schema.union_resolve_type(fn(value) {
+    // Return the concrete type name
+    Ok("User")
+  })
+
+// Add to schema
+let my_schema = query.new()
+  |> query.add_interface(node_interface)
+  |> query.add_union(search_result)
+  |> query.build
+```
+
+### Custom Directives
+
+Define custom directives for your schema:
+
+```gleam
+import mochi/schema
+
+// Define a custom directive
+let auth_directive = schema.directive("auth", [schema.FieldLocation, schema.ObjectLocation])
+  |> schema.directive_description("Requires authentication")
+  |> schema.directive_argument(
+    schema.arg("role", schema.string_type())
+    |> schema.arg_description("Required role"),
+  )
+
+// Repeatable directive
+let log_directive = schema.directive("log", [schema.FieldLocation])
+  |> schema.directive_repeatable
+
+// Directive with handler
+let uppercase_directive = schema.directive("uppercase", [schema.FieldLocation])
+  |> schema.directive_handler(fn(args, value) {
+    // Transform the field value
+    Ok(transform_value(value))
+  })
+
+// Add to schema
+let my_schema = schema.schema()
+  |> schema.add_directive(auth_directive)
+  |> schema.add_directive(log_directive)
+```
+
+### DataLoader (`mochi/dataloader`)
+
+Prevent N+1 queries with automatic batching:
+
+```gleam
+import mochi/dataloader
+import mochi/schema
+
+// Create a batch loading function
+fn batch_load_users(ids: List(String)) -> Result(List(Result(User, String)), String) {
+  // Load all users in a single database query
+  let users = db.get_users_by_ids(ids)
+  Ok(list.map(ids, fn(id) {
+    case list.find(users, fn(u) { u.id == id }) {
+      Ok(user) -> Ok(user)
+      Error(_) -> Error("User not found")
+    }
+  }))
+}
+
+// Create DataLoader
+let user_loader = dataloader.new(batch_load_users)
+
+// Or with custom options
+let user_loader = dataloader.new_with_options(
+  batch_load_users,
+  dataloader.DataLoaderOptions(max_batch_size: 50, cache_enabled: True),
+)
+
+// Load data (automatically batched)
+let #(loader, result) = dataloader.load(user_loader, "user-1")
+let #(loader, results) = dataloader.load_many(loader, ["user-2", "user-3"])
+
+// Cache management
+let loader = dataloader.prime(loader, "user-4", user)  // Pre-populate cache
+let loader = dataloader.clear_key(loader, "user-1")    // Clear specific key
+let loader = dataloader.clear_cache(loader)            // Clear all cache
+
+// Use with execution context
+let ctx = schema.execution_context(types.to_dynamic(Nil))
+  |> schema.add_data_loader("users", user_loader)
+```
+
+### Codegen Configuration
+
+Customize code generation output:
+
+```gleam
 import mochi/codegen/typescript
-let ts = typescript.generate(schema)
-let ts = typescript.generate_with_config(schema, config)
-
-// SDL
 import mochi/codegen/sdl
-let gql = sdl.generate(schema)
-let gql = sdl.generate_with_config(schema, config)
-```
+import gleam/option.{Some}
 
-## Module Structure
+// TypeScript with custom config
+let ts_config = typescript.Config(
+  use_exports: True,
+  use_interfaces: True,
+  readonly_properties: True,
+  include_helpers: True,
+  header: Some("// Custom header\n// Generated types"),
+)
+let ts_code = typescript.generate_with_config(schema, ts_config)
 
-```
-mochi/
-├── query.gleam           # Query/Mutation builders
-├── types.gleam           # Type builders (object, enum)
-├── schema.gleam          # Core schema types
-├── parser.gleam          # GraphQL query parser
-├── executor.gleam        # Query execution engine
-├── codegen/
-│   ├── typescript.gleam  # TypeScript generation
-│   └── sdl.gleam         # SDL generation
-└── ...
+// SDL with custom config
+let sdl_config = sdl.Config(
+  include_descriptions: True,
+  include_builtin_scalars: False,
+  indent: "  ",
+  header: Some("# My GraphQL Schema"),
+)
+let graphql_code = sdl.generate_with_config(schema, sdl_config)
 ```
 
 ## Examples
 
-### Defining Mutations
+See the [`examples/`](examples/) directory for complete working examples:
+
+- **`code_first_example.gleam`** - Basic User/Post schema with queries and mutations
+- **`core_library_examples/`** - Pure GraphQL functionality demonstrations
+- **`geql_web_app/`** - Full web application with database integration
+
+### Basic Schema Example
+
+```gleam
+import mochi/query
+import mochi/schema
+import mochi/types
+
+pub type User {
+  User(id: String, name: String, email: String)
+}
+
+pub type Post {
+  Post(id: String, title: String, author_id: String)
+}
+
+fn user_type() -> schema.ObjectType {
+  types.object("User")
+  |> types.id("id", fn(u: User) { u.id })
+  |> types.string("name", fn(u: User) { u.name })
+  |> types.string("email", fn(u: User) { u.email })
+  |> types.build(fn(_) { Ok(User("", "", "")) })
+}
+
+fn post_type() -> schema.ObjectType {
+  types.object("Post")
+  |> types.id("id", fn(p: Post) { p.id })
+  |> types.string("title", fn(p: Post) { p.title })
+  |> types.string("authorId", fn(p: Post) { p.author_id })
+  |> types.build(fn(_) { Ok(Post("", "", "")) })
+}
+
+pub fn create_schema() -> schema.Schema {
+  query.new()
+  |> query.add_query(query.query(
+    "users",
+    schema.list_type(schema.named_type("User")),
+    fn(_) { Ok([]) },
+    types.to_dynamic,
+  ))
+  |> query.add_type(user_type())
+  |> query.add_type(post_type())
+  |> query.build
+}
+```
+
+### Mutation Example
 
 ```gleam
 pub type CreateUserInput {
@@ -240,35 +470,34 @@ fn create_user_mutation() {
     decode_create_input,
     fn(input, ctx) {
       // Insert into database
-      create_user(ctx.db, input)
+      let user = User(id: generate_id(), name: input.name, email: input.email)
+      db.insert_user(user)
+      Ok(user)
     },
     types.to_dynamic,
   )
   |> query.mutation_description("Create a new user")
 }
+
+let schema = query.new()
+  |> query.add_mutation(create_user_mutation())
+  |> query.build
 ```
 
-### Custom Configuration
+## Module Structure
 
-```gleam
-// TypeScript with custom config
-let config = typescript.Config(
-  use_exports: True,
-  use_interfaces: True,
-  readonly_properties: True,
-  include_helpers: True,
-  header: Some("// Custom header"),
-)
-let ts = typescript.generate_with_config(schema, config)
-
-// SDL with custom config
-let config = sdl.Config(
-  include_descriptions: True,
-  include_builtin_scalars: False,
-  indent: "  ",
-  header: Some("# My Schema"),
-)
-let gql = sdl.generate_with_config(schema, config)
+```
+mochi/
+|-- query.gleam           # Query/Mutation builders (Code First API)
+|-- types.gleam           # Type builders (object, enum, fields)
+|-- schema.gleam          # Core schema types and low-level API
+|-- parser.gleam          # GraphQL query parser
+|-- executor.gleam        # Query execution engine
+|-- dataloader.gleam      # N+1 query prevention
+|-- codegen/
+|   |-- typescript.gleam  # TypeScript .d.ts generation
+|   +-- sdl.gleam         # GraphQL SDL generation
++-- ...
 ```
 
 ## Running Tests
@@ -281,15 +510,10 @@ gleam test
 
 ```sh
 gleam build          # Build the library
-gleam test           # Run tests (35 tests)
+gleam test           # Run all tests
 gleam run            # Run demo
 ```
 
 ## License
 
 Apache 2.0
-
----
-
-**mochi** 🍡 - Code First GraphQL for Gleam
-# CI trigger
