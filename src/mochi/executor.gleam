@@ -413,6 +413,86 @@ fn eval_bool_value(
 @external(javascript, "../mochi_ffi.mjs", "dynamic_to_bool")
 fn decode_bool_from_dynamic(value: Dynamic) -> Option(Bool)
 
+// ============================================================================
+// Custom Directive Execution
+// ============================================================================
+
+/// Apply custom directive handlers to a resolved field value.
+/// Directives are applied in order (left to right as they appear in the query).
+/// Built-in directives (@skip, @include, @deprecated) are skipped as they
+/// are handled specially elsewhere.
+fn apply_custom_directives(
+  schema_def: schema.Schema,
+  directives: List(ast.Directive),
+  value: Dynamic,
+  variables: Dict(String, Dynamic),
+  path: List(String),
+) -> Result(Dynamic, String) {
+  list.fold(directives, Ok(value), fn(acc, directive) {
+    case acc {
+      Error(msg) -> Error(msg)
+      Ok(current_value) ->
+        apply_single_directive(
+          schema_def,
+          directive,
+          current_value,
+          variables,
+          path,
+        )
+    }
+  })
+}
+
+/// Apply a single directive handler to a value.
+/// Returns the transformed value or an error.
+fn apply_single_directive(
+  schema_def: schema.Schema,
+  directive: ast.Directive,
+  value: Dynamic,
+  variables: Dict(String, Dynamic),
+  _path: List(String),
+) -> Result(Dynamic, String) {
+  // Skip built-in directives - they're handled elsewhere
+  case directive.name {
+    "skip" | "include" | "deprecated" -> Ok(value)
+    _ -> {
+      // Look up the directive definition in the schema
+      case dict.get(schema_def.directives, directive.name) {
+        Ok(directive_def) -> {
+          // Check if the directive has a handler
+          case directive_def.handler {
+            Some(handler) -> {
+              // Coerce directive arguments
+              let args = coerce_directive_arguments(directive.arguments, variables)
+              // Call the handler with arguments and current value
+              handler(args, value)
+            }
+            None -> {
+              // No handler defined - just pass through the value
+              Ok(value)
+            }
+          }
+        }
+        Error(_) -> {
+          // Directive not found in schema - pass through (could also error here)
+          // For now, we'll be lenient and just pass through unknown directives
+          Ok(value)
+        }
+      }
+    }
+  }
+}
+
+/// Coerce directive arguments from AST to Dynamic values
+fn coerce_directive_arguments(
+  args: List(ast.Argument),
+  variables: Dict(String, Dynamic),
+) -> Dict(String, Dynamic) {
+  list.fold(args, dict.new(), fn(acc, arg) {
+    dict.insert(acc, arg.name, coerce_value(arg.value, variables))
+  })
+}
+
 fn execute_regular_field(
   context: QueryExecutionContext,
   field: ast.Field,
@@ -441,6 +521,7 @@ fn execute_regular_field(
         field_path,
         resolver,
         field_context.parent_value,
+        field.directives,
       )
     None ->
       resolve_from_parent(
@@ -481,6 +562,7 @@ fn resolve_field(
   field_path: List(String),
   resolver: schema.Resolver,
   parent_value: Option(Dynamic),
+  directives: List(ast.Directive),
 ) -> ExecutionResult {
   let resolver_info =
     schema.ResolverInfo(
@@ -492,15 +574,28 @@ fn resolve_field(
 
   case resolver(resolver_info) {
     Ok(resolved) ->
-      handle_resolved_value(
-        context,
-        field,
-        field_def,
-        field_args,
-        response_name,
-        field_path,
-        resolved,
-      )
+      // Apply custom directive handlers after resolving the value
+      case
+        apply_custom_directives(
+          context.schema,
+          directives,
+          resolved,
+          context.variable_values,
+          field_path,
+        )
+      {
+        Ok(transformed) ->
+          handle_resolved_value(
+            context,
+            field,
+            field_def,
+            field_args,
+            response_name,
+            field_path,
+            transformed,
+          )
+        Error(msg) -> resolver_error(msg, field_path)
+      }
     Error(msg) -> resolver_error(msg, field_path)
   }
 }

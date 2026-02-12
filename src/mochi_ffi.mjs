@@ -1,5 +1,5 @@
 // FFI helpers for mochi
-import { Some, None } from "./gleam.mjs";
+import { Some, None, Ok, Error } from "./gleam.mjs";
 
 export function identity(x) {
   return x;
@@ -28,4 +28,20 @@ export function dict_has_key(value, key) {
     return key in value;
   }
   return false;
+}
+
+// Result-returning string extraction for directive handlers
+export function try_extract_string(value) {
+  if (typeof value === "string") {
+    return new Ok(value);
+  }
+  return new Error("Expected string");
+}
+
+// Result-returning int extraction for directive handlers
+export function try_extract_int(value) {
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return new Ok(value);
+  }
+  return new Error("Expected int");
 }
