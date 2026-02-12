@@ -52,3 +52,14 @@ export function get_list_elements(value) {
   }
   return new None();
 }
+
+// Extract a field from a dynamic value (object or map)
+export function extract_field(data, field) {
+  if (data instanceof Map) {
+    return data.has(field) ? data.get(field) : null;
+  }
+  if (data && typeof data === "object") {
+    return field in data ? data[field] : null;
+  }
+  return null;
+}

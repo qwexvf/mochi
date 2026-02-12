@@ -41,6 +41,21 @@ pub type MutationDef(args, result) {
   )
 }
 
+/// A subscription definition
+pub type SubscriptionDef(args, event) {
+  SubscriptionDef(
+    name: String,
+    description: Option(String),
+    args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
+    /// Returns the topic to subscribe to
+    topic_resolver: fn(args, ExecutionContext) -> Result(String, String),
+    /// Transforms event data for GraphQL response
+    event_encoder: fn(event) -> Dynamic,
+    arg_definitions: List(ArgDef),
+    return_type: FieldType,
+  )
+}
+
 /// A field definition for extending types
 pub type FieldDef(parent, args, result) {
   FieldDef(
@@ -145,6 +160,56 @@ pub fn mutation_description(
   desc: String,
 ) -> MutationDef(args, result) {
   MutationDef(..m, description: Some(desc))
+}
+
+// ============================================================================
+// Subscription Builders
+// ============================================================================
+
+/// Define a subscription with no arguments
+pub fn subscription(
+  name: String,
+  return_type: FieldType,
+  topic: String,
+  encoder: fn(event) -> Dynamic,
+) -> SubscriptionDef(NoArgs, event) {
+  SubscriptionDef(
+    name: name,
+    description: None,
+    args_decoder: fn(_) { Ok(NoArgs) },
+    topic_resolver: fn(_, _) { Ok(topic) },
+    event_encoder: encoder,
+    arg_definitions: [],
+    return_type: return_type,
+  )
+}
+
+/// Define a subscription with arguments
+pub fn subscription_with_args(
+  name: String,
+  arg_defs: List(ArgDef),
+  return_type: FieldType,
+  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
+  topic_resolver: fn(args, ExecutionContext) -> Result(String, String),
+  encoder: fn(event) -> Dynamic,
+) -> SubscriptionDef(args, event) {
+  SubscriptionDef(
+    name: name,
+    description: None,
+    args_decoder: args_decoder,
+    topic_resolver: topic_resolver,
+    event_encoder: encoder,
+    arg_definitions: arg_defs,
+    return_type: return_type,
+  )
+}
+
+/// Add description to a subscription
+pub fn subscription_description(
+  s: SubscriptionDef(args, event),
+  desc: String,
+) -> SubscriptionDef(args, event) {
+  SubscriptionDef(..s, description: Some(desc))
 }
 
 // ============================================================================
@@ -273,6 +338,28 @@ pub fn mutation_to_field_def(m: MutationDef(args, result)) -> FieldDefinition {
   }
 }
 
+/// Convert a SubscriptionDef to a schema FieldDefinition
+/// Note: The actual subscription logic is handled by the subscription executor,
+/// this just creates the schema definition for introspection and SDL generation
+pub fn subscription_to_field_def(s: SubscriptionDef(args, event)) -> FieldDefinition {
+  // Subscriptions don't have a regular resolver - they're handled specially
+  // We create a placeholder resolver that returns an error if called directly
+  let resolver: Resolver = fn(_info: ResolverInfo) {
+    Error("Subscriptions must be executed through the subscription executor")
+  }
+
+  let base =
+    schema.field_def(s.name, s.return_type)
+    |> schema.resolver(resolver)
+
+  let with_args = add_args_to_field(base, s.arg_definitions)
+
+  case s.description {
+    Some(desc) -> schema.field_description(with_args, desc)
+    None -> with_args
+  }
+}
+
 /// Convert a FieldDef to a schema FieldDefinition
 pub fn field_def_to_schema(f: FieldDef(parent, args, result)) -> FieldDefinition {
   let resolver: Resolver = fn(info: ResolverInfo) {
@@ -325,11 +412,12 @@ fn add_args_to_field(
 // Schema Builder - Fluent API
 // ============================================================================
 
-/// Schema builder for collecting queries and mutations
+/// Schema builder for collecting queries, mutations, and subscriptions
 pub type SchemaBuilder {
   SchemaBuilder(
     queries: List(FieldDefinition),
     mutations: List(FieldDefinition),
+    subscriptions: List(FieldDefinition),
     types: List(ObjectType),
     enums: List(schema.EnumType),
     interfaces: List(schema.InterfaceType),
@@ -342,6 +430,7 @@ pub fn new() -> SchemaBuilder {
   SchemaBuilder(
     queries: [],
     mutations: [],
+    subscriptions: [],
     types: [],
     enums: [],
     interfaces: [],
@@ -365,6 +454,17 @@ pub fn add_mutation(
   SchemaBuilder(..builder, mutations: [
     mutation_to_field_def(m),
     ..builder.mutations
+  ])
+}
+
+/// Add a subscription to the schema
+pub fn add_subscription(
+  builder: SchemaBuilder,
+  s: SubscriptionDef(args, event),
+) -> SchemaBuilder {
+  SchemaBuilder(..builder, subscriptions: [
+    subscription_to_field_def(s),
+    ..builder.subscriptions
   ])
 }
 
@@ -413,8 +513,19 @@ pub fn build(builder: SchemaBuilder) -> Schema {
     }
   }
 
+  let with_subscription = case builder.subscriptions {
+    [] -> with_mutation
+    _ -> {
+      let subscription_type =
+        list.fold(builder.subscriptions, schema.object("Subscription"), fn(obj, field) {
+          schema.field(obj, field)
+        })
+      schema.subscription(with_mutation, subscription_type)
+    }
+  }
+
   let with_types =
-    list.fold(builder.types, with_mutation, fn(s, t) {
+    list.fold(builder.types, with_subscription, fn(s, t) {
       schema.add_type(s, schema.ObjectTypeDef(t))
     })
 

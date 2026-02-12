@@ -1,5 +1,5 @@
 -module(mochi_ffi).
--export([dynamic_to_string/1, dynamic_to_bool/1, dict_has_key/2, try_extract_string/1, try_extract_int/1, get_list_elements/1]).
+-export([dynamic_to_string/1, dynamic_to_bool/1, dict_has_key/2, try_extract_string/1, try_extract_int/1, get_list_elements/1, extract_field/2]).
 
 dynamic_to_string(Value) when is_binary(Value) ->
     {some, Value};
@@ -42,3 +42,8 @@ get_list_elements(Value) when erlang:is_list(Value) ->
     {some, Value};
 get_list_elements(_) ->
     none.
+
+extract_field(Data, Field) when is_map(Data) ->
+    maps:get(Field, Data, nil);
+extract_field(_, _) ->
+    nil.
