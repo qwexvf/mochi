@@ -75,7 +75,8 @@ pub fn subscribe_document(
   case find_subscription_operation(document) {
     Some(operation) ->
       execute_subscription(context, document, operation, callback)
-    None -> SubscriptionError("Document does not contain a subscription operation")
+    None ->
+      SubscriptionError("Document does not contain a subscription operation")
   }
 }
 
@@ -102,8 +103,9 @@ fn find_subscription_operation(document: ast.Document) -> Option(ast.Operation) 
   document.definitions
   |> list.find_map(fn(def) {
     case def {
-      ast.OperationDefinition(ast.Operation(operation_type: ast.Subscription, ..) as op) ->
-        Ok(op)
+      ast.OperationDefinition(
+        ast.Operation(operation_type: ast.Subscription, ..) as op,
+      ) -> Ok(op)
       _ -> Error(Nil)
     }
   })
@@ -136,7 +138,8 @@ fn execute_subscription(
               )
             Ok(field_def) -> {
               // Resolve the topic from arguments
-              let args = coerce_arguments(field.arguments, context.variable_values)
+              let args =
+                coerce_arguments(field.arguments, context.variable_values)
 
               // For now, use the field name as the topic
               // In a full implementation, this would call the topic_resolver
@@ -346,15 +349,12 @@ fn execute_event_field(
     _ -> {
       case dict.get(object_type.fields, field.name) {
         Error(_) ->
-          executor.ExecutionResult(
-            data: None,
-            errors: [
-              executor.ValidationError(
-                "Field '" <> field.name <> "' not found",
-                [],
-              ),
-            ],
-          )
+          executor.ExecutionResult(data: None, errors: [
+            executor.ValidationError(
+              "Field '" <> field.name <> "' not found",
+              [],
+            ),
+          ])
         Ok(field_def) -> {
           // Try to resolve from event data or use resolver
           case field_def.resolver {
@@ -362,7 +362,10 @@ fn execute_event_field(
               let resolver_info =
                 schema.ResolverInfo(
                   parent: Some(event_data),
-                  arguments: coerce_arguments(field.arguments, context.variable_values),
+                  arguments: coerce_arguments(
+                    field.arguments,
+                    context.variable_values,
+                  ),
                   context: context.execution_context,
                   info: types.to_dynamic(dict.new()),
                 )
@@ -373,10 +376,9 @@ fn execute_event_field(
                     errors: [],
                   )
                 Error(msg) ->
-                  executor.ExecutionResult(
-                    data: None,
-                    errors: [executor.ResolverError(msg, [response_name])],
-                  )
+                  executor.ExecutionResult(data: None, errors: [
+                    executor.ResolverError(msg, [response_name]),
+                  ])
               }
             }
             None -> {

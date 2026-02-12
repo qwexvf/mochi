@@ -115,7 +115,8 @@ pub fn non_null_field_returns_null_test() {
   case result.errors {
     [executor.NullValueError(_, _), ..] -> Nil
     [] -> panic as "Should have error for non-null field returning null"
-    _ -> Nil  // Other error types also acceptable
+    _ -> Nil
+    // Other error types also acceptable
   }
 
   // Data should be None (null bubbled to root)
@@ -306,14 +307,17 @@ pub fn list_with_non_null_items_null_test() {
     |> schema.field(
       // users: [User!] - list items are non-null
       schema.field_def(
-          "users",
-          schema.list_type(schema.non_null(schema.named_type("User"))),
-        )
+        "users",
+        schema.list_type(schema.non_null(schema.named_type("User"))),
+      )
       |> schema.resolver(fn(_info) {
         // Return a list with a null item - use Dynamic list so Nil can be included
-        let item1 = types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))]))
-        let item2 = types.to_dynamic(Nil)  // This null item should cause error
-        let item3 = types.to_dynamic(dict.from_list([#("id", types.to_dynamic("3"))]))
+        let item1 =
+          types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))]))
+        let item2 = types.to_dynamic(Nil)
+        // This null item should cause error
+        let item3 =
+          types.to_dynamic(dict.from_list([#("id", types.to_dynamic("3"))]))
         Ok(types.to_dynamic([item1, item2, item3]))
       }),
     )
@@ -355,12 +359,11 @@ pub fn nested_non_null_fields_test() {
       |> schema.resolver(fn(_info) { Ok(types.to_dynamic("1")) }),
     )
     |> schema.field(
-      schema.field_def(
-          "address",
-          schema.non_null(schema.named_type("Address")),
-        )
+      schema.field_def("address", schema.non_null(schema.named_type("Address")))
       |> schema.resolver(fn(_info) {
-        Ok(types.to_dynamic(dict.from_list([#("street", types.to_dynamic(Nil))])))
+        Ok(
+          types.to_dynamic(dict.from_list([#("street", types.to_dynamic(Nil))])),
+        )
       }),
     )
 
@@ -449,9 +452,11 @@ pub fn nullable_list_items_test() {
       schema.field_def("users", schema.list_type(schema.named_type("User")))
       |> schema.resolver(fn(_info) {
         // Return a list with a null item - this should be OK
-        let item1 = types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))]))
+        let item1 =
+          types.to_dynamic(dict.from_list([#("id", types.to_dynamic("1"))]))
         let item2 = types.to_dynamic(Nil)
-        let item3 = types.to_dynamic(dict.from_list([#("id", types.to_dynamic("3"))]))
+        let item3 =
+          types.to_dynamic(dict.from_list([#("id", types.to_dynamic("3"))]))
         Ok(types.to_dynamic([item1, item2, item3]))
       }),
     )

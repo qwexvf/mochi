@@ -95,7 +95,8 @@ pub fn error_with_locations_list_test() {
   case err.locations {
     Some(locations) -> {
       case locations {
-        [error.Location(1, 1), error.Location(2, 2), error.Location(3, 3)] -> Nil
+        [error.Location(1, 1), error.Location(2, 2), error.Location(3, 3)] ->
+          Nil
         _ -> panic as "Should have three locations"
       }
     }
@@ -127,7 +128,7 @@ pub fn error_with_multiple_extensions_test() {
   let err =
     error.error("Test error")
     |> error.with_extension("code", types.to_dynamic("ERROR_CODE"))
-    |> error.with_extension("timestamp", types.to_dynamic(1234567890))
+    |> error.with_extension("timestamp", types.to_dynamic(1_234_567_890))
     |> error.with_extension("requestId", types.to_dynamic("req-123"))
 
   case err.extensions {
@@ -299,7 +300,7 @@ pub fn internal_error_test() {
 
 pub fn error_to_dynamic_basic_test() {
   let err = error.error("Test message")
-  let dyn = error.to_dynamic(err)
+  let _dyn = error.to_dynamic(err)
 
   // Should produce a Dynamic value (we can't easily inspect it without FFI)
   // Just verify it doesn't crash
@@ -317,9 +318,9 @@ pub fn error_to_dynamic_full_test() {
       error.FieldSegment("name"),
     ])
     |> error.with_extension("code", types.to_dynamic("FULL_ERROR"))
-    |> error.with_extension("timestamp", types.to_dynamic(1234567890))
+    |> error.with_extension("timestamp", types.to_dynamic(1_234_567_890))
 
-  let dyn = error.to_dynamic(err)
+  let _dyn = error.to_dynamic(err)
 
   // Should produce a Dynamic value
   Nil
@@ -332,7 +333,7 @@ pub fn errors_to_dynamic_test() {
     error.error("Error 3"),
   ]
 
-  let dyn = error.errors_to_dynamic(errors)
+  let _dyn = error.errors_to_dynamic(errors)
 
   // Should produce a list Dynamic
   Nil
@@ -358,7 +359,10 @@ pub fn format_error_with_path_test() {
 
   case formatted == "Field error at user.email" {
     True -> Nil
-    False -> panic as { "Format should be 'Field error at user.email', got: " <> formatted }
+    False ->
+      panic as {
+        "Format should be 'Field error at user.email', got: " <> formatted
+      }
   }
 }
 
@@ -374,7 +378,9 @@ pub fn format_error_with_index_path_test() {
   case formatted == "Array error at users.[5].name" {
     True -> Nil
     False ->
-      panic as { "Format should be 'Array error at users.[5].name', got: " <> formatted }
+      panic as {
+        "Format should be 'Array error at users.[5].name', got: " <> formatted
+      }
   }
 }
 
@@ -386,7 +392,10 @@ pub fn format_error_with_location_test() {
 
   case formatted == "Located error [(10:5)]" {
     True -> Nil
-    False -> panic as { "Format should be 'Located error [(10:5)]', got: " <> formatted }
+    False ->
+      panic as {
+        "Format should be 'Located error [(10:5)]', got: " <> formatted
+      }
   }
 }
 
@@ -398,11 +407,8 @@ pub fn path_from_strings_test() {
   let path = error.path_from_strings(["a", "b", "c"])
 
   case path {
-    [
-      error.FieldSegment("a"),
-      error.FieldSegment("b"),
-      error.FieldSegment("c"),
-    ] -> Nil
+    [error.FieldSegment("a"), error.FieldSegment("b"), error.FieldSegment("c")] ->
+      Nil
     _ -> panic as "Should convert strings to field segments"
   }
 }

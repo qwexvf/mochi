@@ -34,7 +34,11 @@ pub type CreateUserInput {
 
 /// Input for updating an existing user
 pub type UpdateUserInput {
-  UpdateUserInput(name: Option(String), email: Option(String), role: Option(String))
+  UpdateUserInput(
+    name: Option(String),
+    email: Option(String),
+    role: Option(String),
+  )
 }
 
 /// Payload returned after creating a user
@@ -81,14 +85,18 @@ fn decode_user(dyn: Dynamic) -> Result(User, String) {
   }
 }
 
-fn decode_create_input(args: dict.Dict(String, Dynamic)) -> Result(CreateUserInput, String) {
+fn decode_create_input(
+  args: dict.Dict(String, Dynamic),
+) -> Result(CreateUserInput, String) {
   case dict.get(args, "input") {
     Ok(_) -> Ok(CreateUserInput("New User", "new@example.com", None))
     Error(_) -> Error("Missing input argument")
   }
 }
 
-fn decode_update_input(args: dict.Dict(String, Dynamic)) -> Result(#(String, UpdateUserInput), String) {
+fn decode_update_input(
+  args: dict.Dict(String, Dynamic),
+) -> Result(#(String, UpdateUserInput), String) {
   case dict.get(args, "id"), dict.get(args, "input") {
     Ok(id_dyn), Ok(_) -> {
       case dynamic.string(id_dyn) {
@@ -193,7 +201,10 @@ fn user_query() -> query.QueryDef(String, User) {
 // ============================================================================
 
 /// Mutation: createUser - Create a new user
-fn create_user_mutation() -> query.MutationDef(CreateUserInput, CreateUserPayload) {
+fn create_user_mutation() -> query.MutationDef(
+  CreateUserInput,
+  CreateUserPayload,
+) {
   query.mutation(
     "createUser",
     [
@@ -207,12 +218,13 @@ fn create_user_mutation() -> query.MutationDef(CreateUserInput, CreateUserPayloa
     decode_create_input,
     fn(input, _ctx) {
       // In practice, this would insert into a database
-      let new_user = User(
-        id: "new-" <> input.name,
-        name: input.name,
-        email: input.email,
-        role: Member,
-      )
+      let new_user =
+        User(
+          id: "new-" <> input.name,
+          name: input.name,
+          email: input.email,
+          role: Member,
+        )
       Ok(CreateUserPayload(user: new_user, success: True))
     },
     types.to_dynamic,
@@ -221,7 +233,10 @@ fn create_user_mutation() -> query.MutationDef(CreateUserInput, CreateUserPayloa
 }
 
 /// Mutation: updateUser - Update an existing user
-fn update_user_mutation() -> query.MutationDef(#(String, UpdateUserInput), UpdateUserPayload) {
+fn update_user_mutation() -> query.MutationDef(
+  #(String, UpdateUserInput),
+  UpdateUserPayload,
+) {
   query.mutation(
     "updateUser",
     [
@@ -331,7 +346,9 @@ pub fn main() {
 
   io.println("Available Mutations:")
   io.println("  - createUser(input: CreateUserInput!): CreateUserPayload!")
-  io.println("  - updateUser(id: ID!, input: UpdateUserInput!): UpdateUserPayload!")
+  io.println(
+    "  - updateUser(id: ID!, input: UpdateUserInput!): UpdateUserPayload!",
+  )
   io.println("  - deleteUser(id: ID!): DeleteUserPayload!")
   io.println("")
 

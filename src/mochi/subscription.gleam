@@ -17,9 +17,7 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import mochi/schema
-import mochi/types
 
 // ============================================================================
 // Types
@@ -117,7 +115,11 @@ pub fn subscribe(
   let topics = dict.insert(pubsub.topics, topic, topic_subs)
 
   let new_pubsub =
-    PubSub(subscriptions: subscriptions, topics: topics, next_id: pubsub.next_id + 1)
+    PubSub(
+      subscriptions: subscriptions,
+      topics: topics,
+      next_id: pubsub.next_id + 1,
+    )
 
   SubscribeResult(subscription_id: id, pubsub: new_pubsub)
 }
@@ -161,7 +163,10 @@ pub fn publish(pubsub: PubSub, topic: Topic, payload: Dynamic) -> Nil {
 }
 
 /// Get all active subscription IDs for a topic
-pub fn get_topic_subscribers(pubsub: PubSub, topic: Topic) -> List(SubscriptionId) {
+pub fn get_topic_subscribers(
+  pubsub: PubSub,
+  topic: Topic,
+) -> List(SubscriptionId) {
   case dict.get(pubsub.topics, topic) {
     Ok(sub_ids) -> sub_ids
     Error(_) -> []
@@ -234,7 +239,9 @@ pub fn filter(
 }
 
 /// Convert subscription definition to a field definition for schema
-pub fn to_field_definition(sub: SubscriptionDefinition(event)) -> schema.FieldDefinition {
+pub fn to_field_definition(
+  sub: SubscriptionDefinition(event),
+) -> schema.FieldDefinition {
   schema.FieldDefinition(
     name: sub.name,
     description: sub.description,

@@ -185,7 +185,9 @@ pub fn main() {
   io.println("  - @hasRole(role: String!) - Requires specific role")
   io.println("  - @rateLimit(limit: Int!, duration: Int!) - Rate limiting")
   io.println("  - @cache(maxAge: Int, scope: String) - Caching configuration")
-  io.println("  - @log(level: String) repeatable - Logging (can be applied multiple times)")
+  io.println(
+    "  - @log(level: String) repeatable - Logging (can be applied multiple times)",
+  )
   io.println("  - @uppercase - Transform to uppercase")
   io.println("  - @format(pattern: String!) - Format date/time values")
   io.println("")

@@ -121,7 +121,13 @@ fn users_query() -> query.QueryDef(query.NoArgs, List(User)) {
 fn user_query() -> query.QueryDef(String, User) {
   query.query_with_args(
     "user",
-    [query.arg_with_desc("id", schema.non_null(schema.id_type()), "The user ID")],
+    [
+      query.arg_with_desc(
+        "id",
+        schema.non_null(schema.id_type()),
+        "The user ID",
+      ),
+    ],
     schema.named_type("User"),
     fn(args) {
       case dict.get(args, "id") {

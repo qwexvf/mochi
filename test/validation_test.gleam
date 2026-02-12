@@ -3,7 +3,6 @@
 
 import gleam/dynamic.{type Dynamic}
 import gleam/list
-import gleam/option
 import mochi/parser
 import mochi/query
 import mochi/schema

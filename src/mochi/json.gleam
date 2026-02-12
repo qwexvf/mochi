@@ -9,6 +9,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/float
 import gleam/int
 import gleam/list
+
 // Option type is handled via FFI
 import gleam/string
 
@@ -242,11 +243,7 @@ fn encode_value_pretty(value: Dynamic, depth: Int, indent: Int) -> String {
   }
 }
 
-fn encode_array_pretty(
-  items: List(Dynamic),
-  depth: Int,
-  indent: Int,
-) -> String {
+fn encode_array_pretty(items: List(Dynamic), depth: Int, indent: Int) -> String {
   case items {
     [] -> "[]"
     _ -> {

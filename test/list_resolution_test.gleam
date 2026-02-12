@@ -69,23 +69,25 @@ fn build_users_list_schema() -> schema.Schema {
       schema.list_type(schema.named_type("User")),
       fn(_info) {
         // Return a list of users as dynamic dicts
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Alice")),
-            #("age", types.to_dynamic(30)),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Alice")),
+              #("age", types.to_dynamic(30)),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("2")),
+              #("name", types.to_dynamic("Bob")),
+              #("age", types.to_dynamic(25)),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("3")),
+              #("name", types.to_dynamic("Charlie")),
+              #("age", types.to_dynamic(35)),
+            ]),
           ]),
-          dict.from_list([
-            #("id", types.to_dynamic("2")),
-            #("name", types.to_dynamic("Bob")),
-            #("age", types.to_dynamic(25)),
-          ]),
-          dict.from_list([
-            #("id", types.to_dynamic("3")),
-            #("name", types.to_dynamic("Charlie")),
-            #("age", types.to_dynamic(35)),
-          ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )
@@ -183,36 +185,38 @@ fn build_posts_with_author_schema() -> schema.Schema {
       "posts",
       schema.list_type(schema.named_type("Post")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("post1")),
-            #("title", types.to_dynamic("First Post")),
-            #(
-              "author",
-              types.to_dynamic(
-                dict.from_list([
-                  #("id", types.to_dynamic("1")),
-                  #("name", types.to_dynamic("Alice")),
-                  #("age", types.to_dynamic(30)),
-                ]),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("post1")),
+              #("title", types.to_dynamic("First Post")),
+              #(
+                "author",
+                types.to_dynamic(
+                  dict.from_list([
+                    #("id", types.to_dynamic("1")),
+                    #("name", types.to_dynamic("Alice")),
+                    #("age", types.to_dynamic(30)),
+                  ]),
+                ),
               ),
-            ),
-          ]),
-          dict.from_list([
-            #("id", types.to_dynamic("post2")),
-            #("title", types.to_dynamic("Second Post")),
-            #(
-              "author",
-              types.to_dynamic(
-                dict.from_list([
-                  #("id", types.to_dynamic("2")),
-                  #("name", types.to_dynamic("Bob")),
-                  #("age", types.to_dynamic(25)),
-                ]),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("post2")),
+              #("title", types.to_dynamic("Second Post")),
+              #(
+                "author",
+                types.to_dynamic(
+                  dict.from_list([
+                    #("id", types.to_dynamic("2")),
+                    #("name", types.to_dynamic("Bob")),
+                    #("age", types.to_dynamic(25)),
+                  ]),
+                ),
               ),
-            ),
+            ]),
           ]),
-        ]))
+        )
       },
       fn(p) { types.to_dynamic(p) },
     )
@@ -292,18 +296,20 @@ fn build_users_with_filter_schema() -> schema.Schema {
       },
       fn(_min_age, _ctx) {
         // Return users regardless of filter for simplicity
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Alice")),
-            #("age", types.to_dynamic(30)),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Alice")),
+              #("age", types.to_dynamic(30)),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("2")),
+              #("name", types.to_dynamic("Bob")),
+              #("age", types.to_dynamic(25)),
+            ]),
           ]),
-          dict.from_list([
-            #("id", types.to_dynamic("2")),
-            #("name", types.to_dynamic("Bob")),
-            #("age", types.to_dynamic(25)),
-          ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )
@@ -415,12 +421,14 @@ fn build_non_null_list_schema() -> schema.Schema {
         schema.list_type(schema.non_null(schema.named_type("User"))),
       ),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Alice")),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Alice")),
+            ]),
           ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )
@@ -471,12 +479,14 @@ fn build_multi_list_schema() -> schema.Schema {
       "users",
       schema.list_type(schema.named_type("User")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Alice")),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Alice")),
+            ]),
           ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )
@@ -486,16 +496,18 @@ fn build_multi_list_schema() -> schema.Schema {
       "comments",
       schema.list_type(schema.named_type("Comment")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("c1")),
-            #("body", types.to_dynamic("Great post!")),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("c1")),
+              #("body", types.to_dynamic("Great post!")),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("c2")),
+              #("body", types.to_dynamic("Thanks for sharing")),
+            ]),
           ]),
-          dict.from_list([
-            #("id", types.to_dynamic("c2")),
-            #("body", types.to_dynamic("Thanks for sharing")),
-          ]),
-        ]))
+        )
       },
       fn(c) { types.to_dynamic(c) },
     )
@@ -592,18 +604,20 @@ fn build_user_with_tags_schema() -> schema.Schema {
       "users",
       schema.list_type(schema.named_type("User")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Alice")),
-            #("tags", types.to_dynamic(["admin", "developer"])),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Alice")),
+              #("tags", types.to_dynamic(["admin", "developer"])),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("2")),
+              #("name", types.to_dynamic("Bob")),
+              #("tags", types.to_dynamic(["user"])),
+            ]),
           ]),
-          dict.from_list([
-            #("id", types.to_dynamic("2")),
-            #("name", types.to_dynamic("Bob")),
-            #("tags", types.to_dynamic(["user"])),
-          ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )
@@ -675,38 +689,40 @@ fn build_nested_list_schema() -> schema.Schema {
       "teams",
       schema.list_type(schema.named_type("Team")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("team1")),
-            #("name", types.to_dynamic("Engineering")),
-            #(
-              "members",
-              types.to_dynamic([
-                dict.from_list([
-                  #("id", types.to_dynamic("1")),
-                  #("name", types.to_dynamic("Alice")),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("team1")),
+              #("name", types.to_dynamic("Engineering")),
+              #(
+                "members",
+                types.to_dynamic([
+                  dict.from_list([
+                    #("id", types.to_dynamic("1")),
+                    #("name", types.to_dynamic("Alice")),
+                  ]),
                 ]),
-              ]),
-            ),
+              ),
+            ]),
+            dict.from_list([
+              #("id", types.to_dynamic("team2")),
+              #("name", types.to_dynamic("Design")),
+              #(
+                "members",
+                types.to_dynamic([
+                  dict.from_list([
+                    #("id", types.to_dynamic("2")),
+                    #("name", types.to_dynamic("Bob")),
+                  ]),
+                  dict.from_list([
+                    #("id", types.to_dynamic("3")),
+                    #("name", types.to_dynamic("Charlie")),
+                  ]),
+                ]),
+              ),
+            ]),
           ]),
-          dict.from_list([
-            #("id", types.to_dynamic("team2")),
-            #("name", types.to_dynamic("Design")),
-            #(
-              "members",
-              types.to_dynamic([
-                dict.from_list([
-                  #("id", types.to_dynamic("2")),
-                  #("name", types.to_dynamic("Bob")),
-                ]),
-                dict.from_list([
-                  #("id", types.to_dynamic("3")),
-                  #("name", types.to_dynamic("Charlie")),
-                ]),
-              ]),
-            ),
-          ]),
-        ]))
+        )
       },
       fn(t) { types.to_dynamic(t) },
     )
@@ -776,12 +792,14 @@ fn build_single_item_list_schema() -> schema.Schema {
       "users",
       schema.list_type(schema.named_type("User")),
       fn(_info) {
-        Ok(types.to_dynamic([
-          dict.from_list([
-            #("id", types.to_dynamic("1")),
-            #("name", types.to_dynamic("Only User")),
+        Ok(
+          types.to_dynamic([
+            dict.from_list([
+              #("id", types.to_dynamic("1")),
+              #("name", types.to_dynamic("Only User")),
+            ]),
           ]),
-        ]))
+        )
       },
       fn(u) { types.to_dynamic(u) },
     )

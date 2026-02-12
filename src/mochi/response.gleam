@@ -111,13 +111,10 @@ pub fn to_dynamic(response: GraphQLResponse) -> Dynamic {
 
   // Always include data (even if null)
   let parts = [
-    #(
-      "data",
-      case response.data {
-        Some(d) -> d
-        None -> types.to_dynamic(Nil)
-      },
-    ),
+    #("data", case response.data {
+      Some(d) -> d
+      None -> types.to_dynamic(Nil)
+    }),
     ..parts
   ]
 
@@ -186,7 +183,7 @@ pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
 /// Check if response has errors
 pub fn has_errors(response: GraphQLResponse) -> Bool {
   case response.errors {
-    Some(errors) -> list.length(errors) > 0
+    Some(errors) -> errors != []
     None -> False
   }
 }
@@ -244,7 +241,13 @@ pub fn format(response: GraphQLResponse) -> String {
     None -> "extensions: none"
   }
 
-  "GraphQLResponse { " <> data_str <> ", " <> errors_str <> ", " <> ext_str <> " }"
+  "GraphQLResponse { "
+  <> data_str
+  <> ", "
+  <> errors_str
+  <> ", "
+  <> ext_str
+  <> " }"
 }
 
 fn int_to_string(n: Int) -> String {

@@ -26,7 +26,13 @@ pub type User {
 }
 
 pub type Post {
-  Post(id: String, title: String, body: String, author_id: String, tags: List(String))
+  Post(
+    id: String,
+    title: String,
+    body: String,
+    author_id: String,
+    tags: List(String),
+  )
 }
 
 pub type Comment {

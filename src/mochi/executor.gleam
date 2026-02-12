@@ -478,7 +478,8 @@ fn apply_single_directive(
           case directive_def.handler {
             Some(handler) -> {
               // Coerce directive arguments
-              let args = coerce_directive_arguments(directive.arguments, variables)
+              let args =
+                coerce_directive_arguments(directive.arguments, variables)
               // Call the handler with arguments and current value
               handler(args, value)
             }
@@ -638,9 +639,7 @@ fn handle_resolved_value(
       // Non-null field returned null - this is an error per GraphQL spec
       // Return an error result that signals null propagation should occur
       null_value_error(
-        "Cannot return null for non-null field '"
-          <> response_name
-          <> "'",
+        "Cannot return null for non-null field '" <> response_name <> "'",
         field_path,
       )
     }
@@ -666,14 +665,15 @@ fn handle_resolved_value(
                 resolved,
               )
             False -> {
-              let sub_result = execute_sub_selection(
-                context,
-                sub_ss,
-                field_def,
-                field_args,
-                field_path,
-                resolved,
-              )
+              let sub_result =
+                execute_sub_selection(
+                  context,
+                  sub_ss,
+                  field_def,
+                  field_args,
+                  field_path,
+                  resolved,
+                )
               // Handle null propagation from sub-selection
               case sub_result.data {
                 Some(_) -> wrap_result_in_field(sub_result, response_name)
@@ -687,7 +687,10 @@ fn handle_resolved_value(
                     False -> {
                       // Nullable field - absorb null here, return null for this field
                       ExecutionResult(
-                        data: Some(make_field(response_name, types.to_dynamic(Nil))),
+                        data: Some(make_field(
+                          response_name,
+                          types.to_dynamic(Nil),
+                        )),
                         errors: sub_result.errors,
                       )
                     }
@@ -751,8 +754,7 @@ fn execute_list_sub_selection(
       // Execute selection set on each list item, checking for null values
       let results =
         list.index_map(elements, fn(element, index) {
-          let item_path =
-            list.append(field_path, [int.to_string(index)])
+          let item_path = list.append(field_path, [int.to_string(index)])
 
           // Check if list element itself is null
           case is_null(element), items_are_non_null {
@@ -822,7 +824,10 @@ fn execute_list_sub_selection(
               ok_result(make_field(response_name, types.to_dynamic(data_list)))
             _ ->
               ExecutionResult(
-                data: Some(make_field(response_name, types.to_dynamic(data_list))),
+                data: Some(make_field(
+                  response_name,
+                  types.to_dynamic(data_list),
+                )),
                 errors: errors,
               )
           }
@@ -831,14 +836,15 @@ fn execute_list_sub_selection(
     }
     None -> {
       // Not actually a list - fall back to single item execution
-      let sub_result = execute_sub_selection(
-        context,
-        sub_selection_set,
-        field_def,
-        field_args,
-        field_path,
-        resolved_value,
-      )
+      let sub_result =
+        execute_sub_selection(
+          context,
+          sub_selection_set,
+          field_def,
+          field_args,
+          field_path,
+          resolved_value,
+        )
       // Handle null propagation
       case sub_result.data {
         Some(_) -> wrap_result_in_field(sub_result, response_name)
@@ -858,10 +864,12 @@ fn execute_list_sub_selection(
 }
 
 /// Wrap an execution result's data in a field
-fn wrap_result_in_field(result: ExecutionResult, name: String) -> ExecutionResult {
+fn wrap_result_in_field(
+  result: ExecutionResult,
+  name: String,
+) -> ExecutionResult {
   case result.data {
-    Some(data) ->
-      ExecutionResult(..result, data: Some(make_field(name, data)))
+    Some(data) -> ExecutionResult(..result, data: Some(make_field(name, data)))
     None -> result
   }
 }

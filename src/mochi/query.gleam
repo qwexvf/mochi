@@ -341,7 +341,9 @@ pub fn mutation_to_field_def(m: MutationDef(args, result)) -> FieldDefinition {
 /// Convert a SubscriptionDef to a schema FieldDefinition
 /// Note: The actual subscription logic is handled by the subscription executor,
 /// this just creates the schema definition for introspection and SDL generation
-pub fn subscription_to_field_def(s: SubscriptionDef(args, event)) -> FieldDefinition {
+pub fn subscription_to_field_def(
+  s: SubscriptionDef(args, event),
+) -> FieldDefinition {
   // Subscriptions don't have a regular resolver - they're handled specially
   // We create a placeholder resolver that returns an error if called directly
   let resolver: Resolver = fn(_info: ResolverInfo) {
@@ -517,9 +519,11 @@ pub fn build(builder: SchemaBuilder) -> Schema {
     [] -> with_mutation
     _ -> {
       let subscription_type =
-        list.fold(builder.subscriptions, schema.object("Subscription"), fn(obj, field) {
-          schema.field(obj, field)
-        })
+        list.fold(
+          builder.subscriptions,
+          schema.object("Subscription"),
+          fn(obj, field) { schema.field(obj, field) },
+        )
       schema.subscription(with_mutation, subscription_type)
     }
   }

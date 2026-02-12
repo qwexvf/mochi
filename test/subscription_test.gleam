@@ -135,17 +135,18 @@ pub fn pubsub_multiple_subscribers_test() {
 }
 
 pub fn pubsub_publish_test() {
-  // Track received events
-  let received = dict.new()
-
   let pubsub = subscription.new_pubsub()
 
   // We can't easily test publish with side effects in pure Gleam
   // but we can verify the mechanics work
   let result =
-    subscription.subscribe(pubsub, "test:topic", "testField", dict.new(), fn(
-      _data,
-    ) { Nil })
+    subscription.subscribe(
+      pubsub,
+      "test:topic",
+      "testField",
+      dict.new(),
+      fn(_data) { Nil },
+    )
 
   // Publish should not error
   subscription.publish(
@@ -416,8 +417,7 @@ pub fn subscription_executor_basic_test() {
       variable_values: dict.new(),
     )
 
-  let subscription_query =
-    "subscription { onUserCreated { id name } }"
+  let subscription_query = "subscription { onUserCreated { id name } }"
 
   let result =
     subscription_executor.subscribe(sub_ctx, subscription_query, fn(_result) {
@@ -425,7 +425,7 @@ pub fn subscription_executor_basic_test() {
     })
 
   case result {
-    subscription_executor.SubscriptionResult(subscription_id, topic, new_pubsub) -> {
+    subscription_executor.SubscriptionResult(_subscription_id, topic, new_pubsub) -> {
       case subscription.subscription_count(new_pubsub) == 1 {
         True -> Nil
         False -> panic as "Should have 1 active subscription"

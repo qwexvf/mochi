@@ -12,7 +12,8 @@ import mochi/types
 // ============================================================================
 
 pub fn success_response_test() {
-  let data = types.to_dynamic(dict.from_list([#("user", types.to_dynamic("test"))]))
+  let data =
+    types.to_dynamic(dict.from_list([#("user", types.to_dynamic("test"))]))
   let resp = response.success(data)
 
   case response.has_data(resp) {
@@ -52,7 +53,8 @@ pub fn failure_response_test() {
 }
 
 pub fn partial_response_test() {
-  let data = types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
+  let data =
+    types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
   let errors = [error.error("Partial error")]
   let resp = response.partial(data, errors)
 
@@ -77,7 +79,8 @@ pub fn partial_response_test() {
 // ============================================================================
 
 pub fn from_execution_result_success_test() {
-  let data = types.to_dynamic(dict.from_list([#("result", types.to_dynamic("ok"))]))
+  let data =
+    types.to_dynamic(dict.from_list([#("result", types.to_dynamic("ok"))]))
   let exec_result = executor.ExecutionResult(data: Some(data), errors: [])
 
   let resp = response.from_execution_result(exec_result)
@@ -89,7 +92,8 @@ pub fn from_execution_result_success_test() {
 }
 
 pub fn from_execution_result_with_errors_test() {
-  let data = types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
+  let data =
+    types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
   let errors = [
     executor.ValidationError("Field not found", ["user", "email"]),
     executor.ResolverError("Database error", ["query", "users"]),
@@ -215,7 +219,7 @@ pub fn to_dynamic_success_test() {
     types.to_dynamic(dict.from_list([#("user", types.to_dynamic("john"))]))
   let resp = response.success(data)
 
-  let dyn = response.to_dynamic(resp)
+  let _dyn = response.to_dynamic(resp)
 
   // Should produce a Dynamic value without crashing
   Nil
@@ -229,17 +233,18 @@ pub fn to_dynamic_failure_test() {
   ]
   let resp = response.failure(errors)
 
-  let dyn = response.to_dynamic(resp)
+  let _dyn = response.to_dynamic(resp)
 
   Nil
 }
 
 pub fn to_dynamic_partial_test() {
-  let data = types.to_dynamic(dict.from_list([#("partial", types.to_dynamic(True))]))
+  let data =
+    types.to_dynamic(dict.from_list([#("partial", types.to_dynamic(True))]))
   let errors = [error.validation_error("Warning", ["field"])]
   let resp = response.partial(data, errors)
 
-  let dyn = response.to_dynamic(resp)
+  let _dyn = response.to_dynamic(resp)
 
   Nil
 }
@@ -250,7 +255,7 @@ pub fn to_dynamic_with_extensions_test() {
     response.success(data)
     |> response.with_extension("custom", types.to_dynamic("value"))
 
-  let dyn = response.to_dynamic(resp)
+  let _dyn = response.to_dynamic(resp)
 
   Nil
 }
@@ -259,7 +264,7 @@ pub fn serialize_test() {
   let data = types.to_dynamic("test")
   let resp = response.success(data)
 
-  let dyn = response.serialize(resp)
+  let _dyn = response.serialize(resp)
 
   // Serialize should return same as to_dynamic
   Nil

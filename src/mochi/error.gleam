@@ -130,7 +130,11 @@ pub fn with_extensions(
 
 /// Set error category in extensions
 pub fn with_category(err: GraphQLError, category: ErrorCategory) -> GraphQLError {
-  with_extension(err, "category", types.to_dynamic(category_to_string(category)))
+  with_extension(
+    err,
+    "category",
+    types.to_dynamic(category_to_string(category)),
+  )
 }
 
 /// Set error code in extensions
@@ -225,7 +229,10 @@ pub fn to_dynamic(err: GraphQLError) -> Dynamic {
   // Add path if present
   let with_path = case err.path {
     Some(path_segments) -> [
-      #("path", types.to_dynamic(list.map(path_segments, path_segment_to_dynamic))),
+      #(
+        "path",
+        types.to_dynamic(list.map(path_segments, path_segment_to_dynamic)),
+      ),
       ..with_locations
     ]
     None -> with_locations

@@ -123,8 +123,7 @@ fn multiply_handler(
   case dict.get(args, "by") {
     Ok(by_value) -> {
       case try_get_int(by_value), try_get_int(value) {
-        Ok(multiplier), Ok(num) ->
-          Ok(types.to_dynamic(num * multiplier))
+        Ok(multiplier), Ok(num) -> Ok(types.to_dynamic(num * multiplier))
         _, _ -> Ok(value)
         // Pass through if types don't match
       }
@@ -195,7 +194,8 @@ pub fn multiply_directive_with_variable_test() {
     "
 
   let vars = dict.from_list([#("factor", types.to_dynamic(10))])
-  let result = executor.execute_query_with_variables(schema_def, query_str, vars)
+  let result =
+    executor.execute_query_with_variables(schema_def, query_str, vars)
   should.be_true(option.is_some(result.data))
   should.equal(result.errors, [])
 }
@@ -211,8 +211,7 @@ fn add_prefix_handler(
   case dict.get(args, "prefix") {
     Ok(prefix_value) -> {
       case try_get_string(prefix_value), try_get_string(value) {
-        Ok(prefix), Ok(str) ->
-          Ok(types.to_dynamic(prefix <> str))
+        Ok(prefix), Ok(str) -> Ok(types.to_dynamic(prefix <> str))
         _, _ -> Ok(value)
       }
     }
