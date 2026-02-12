@@ -75,20 +75,33 @@ pub fn main() {
 
 ## Performance
 
-Mochi is built for performance on the BEAM VM. Benchmarks run in Docker containers with no resource limits, utilizing all available CPU and RAM.
+Mochi is built for performance on the BEAM VM.
+
+**Test System:** AMD Ryzen 7 PRO 7840U (8 cores, 16 threads) | 64GB RAM | Docker containers (no resource limits)
 
 ### Simple Query: `{ users { id name } }`
 
 | Server | Runtime | Req/sec | Latency (avg) |
 |--------|---------|---------|---------------|
-| **Mercurius** | Node.js + Fastify | ~13,000 | 7.5ms |
-| **Mochi** | Gleam/Erlang | ~11,000 | 9.0ms |
-| **Bun + Yoga** | Bun | ~10,500 | 9.5ms |
-| **GraphQL Yoga** | Node.js | ~8,500 | 11.5ms |
-| **Apollo Server** | Node.js | ~5,500 | 18.0ms |
-| **graphql-js** | Node.js (reference) | ~4,500 | 22.0ms |
+| **Mercurius** | Node.js + Fastify | 36,485 | 2.28ms |
+| **Mochi** | Gleam/Erlang | 27,770 | 3.13ms |
+| **Bun + Yoga** | Bun | 19,067 | 4.68ms |
+| **GraphQL Yoga** | Node.js | 13,798 | 6.78ms |
+| **Apollo Server** | Node.js | 6,659 | 14.53ms |
+| **graphql-js** | Node.js (reference) | 4,604 | 21.21ms |
 
-Mochi achieves **2x faster** performance than Apollo Server and near-parity with Mercurius (the fastest Node.js implementation), while providing:
+### Medium Query: `{ users { id name email posts { id title } } }`
+
+| Server | Runtime | Req/sec | Latency (avg) |
+|--------|---------|---------|---------------|
+| **Mercurius** | Node.js + Fastify | 32,696 | 2.50ms |
+| **Mochi** | Gleam/Erlang | 25,850 | 3.39ms |
+| **Bun + Yoga** | Bun | 14,854 | 6.25ms |
+| **GraphQL Yoga** | Node.js | 11,705 | 8.09ms |
+| **Apollo Server** | Node.js | 5,286 | 18.43ms |
+| **graphql-js** | Node.js (reference) | 3,463 | 28.37ms |
+
+Mochi achieves **4x faster** performance than Apollo Server and **6x faster** than the reference graphql-js implementation, while providing:
 
 - **Type safety** - Full compile-time guarantees from Gleam
 - **Fault tolerance** - BEAM VM supervision and process isolation
