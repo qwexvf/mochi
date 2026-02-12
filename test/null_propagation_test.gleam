@@ -293,6 +293,8 @@ pub fn errors_collected_during_null_propagation_test() {
 // Test: List with non-null items where one item is null
 // ============================================================================
 
+// This test relies on Nil detection which works differently on JS target
+@target(erlang)
 pub fn list_with_non_null_items_null_test() {
   // Schema with [User!] where one user is null
   let user_type =

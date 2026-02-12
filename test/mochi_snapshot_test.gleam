@@ -1,49 +1,42 @@
 // GeQL Snapshot Tests - Using Birdie for comprehensive testing
 // Tests SDL parsing, schema building, query structures, and new features
+//
+// Note: All birdie snapshot tests are Erlang-only because:
+// - string.inspect output format differs between targets
+// - JSON key ordering differs between targets (dict iteration order)
 
+@target(erlang)
 import birdie
 import gleam/dict
 import gleam/string
 import gleeunit
+@target(erlang)
 import mochi/error
+@target(erlang)
 import mochi/json
+@target(erlang)
 import mochi/response
+@target(erlang)
 import mochi/schema
+@target(erlang)
 import mochi/sdl_parser
+@target(erlang)
 import mochi/types
 
 pub fn main() {
-  // Run a simple test to verify snapshots are working
-  basic_sdl_parsing_test()
-  enum_type_parsing_test()
-  union_type_parsing_test()
-  input_type_parsing_test()
-  complex_schema_parsing_test()
-  user_schema_structure_test()
-  field_type_variations_test()
-  sdl_parsing_error_test()
-  malformed_union_error_test()
-
-  // New feature snapshots
-  json_object_encoding_test()
-  json_nested_encoding_test()
-  error_with_extensions_test()
-  error_with_path_and_location_test()
-  response_success_test()
-  response_with_errors_test()
-
-  // If we get here, all snapshots matched
   gleeunit.main()
 }
 
-// Test functions need to end with _test for gleeunit to find them
-
+// ============================================================================
 // SDL Parsing Snapshot Tests
+// ============================================================================
+
+@target(erlang)
 pub fn basic_sdl_parsing_test() {
   let sdl =
     "
     scalar DateTime
-    
+
     type User {
       id: ID!
       name: String
@@ -55,6 +48,7 @@ pub fn basic_sdl_parsing_test() {
   |> birdie.snap(title: "Basic SDL parsing with scalar and object types")
 }
 
+@target(erlang)
 pub fn enum_type_parsing_test() {
   let sdl =
     "
@@ -69,6 +63,7 @@ pub fn enum_type_parsing_test() {
   |> birdie.snap(title: "Enum type SDL parsing")
 }
 
+@target(erlang)
 pub fn union_type_parsing_test() {
   let sdl =
     "
@@ -79,6 +74,7 @@ pub fn union_type_parsing_test() {
   |> birdie.snap(title: "Union type SDL parsing")
 }
 
+@target(erlang)
 pub fn input_type_parsing_test() {
   let sdl =
     "
@@ -93,6 +89,7 @@ pub fn input_type_parsing_test() {
   |> birdie.snap(title: "Input type SDL parsing")
 }
 
+@target(erlang)
 pub fn complex_schema_parsing_test() {
   let sdl =
     "
@@ -100,13 +97,13 @@ pub fn complex_schema_parsing_test() {
       user: User
       posts: [Post!]!
     }
-    
+
     type User {
       id: ID!
       name: String!
       posts: [Post!]!
     }
-    
+
     type Post {
       id: ID!
       title: String!
@@ -118,7 +115,11 @@ pub fn complex_schema_parsing_test() {
   |> birdie.snap(title: "Complex schema with relationships")
 }
 
+// ============================================================================
 // Schema Building Snapshot Tests
+// ============================================================================
+
+@target(erlang)
 pub fn user_schema_structure_test() {
   let user_type =
     schema.object("User")
@@ -156,6 +157,7 @@ pub fn user_schema_structure_test() {
   |> birdie.snap(title: "Complete User schema structure")
 }
 
+@target(erlang)
 pub fn field_type_variations_test() {
   let test_type =
     schema.object("TestType")
@@ -178,12 +180,16 @@ pub fn field_type_variations_test() {
   |> birdie.snap(title: "Field type variations (nullable, non-null, lists)")
 }
 
+// ============================================================================
 // Error Handling Snapshot Tests
+// ============================================================================
+
+@target(erlang)
 pub fn sdl_parsing_error_test() {
   let invalid_sdl =
     "
     type User {
-      id: ID!  
+      id: ID!
       name: String
       # Missing closing brace"
 
@@ -192,6 +198,7 @@ pub fn sdl_parsing_error_test() {
   |> birdie.snap(title: "SDL parsing error handling")
 }
 
+@target(erlang)
 pub fn malformed_union_error_test() {
   let invalid_sdl = "union SearchResult = | Post"
 
@@ -204,6 +211,7 @@ pub fn malformed_union_error_test() {
 // JSON Serialization Snapshot Tests
 // ============================================================================
 
+@target(erlang)
 pub fn json_object_encoding_test() {
   let data =
     dict.from_list([
@@ -218,6 +226,7 @@ pub fn json_object_encoding_test() {
   |> birdie.snap(title: "JSON object encoding with mixed types")
 }
 
+@target(erlang)
 pub fn json_nested_encoding_test() {
   let inner =
     dict.from_list([
@@ -242,6 +251,7 @@ pub fn json_nested_encoding_test() {
 // Error Extensions Snapshot Tests
 // ============================================================================
 
+@target(erlang)
 pub fn error_with_extensions_test() {
   let err =
     error.error("Authentication required")
@@ -255,6 +265,7 @@ pub fn error_with_extensions_test() {
   |> birdie.snap(title: "GraphQL error with extensions")
 }
 
+@target(erlang)
 pub fn error_with_path_and_location_test() {
   let err =
     error.error("Field 'email' is not valid")
@@ -277,6 +288,7 @@ pub fn error_with_path_and_location_test() {
 // Response Serialization Snapshot Tests
 // ============================================================================
 
+@target(erlang)
 pub fn response_success_test() {
   let data =
     dict.from_list([
@@ -300,6 +312,7 @@ pub fn response_success_test() {
   |> birdie.snap(title: "GraphQL success response with extensions")
 }
 
+@target(erlang)
 pub fn response_with_errors_test() {
   let data = dict.from_list([#("user", types.to_dynamic(Nil))])
 
