@@ -84,6 +84,10 @@ pub fn main() {
 - **Interface Types** - Define GraphQL interfaces with type resolution
 - **Union Types** - Define union types with runtime type resolution
 - **Fragment Support** - Full support for GraphQL fragments
+- **Subscriptions** - Real-time updates with PubSub pattern
+- **Error Extensions** - GraphQL-spec compliant errors with locations, path, and extensions
+- **JSON Serialization** - Built-in JSON encoding for responses
+- **Null Propagation** - Proper null bubbling per GraphQL specification
 - **DataLoader** - N+1 query prevention with automatic batching and caching
 - **Dual Target** - Works on BEAM (Erlang) and JavaScript runtimes
 - **Zero Config** - Simple, intuitive API with sensible defaults
@@ -330,6 +334,153 @@ let my_schema = schema.schema()
   |> schema.add_directive(log_directive)
 ```
 
+### Subscriptions (`mochi/subscription`)
+
+Real-time updates with a PubSub pattern:
+
+```gleam
+import mochi/subscription
+import mochi/subscription_executor
+import mochi/query
+
+// Define a subscription
+let on_user_created = query.subscription(
+  "onUserCreated",
+  schema.named_type("User"),
+  "user:created",  // Topic to subscribe to
+  fn(user) { types.to_dynamic(user) },
+)
+
+// With arguments for filtered subscriptions
+let on_message = query.subscription_with_args(
+  "onMessageSent",
+  [query.arg("roomId", schema.non_null(schema.id_type()))],
+  schema.named_type("Message"),
+  fn(args) { Ok(args.room_id) },
+  fn(room_id, _ctx) { Ok("messages:" <> room_id) },
+  fn(msg) { types.to_dynamic(msg) },
+)
+
+// Build schema with subscriptions
+let my_schema = query.new()
+  |> query.add_subscription(on_user_created)
+  |> query.add_subscription(on_message)
+  |> query.build
+
+// Create PubSub and subscribe
+let pubsub = subscription.new_pubsub()
+let result = subscription.subscribe(
+  pubsub,
+  "user:created",
+  "onUserCreated",
+  dict.new(),
+  fn(event) { send_to_client(event) },
+)
+
+// Publish events to subscribers
+subscription.publish(result.pubsub, "user:created", user_data)
+
+// Topic helpers
+subscription.topic("user:created")           // "user:created"
+subscription.topic_with_id("user", "123")    // "user:123"
+subscription.topic_from_parts(["chat", "room", "456"])  // "chat:room:456"
+```
+
+### Error Handling (`mochi/error`)
+
+GraphQL-spec compliant errors with extensions:
+
+```gleam
+import mochi/error
+
+// Basic error
+let err = error.error("Something went wrong")
+
+// Error with path (shows where in the query the error occurred)
+let err = error.error_at("Field not found", ["user", "email"])
+
+// Error with source location
+let err = error.error("Syntax error")
+  |> error.at_location(10, 5)
+
+// Error with extensions (custom metadata)
+let err = error.error("Rate limited")
+  |> error.with_code("RATE_LIMITED")
+  |> error.with_extension("retryAfter", types.to_dynamic(60))
+
+// Convenience constructors
+let err = error.validation_error("Field not found", ["user", "email"])
+let err = error.resolver_error("Database error", ["query", "users"])
+let err = error.authentication_error("Not authenticated")
+let err = error.authorization_error("Access denied", ["user", "role"])
+let err = error.user_input_error("Invalid email", "email", ["input"])
+
+// Format for logging
+error.format(err)  // "Field not found at user.email"
+
+// Serialize to Dynamic for JSON output
+error.to_dynamic(err)
+```
+
+### Response Handling (`mochi/response`)
+
+Construct and serialize GraphQL responses:
+
+```gleam
+import mochi/response
+import mochi/error
+
+// Success response
+let resp = response.success(data)
+
+// Error response
+let resp = response.failure([error.error("Something failed")])
+
+// Partial response (data with errors)
+let resp = response.partial(data, errors)
+
+// From execution result
+let resp = response.from_execution_result(exec_result)
+
+// Add extensions
+let resp = response.success(data)
+  |> response.with_extension("requestId", types.to_dynamic("req-123"))
+  |> response.with_tracing(start_time, end_time)
+
+// Serialize to JSON
+let json_string = response.to_json(resp)
+let pretty_json = response.to_json_pretty(resp)
+
+// Inspect response
+response.has_data(resp)      // True
+response.has_errors(resp)    // False
+response.is_success(resp)    // True
+response.is_partial(resp)    // False
+response.error_count(resp)   // 0
+```
+
+### JSON Serialization (`mochi/json`)
+
+Built-in JSON encoding:
+
+```gleam
+import mochi/json
+
+// Encode Dynamic values to JSON strings
+let json_string = json.encode(dynamic_value)
+
+// Pretty-print with indentation
+let pretty_json = json.encode_pretty(dynamic_value, 2)
+
+// Supports all JSON types:
+// - Strings (with proper escaping)
+// - Numbers (Int and Float)
+// - Booleans
+// - Null
+// - Arrays
+// - Objects
+```
+
 ### DataLoader (`mochi/dataloader`)
 
 Prevent N+1 queries with automatic batching:
@@ -488,15 +639,21 @@ let schema = query.new()
 
 ```
 mochi/
-|-- query.gleam           # Query/Mutation builders (Code First API)
-|-- types.gleam           # Type builders (object, enum, fields)
-|-- schema.gleam          # Core schema types and low-level API
-|-- parser.gleam          # GraphQL query parser
-|-- executor.gleam        # Query execution engine
-|-- dataloader.gleam      # N+1 query prevention
+|-- query.gleam              # Query/Mutation/Subscription builders (Code First API)
+|-- types.gleam              # Type builders (object, enum, fields)
+|-- schema.gleam             # Core schema types and low-level API
+|-- parser.gleam             # GraphQL query parser
+|-- executor.gleam           # Query execution engine with null propagation
+|-- validation.gleam         # Query validation
+|-- subscription.gleam       # Subscription PubSub system
+|-- subscription_executor.gleam  # Subscription execution
+|-- error.gleam              # GraphQL-spec compliant errors
+|-- response.gleam           # Response construction and serialization
+|-- json.gleam               # JSON encoding
+|-- dataloader.gleam         # N+1 query prevention
 |-- codegen/
-|   |-- typescript.gleam  # TypeScript .d.ts generation
-|   +-- sdl.gleam         # GraphQL SDL generation
+|   |-- typescript.gleam     # TypeScript .d.ts generation
+|   +-- sdl.gleam            # GraphQL SDL generation
 +-- ...
 ```
 
