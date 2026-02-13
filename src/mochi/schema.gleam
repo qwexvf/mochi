@@ -1,3 +1,35 @@
+//// Core schema types and execution context for GraphQL.
+////
+//// This module provides:
+//// - Schema type definitions (ObjectType, FieldType, ScalarType, etc.)
+//// - ExecutionContext for managing DataLoaders and middleware
+//// - Builder functions for constructing schemas
+////
+//// ## ExecutionContext with DataLoaders
+////
+//// ```gleam
+//// // Create context with multiple loaders
+//// let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+////   |> schema.with_loaders([
+////     #("pokemon", pokemon_loader),
+////     #("trainer", trainer_loader),
+////   ])
+////
+//// // Load by ID (handles context threading automatically)
+//// let #(ctx, pokemon) = schema.load_by_id(ctx, "pokemon", 25)
+//// let #(ctx, trainers) = schema.load_many_by_id(ctx, "trainer", [1, 2, 3])
+//// ```
+////
+//// ## Schema Building
+////
+//// ```gleam
+//// let my_schema = schema.schema()
+////   |> schema.query(query_type)
+////   |> schema.mutation(mutation_type)
+////   |> schema.add_type(schema.ObjectTypeDef(user_type))
+////   |> schema.add_directive(auth_directive)
+//// ```
+
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list

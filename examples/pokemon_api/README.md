@@ -145,40 +145,7 @@ pokemon_api/
 
 ## DataLoader
 
-The example includes DataLoader setup for efficient data fetching using Mochi's helper functions:
-
-```gleam
-// src/pokemon_api/loaders.gleam
-
-// Create loaders with one-liner helper functions
-fn create_pokemon_loader() {
-  dataloader.int_loader_result(data.find_pokemon, pokemon_to_dynamic, "Pokemon not found")
-}
-
-fn create_move_loader() {
-  dataloader.int_loader_result(data.find_move, move_to_dynamic, "Move not found")
-}
-
-// Register all loaders at once
-pub fn create_context() -> schema.ExecutionContext {
-  schema.execution_context(types.to_dynamic(dict.new()))
-  |> schema.with_loaders([
-    #("pokemon", create_pokemon_loader()),
-    #("move", create_move_loader()),
-    #("trainer", create_trainer_loader()),
-  ])
-}
-
-// Type converters using types.record and types.field helpers
-fn pokemon_to_dynamic(p: Pokemon) -> Dynamic {
-  types.record([
-    types.field("id", p.id),
-    types.field("name", p.name),
-    types.field("pokemon_types", list.map(p.pokemon_types, type_to_string)),
-    #("stats", stats_to_dynamic(p.stats)),
-  ])
-}
-```
+The example includes DataLoader setup for efficient data fetching. See `src/pokemon_api/loaders.gleam` for the implementation using Mochi's helper functions like `dataloader.int_loader_result`, `types.record`, and `types.field`.
 
 This solves the N+1 problem when fetching nested data:
 
@@ -195,13 +162,3 @@ This solves the N+1 problem when fetching nested data:
 ```
 
 With DataLoader, all Pokemon and Move fetches are batched into minimal queries.
-
-### Key Helper Functions
-
-| Function | Purpose |
-|----------|---------|
-| `dataloader.int_loader_result(find, encode, err)` | Create loader from find function |
-| `schema.with_loaders(ctx, loaders)` | Register multiple loaders at once |
-| `types.record(fields)` | Build Dynamic dict for encoders |
-| `types.field(name, value)` | Shorthand for field tuples |
-| `types.option(opt)` | Convert Option to Dynamic |

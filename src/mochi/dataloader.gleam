@@ -1,28 +1,73 @@
-/// DataLoader implementation for efficient data fetching in GraphQL
-///
-/// DataLoader solves the N+1 query problem by:
-/// 1. Batching multiple individual loads into single batch requests
-/// 2. Caching results to avoid duplicate requests within the same request context
-/// 3. Providing a simple, type-safe API for data fetching
-///
-/// Based on Facebook's DataLoader specification:
-/// https://github.com/graphql/dataloader
-///
-/// ## Quick Start
-///
-/// ```gleam
-/// // Create a loader from a simple lookup function
-/// let pokemon_loader = dataloader.int_loader(fn(id) {
-///   case find_pokemon(id) {
-///     Ok(p) -> Ok(pokemon_to_dynamic(p))
-///     Error(_) -> Error("Not found")
-///   }
-/// })
-///
-/// // Add to execution context
-/// let ctx = schema.execution_context(user_ctx)
-///   |> schema.add_data_loader("pokemon", pokemon_loader)
-/// ```
+//// DataLoader implementation for efficient data fetching in GraphQL.
+////
+//// DataLoader solves the N+1 query problem by:
+//// 1. Batching multiple individual loads into single batch requests
+//// 2. Caching results to avoid duplicate requests within the same request context
+//// 3. Providing a simple, type-safe API for data fetching
+////
+//// Based on Facebook's DataLoader specification:
+//// https://github.com/graphql/dataloader
+////
+//// ## Quick Start (Recommended)
+////
+//// Use `int_loader_result` for the simplest setup - just pass your find function:
+////
+//// ```gleam
+//// let pokemon_loader = dataloader.int_loader_result(
+////   data.find_pokemon,      // fn(Int) -> Result(Pokemon, _)
+////   pokemon_to_dynamic,     // fn(Pokemon) -> Dynamic
+////   "Pokemon not found",    // Error message
+//// )
+////
+//// // Register multiple loaders at once
+//// let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+////   |> schema.with_loaders([
+////     #("pokemon", pokemon_loader),
+////     #("trainer", trainer_loader),
+////   ])
+////
+//// // Load by ID
+//// let #(ctx, result) = schema.load_by_id(ctx, "pokemon", 25)
+//// ```
+////
+//// ## Custom Loader
+////
+//// For more control, use `int_loader` with custom logic:
+////
+//// ```gleam
+//// let user_loader = dataloader.int_loader(fn(id) {
+////   case db.find_user(id) {
+////     Ok(user) -> Ok(types.to_dynamic(user))
+////     Error(_) -> Error("User not found")
+////   }
+//// })
+//// ```
+////
+//// ## Batch Loader
+////
+//// For efficient bulk database queries, use `int_batch_loader`:
+////
+//// ```gleam
+//// let user_loader = dataloader.int_batch_loader(fn(ids) {
+////   case db.get_users_by_ids(ids) {
+////     Ok(users) -> Ok(list.map(users, types.to_dynamic))
+////     Error(e) -> Error(e)
+////   }
+//// })
+//// ```
+////
+//// ## Available Constructors
+////
+//// | Function | Description |
+//// |----------|-------------|
+//// | `int_loader_result` | One-liner from Result-returning find function |
+//// | `string_loader_result` | Same for String keys |
+//// | `int_loader` | Custom loader with Int keys |
+//// | `string_loader` | Custom loader with String keys |
+//// | `int_batch_loader` | Batch loader with Int keys |
+//// | `string_batch_loader` | Batch loader with String keys |
+//// | `new` | Full control with custom batch function |
+
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode

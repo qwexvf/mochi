@@ -1,6 +1,43 @@
-// mochi/types.gleam
-// Type definition helpers for Code First GraphQL
-// Build GraphQL types from Gleam types with minimal boilerplate
+//// Type definition helpers for Code First GraphQL.
+////
+//// This module provides builders for creating GraphQL types from Gleam types
+//// with minimal boilerplate, plus helpers for Dynamic conversion.
+////
+//// ## Object Type Builder
+////
+//// ```gleam
+//// let user_type = types.object("User")
+////   |> types.description("A user in the system")
+////   |> types.id("id", fn(u: User) { u.id })
+////   |> types.string("name", fn(u: User) { u.name })
+////   |> types.int("age", fn(u: User) { u.age })
+////   |> types.build(decode_user)
+//// ```
+////
+//// ## Enum Builder
+////
+//// ```gleam
+//// let role_enum = types.enum_type("Role")
+////   |> types.value("ADMIN")
+////   |> types.value("USER")
+////   |> types.deprecated_value_with_reason("GUEST", "Use USER instead")
+////   |> types.build_enum
+//// ```
+////
+//// ## Dynamic Conversion Helpers
+////
+//// Use these when building DataLoader encoders or custom resolvers:
+////
+//// ```gleam
+//// fn user_to_dynamic(u: User) -> Dynamic {
+////   types.record([
+////     types.field("id", u.id),
+////     types.field("name", u.name),
+////     #("profile", profile_to_dynamic(u.profile)),
+////     #("age", types.option(u.age)),  // Option(Int) -> null if None
+////   ])
+//// }
+//// ```
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}

@@ -216,130 +216,61 @@ type Query {
 
 ### Type Builders (`mochi/types`)
 
-Build GraphQL object types with type-safe field extractors:
+Build GraphQL object types with type-safe field extractors. See module docs for full API.
 
 ```gleam
 import mochi/types
-import mochi/schema
 
-// Create object type
+// Object type with field extractors
 let user_type = types.object("User")
-  |> types.description("A user in the system")
   |> types.id("id", fn(u: User) { u.id })
   |> types.string("name", fn(u: User) { u.name })
-  |> types.string_with_desc("email", "User's email address", fn(u: User) { u.email })
   |> types.int("age", fn(u: User) { u.age })
-  |> types.float("score", fn(u: User) { u.score })
-  |> types.bool("active", fn(u: User) { u.active })
-  |> types.list_string("tags", fn(u: User) { u.tags })
-  |> types.list_int("scores", fn(u: User) { u.scores })
-  |> types.optional_string("nickname", fn(u: User) { u.nickname })
-  |> types.object_field("profile", "Profile", fn(u: User) { types.to_dynamic(u.profile) })
-  |> types.list_object("posts", "Post", fn(u: User) { types.to_dynamic(u.posts) })
   |> types.build(decode_user)
 
-// Create enum type
+// Enum type
 let role_enum = types.enum_type("Role")
-  |> types.enum_description("User roles in the system")
   |> types.value("ADMIN")
-  |> types.value_with_desc("USER", "Standard user access")
-  |> types.deprecated_value("GUEST")
-  |> types.deprecated_value_with_reason("LEGACY", "Use MEMBER instead")
+  |> types.value("USER")
   |> types.build_enum
-```
 
-#### Dynamic Conversion Helpers
-
-When building DataLoader encoders or custom resolvers, use these helpers for cleaner code:
-
-```gleam
-import mochi/types
-
-// Convert any value to Dynamic
-let dyn = types.to_dynamic(user)
-
-// Build a record (dict) from field tuples - great for DataLoader encoders
+// Dynamic conversion helpers for DataLoader encoders
 fn user_to_dynamic(u: User) -> Dynamic {
   types.record([
     types.field("id", u.id),
     types.field("name", u.name),
-    types.field("email", u.email),
-    types.field("age", u.age),
-    #("profile", profile_to_dynamic(u.profile)),  // Nested object
-  ])
-}
-
-// Handle Option types (None becomes null)
-fn post_to_dynamic(p: Post) -> Dynamic {
-  types.record([
-    types.field("id", p.id),
-    types.field("title", p.title),
-    #("published_at", types.option(p.published_at)),  // Option(Time)
+    #("age", types.option(u.age)),  // Option -> null if None
   ])
 }
 ```
 
-| Function | Description |
-|----------|-------------|
-| `to_dynamic(value)` | Convert any Gleam value to Dynamic |
-| `record(fields)` | Build Dynamic dict from `List(#(String, Dynamic))` |
-| `field(name, value)` | Shorthand for `#(name, to_dynamic(value))` |
-| `option(opt)` | Convert `Option(a)` to Dynamic (None → null) |
-
 ### Query Builders (`mochi/query`)
 
-Define queries and mutations with type-safe resolvers:
+Define queries and mutations with type-safe resolvers. See module docs for full API.
 
 ```gleam
 import mochi/query
-import mochi/schema
-
-// Simple query (no arguments)
-let users_query = query.query(
-  "users",
-  schema.list_type(schema.named_type("User")),
-  fn(ctx) { Ok(get_users()) },
-  types.to_dynamic,
-)
-|> query.query_description("Get all users")
 
 // Query with arguments
 let user_query = query.query_with_args(
   "user",
-  [
-    query.arg("id", schema.non_null(schema.id_type())),
-    query.arg_with_desc("includeProfile", schema.boolean_type(), "Include user profile"),
-  ],
+  [query.arg("id", schema.non_null(schema.id_type()))],
   schema.named_type("User"),
   decode_args,
   fn(args, ctx) { get_user_by_id(args.id) },
   types.to_dynamic,
 )
 
-// Mutation with arguments
-let create_user = query.mutation(
-  "createUser",
-  [query.arg("input", schema.non_null(schema.named_type("CreateUserInput")))],
-  schema.named_type("User"),
-  decode_input,
-  fn(input, ctx) { create_user(input) },
-  types.to_dynamic,
-)
-|> query.mutation_description("Create a new user")
-
 // Build schema
 let my_schema = query.new()
-  |> query.add_query(users_query)
   |> query.add_query(user_query)
-  |> query.add_mutation(create_user)
   |> query.add_type(user_type)
-  |> query.add_enum(role_enum)
   |> query.build
 ```
 
 ### Schema Module (`mochi/schema`)
 
-Low-level schema building and type definitions:
+Low-level schema building and type definitions. See module docs for full API.
 
 ```gleam
 import mochi/schema
@@ -347,486 +278,158 @@ import mochi/schema
 // Field types
 schema.string_type()      // String
 schema.int_type()         // Int
-schema.float_type()       // Float
-schema.boolean_type()     // Boolean
-schema.id_type()          // ID
-schema.named_type("User") // Custom type reference
 schema.list_type(inner)   // [Type]
 schema.non_null(inner)    // Type!
+schema.named_type("User") // Custom type
 
-// Field definitions with deprecation
-let field = schema.field_def("oldField", schema.string_type())
-  |> schema.field_description("This field is deprecated")
-  |> schema.deprecate("Use newField instead")
-
-// Interface types
-let node_interface = schema.interface("Node")
-  |> schema.interface_description("An object with an ID")
+// Interface and union types
+let node = schema.interface("Node")
   |> schema.interface_field(schema.field_def("id", schema.non_null(schema.id_type())))
-  |> schema.interface_resolve_type(fn(value) {
-    // Return the concrete type name
-    Ok("User")
-  })
 
-// Union types
-let search_result = schema.union("SearchResult")
-  |> schema.union_description("Search result types")
+let search = schema.union("SearchResult")
   |> schema.union_member(user_type)
   |> schema.union_member(post_type)
-  |> schema.union_resolve_type(fn(value) {
-    // Return the concrete type name
-    Ok("User")
-  })
-
-// Add to schema
-let my_schema = query.new()
-  |> query.add_interface(node_interface)
-  |> query.add_union(search_result)
-  |> query.build
 ```
 
 ### Custom Directives
 
-Define custom directives for your schema:
+Define custom directives for your schema. See module docs for full API.
 
 ```gleam
 import mochi/schema
 
-// Define a custom directive
-let auth_directive = schema.directive("auth", [schema.FieldLocation, schema.ObjectLocation])
-  |> schema.directive_description("Requires authentication")
-  |> schema.directive_argument(
-    schema.arg("role", schema.string_type())
-    |> schema.arg_description("Required role"),
-  )
-
-// Repeatable directive
-let log_directive = schema.directive("log", [schema.FieldLocation])
-  |> schema.directive_repeatable
-
-// Directive with handler
-let uppercase_directive = schema.directive("uppercase", [schema.FieldLocation])
-  |> schema.directive_handler(fn(args, value) {
-    // Transform the field value
-    Ok(transform_value(value))
-  })
-
-// Add to schema
-let my_schema = schema.schema()
-  |> schema.add_directive(auth_directive)
-  |> schema.add_directive(log_directive)
+let auth = schema.directive("auth", [schema.FieldLocation])
+  |> schema.directive_argument(schema.arg("role", schema.string_type()))
+  |> schema.directive_handler(fn(args, value) { Ok(value) })
 ```
 
 ### Subscriptions (`mochi/subscription`)
 
-Real-time updates with a PubSub pattern:
+Real-time updates with a PubSub pattern. See module docs for full API.
 
 ```gleam
 import mochi/subscription
-import mochi/subscription_executor
-import mochi/query
 
-// Define a subscription
-let on_user_created = query.subscription(
-  "onUserCreated",
-  schema.named_type("User"),
-  "user:created",  // Topic to subscribe to
-  fn(user) { types.to_dynamic(user) },
-)
-
-// With arguments for filtered subscriptions
-let on_message = query.subscription_with_args(
-  "onMessageSent",
-  [query.arg("roomId", schema.non_null(schema.id_type()))],
-  schema.named_type("Message"),
-  fn(args) { Ok(args.room_id) },
-  fn(room_id, _ctx) { Ok("messages:" <> room_id) },
-  fn(msg) { types.to_dynamic(msg) },
-)
-
-// Build schema with subscriptions
-let my_schema = query.new()
-  |> query.add_subscription(on_user_created)
-  |> query.add_subscription(on_message)
-  |> query.build
-
-// Create PubSub and subscribe
 let pubsub = subscription.new_pubsub()
-let result = subscription.subscribe(
-  pubsub,
-  "user:created",
-  "onUserCreated",
-  dict.new(),
-  fn(event) { send_to_client(event) },
-)
-
-// Publish events to subscribers
+let result = subscription.subscribe(pubsub, "user:created", "onUserCreated", dict.new(), handler)
 subscription.publish(result.pubsub, "user:created", user_data)
-
-// Topic helpers
-subscription.topic("user:created")           // "user:created"
-subscription.topic_with_id("user", "123")    // "user:123"
-subscription.topic_from_parts(["chat", "room", "456"])  // "chat:room:456"
 ```
 
 ### Error Handling (`mochi/error`)
 
-GraphQL-spec compliant errors with extensions:
+GraphQL-spec compliant errors with extensions. See module docs for full API.
 
 ```gleam
 import mochi/error
 
-// Basic error
 let err = error.error("Something went wrong")
-
-// Error with path (shows where in the query the error occurred)
-let err = error.error_at("Field not found", ["user", "email"])
-
-// Error with source location
-let err = error.error("Syntax error")
-  |> error.at_location(10, 5)
-
-// Error with extensions (custom metadata)
-let err = error.error("Rate limited")
-  |> error.with_code("RATE_LIMITED")
+  |> error.with_code("INTERNAL_ERROR")
   |> error.with_extension("retryAfter", types.to_dynamic(60))
-
-// Convenience constructors
-let err = error.validation_error("Field not found", ["user", "email"])
-let err = error.resolver_error("Database error", ["query", "users"])
-let err = error.authentication_error("Not authenticated")
-let err = error.authorization_error("Access denied", ["user", "role"])
-let err = error.user_input_error("Invalid email", "email", ["input"])
-
-// Format for logging
-error.format(err)  // "Field not found at user.email"
-
-// Serialize to Dynamic for JSON output
-error.to_dynamic(err)
 ```
 
 ### Response Handling (`mochi/response`)
 
-Construct and serialize GraphQL responses:
+Construct and serialize GraphQL responses. See module docs for full API.
 
 ```gleam
 import mochi/response
-import mochi/error
 
-// Success response
-let resp = response.success(data)
-
-// Error response
-let resp = response.failure([error.error("Something failed")])
-
-// Partial response (data with errors)
-let resp = response.partial(data, errors)
-
-// From execution result
 let resp = response.from_execution_result(exec_result)
-
-// Add extensions
-let resp = response.success(data)
-  |> response.with_extension("requestId", types.to_dynamic("req-123"))
-  |> response.with_tracing(start_time, end_time)
-
-// Serialize to JSON
 let json_string = response.to_json(resp)
-let pretty_json = response.to_json_pretty(resp)
-
-// Inspect response
-response.has_data(resp)      // True
-response.has_errors(resp)    // False
-response.is_success(resp)    // True
-response.is_partial(resp)    // False
-response.error_count(resp)   // 0
 ```
 
 ### JSON Serialization (`mochi/json`)
 
-Built-in JSON encoding:
+Built-in JSON encoding. See module docs for full API.
 
 ```gleam
 import mochi/json
 
-// Encode Dynamic values to JSON strings
 let json_string = json.encode(dynamic_value)
-
-// Pretty-print with indentation
-let pretty_json = json.encode_pretty(dynamic_value, 2)
-
-// Supports all JSON types:
-// - Strings (with proper escaping)
-// - Numbers (Int and Float)
-// - Booleans
-// - Null
-// - Arrays
-// - Objects
 ```
 
 ### Query Security (`mochi/security`)
 
-Protect against malicious queries with depth limiting, complexity analysis, and more:
+Protect against malicious queries. See module docs for full API.
 
 ```gleam
 import mochi/security
 
-// Analyze a query
-let analysis = security.analyze(document)
-// Returns: SecurityAnalysis(depth: 4, complexity: 12, alias_count: 2, root_field_count: 3)
-
-// Validate against limits
-let config = security.SecurityConfig(
-  max_depth: Some(10),           // Maximum query depth
-  max_complexity: Some(100),     // Maximum field count
-  max_aliases: Some(20),         // Maximum alias count
-  max_root_fields: Some(10),     // Maximum root fields
-)
-
-case security.validate(document, config) {
+case security.validate(document, security.default_config()) {
   Ok(_) -> execute_query(document)
-  Error(security.DepthLimitExceeded(actual, max)) ->
-    error_response("Query depth " <> int.to_string(actual) <> " exceeds max " <> int.to_string(max))
-  Error(security.ComplexityLimitExceeded(actual, max)) ->
-    error_response("Query too complex")
-  // ... other error types
+  Error(err) -> error_response(err)
 }
-
-// Convenience configs
-let strict = security.strict_config()    // Low limits for public APIs
-let default = security.default_config()  // Reasonable defaults (depth: 10, complexity: 100)
-let none = security.no_limits()          // No limits (use with caution)
 ```
 
 ### Persisted Queries (`mochi/persisted_queries`)
 
-Automatic Persisted Queries (APQ) for caching and security:
+Automatic Persisted Queries (APQ) for caching and security. See module docs for full API.
 
 ```gleam
 import mochi/persisted_queries as apq
 
-// Create a persisted query store
 let store = apq.new_store()
-
-// Hash a query (SHA256)
-let hash = apq.hash_query("{ users { id name } }")
-// "abc123..." (64-char hex string)
-
-// Process incoming APQ request
-// Client sends: { "extensions": { "persistedQuery": { "sha256Hash": "abc123" } } }
 case apq.process_apq(store, query_opt, hash_opt) {
-  apq.ExecuteQuery(query, new_store) ->
-    // Execute the query and return result
-    execute(query)
-
-  apq.PersistedQueryNotFound ->
-    // Client needs to send full query with hash
-    error_response("PersistedQueryNotFound")
-
-  apq.HashMismatch(expected, got) ->
-    // Query hash doesn't match provided hash
-    error_response("Hash mismatch")
+  apq.ExecuteQuery(query, new_store) -> execute(query)
+  apq.PersistedQueryNotFound -> error_response("PersistedQueryNotFound")
+  apq.HashMismatch(_, _) -> error_response("Hash mismatch")
 }
-
-// Manual store management
-let store = apq.store_query(store, hash, query)
-let query_opt = apq.get_query(store, hash)
-let store = apq.remove_query(store, hash)
-let store = apq.clear_store(store)
 ```
 
 ### GraphQL Playgrounds (`mochi/playground`)
 
-Built-in interactive GraphQL explorers:
+Built-in interactive GraphQL explorers.
 
 ```gleam
 import mochi/playground
 
-// GraphiQL - The classic GraphQL IDE
-let html = playground.graphiql("/graphql")
-
-// GraphQL Playground - Popular alternative (legacy)
-let html = playground.playground("/graphql")
-
-// Apollo Sandbox - Modern Apollo explorer
-let html = playground.apollo_sandbox("/graphql")
-
-// Simple Explorer - Lightweight, no external dependencies
-let html = playground.simple_explorer("/graphql")
-
-// Use with your web framework
-fn handle_request(req) {
-  case path {
-    "/graphiql" -> html_response(playground.graphiql("/graphql"))
-    "/playground" -> html_response(playground.playground("/graphql"))
-    "/sandbox" -> html_response(playground.apollo_sandbox("/graphql"))
-    "/explorer" -> html_response(playground.simple_explorer("/graphql"))
-    _ -> not_found()
-  }
-}
+playground.graphiql("/graphql")      // GraphiQL IDE
+playground.playground("/graphql")    // GraphQL Playground
+playground.apollo_sandbox("/graphql") // Apollo Sandbox
+playground.simple_explorer("/graphql") // Lightweight explorer
 ```
 
 ### WebSocket Transport (`mochi/transport/websocket`)
 
-Real-time subscriptions over WebSocket using the graphql-ws protocol:
+Real-time subscriptions over WebSocket using the graphql-ws protocol. See module docs for full API.
 
 ```gleam
 import mochi/transport/websocket
 
-// Create connection state
 let state = websocket.new_connection(schema, pubsub, execution_context)
-
-// Handle incoming client messages
-case websocket.decode_client_message(json_text) {
-  Ok(client_msg) -> {
-    let result = websocket.handle_message(state, client_msg)
-    case result {
-      websocket.HandleOk(new_state, Some(response)) -> {
-        let json = websocket.encode_server_message(response)
-        send_to_client(json)
-        new_state
-      }
-      websocket.HandleClose(reason) -> close_connection(reason)
-      // ...
-    }
-  }
-  Error(err) -> log_error(websocket.format_decode_error(err))
-}
-
-// Message types supported:
-// Client -> Server: ConnectionInit, Subscribe, Complete, Ping, Pong
-// Server -> Client: ConnectionAck, Next, Error, Complete, Ping, Pong
-
-// Helper functions
-websocket.send_next(id, result)      // Send subscription data
-websocket.send_error(id, errors)     // Send subscription errors
-websocket.send_complete(id)          // Complete a subscription
-websocket.cleanup(state)             // Clean up on disconnect
+let result = websocket.handle_message(state, client_msg)
 ```
 
 ### DataLoader (`mochi/dataloader`)
 
-Prevent N+1 queries with automatic batching:
+Prevent N+1 queries with automatic batching. See module docs for full API.
 
 ```gleam
 import mochi/dataloader
 import mochi/schema
-import mochi/types
 
-// === Quick Start (Recommended) ===
-
-// Create loader from an existing find function - one line!
+// Create loader from find function (one-liner)
 let pokemon_loader = dataloader.int_loader_result(
-  data.find_pokemon,      // fn(Int) -> Result(Pokemon, _)
-  pokemon_to_dynamic,     // fn(Pokemon) -> Dynamic
-  "Pokemon not found",    // Error message
+  data.find_pokemon, pokemon_to_dynamic, "Pokemon not found",
 )
 
-// Same for String keys
-let user_loader = dataloader.string_loader_result(
-  data.find_user_by_email,
-  user_to_dynamic,
-  "User not found",
-)
-
-// Register multiple loaders at once
+// Register loaders and load data
 let ctx = schema.execution_context(types.to_dynamic(dict.new()))
-  |> schema.with_loaders([
-    #("pokemon", pokemon_loader),
-    #("user", user_loader),
-    #("trainer", trainer_loader),
-  ])
+  |> schema.with_loaders([#("pokemon", pokemon_loader)])
 
-// Load by ID (convenience helper)
 let #(ctx, result) = schema.load_by_id(ctx, "pokemon", 25)
-let #(ctx, results) = schema.load_many_by_id(ctx, "pokemon", [1, 4, 7])
-
-// === Custom Loader (Advanced) ===
-
-// Create loader with custom logic
-let user_loader = dataloader.int_loader(fn(id) {
-  case db.find_user(id) {
-    Ok(user) -> Ok(types.to_dynamic(user))
-    Error(_) -> Error("User not found")
-  }
-})
-
-// Batch loader for efficient bulk fetching
-let user_loader = dataloader.int_batch_loader(fn(ids) {
-  case db.get_users_by_ids(ids) {
-    Ok(users) -> Ok(list.map(users, types.to_dynamic))
-    Error(e) -> Error(e)
-  }
-})
-
-// === Full Control (Low-Level) ===
-
-// Create a batch loading function
-fn batch_load_users(ids: List(String)) -> Result(List(Result(User, String)), String) {
-  let users = db.get_users_by_ids(ids)
-  Ok(list.map(ids, fn(id) {
-    case list.find(users, fn(u) { u.id == id }) {
-      Ok(user) -> Ok(user)
-      Error(_) -> Error("User not found")
-    }
-  }))
-}
-
-let user_loader = dataloader.new(batch_load_users)
-
-// With custom options
-let user_loader = dataloader.new_with_options(
-  batch_load_users,
-  dataloader.DataLoaderOptions(max_batch_size: 50, cache_enabled: True),
-)
-
-// Cache management
-let loader = dataloader.prime(loader, "user-4", user)  // Pre-populate cache
-let loader = dataloader.clear_key(loader, "user-1")    // Clear specific key
-let loader = dataloader.clear_cache(loader)            // Clear all cache
 ```
-
-#### DataLoader Helper Summary
-
-| Function | Description |
-|----------|-------------|
-| `int_loader_result(find, encode, err)` | One-liner from Result-returning find function |
-| `string_loader_result(find, encode, err)` | Same for String keys |
-| `int_loader(fn)` | Custom loader with Int keys |
-| `string_loader(fn)` | Custom loader with String keys |
-| `int_batch_loader(fn)` | Batch loader with Int keys |
-| `string_batch_loader(fn)` | Batch loader with String keys |
-| `schema.with_loaders(ctx, loaders)` | Register multiple loaders |
-| `schema.load_by_id(ctx, name, id)` | Load by Int ID |
-| `schema.load_many_by_id(ctx, name, ids)` | Load multiple by Int IDs |
 
 ### Codegen Configuration
 
-Customize code generation output:
+Customize code generation output. See module docs for full API.
 
 ```gleam
 import mochi/codegen/typescript
 import mochi/codegen/sdl
-import gleam/option.{Some}
 
-// TypeScript with custom config
-let ts_config = typescript.Config(
-  use_exports: True,
-  use_interfaces: True,
-  readonly_properties: True,
-  include_helpers: True,
-  header: Some("// Custom header\n// Generated types"),
-)
-let ts_code = typescript.generate_with_config(schema, ts_config)
-
-// SDL with custom config
-let sdl_config = sdl.Config(
-  include_descriptions: True,
-  include_builtin_scalars: False,
-  indent: "  ",
-  header: Some("# My GraphQL Schema"),
-)
-let graphql_code = sdl.generate_with_config(schema, sdl_config)
+let ts_code = typescript.generate(schema)
+let graphql_code = sdl.generate(schema)
 ```
 
 ## Examples
