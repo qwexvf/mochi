@@ -683,6 +683,78 @@ pub fn required_ref_field(
   auto_field(obj, name, NonNull(Named(type_name)))
 }
 
+// ============================================================================
+// Query/Mutation Field Helpers
+// ============================================================================
+// These helpers simplify defining query/mutation fields with custom resolvers.
+
+/// Add a field with custom resolver and optional description
+pub fn resolver_field(
+  obj: ObjectType,
+  name: String,
+  field_type: FieldType,
+  desc: String,
+  resolve_fn: Resolver,
+) -> ObjectType {
+  let f =
+    FieldDefinition(
+      name: name,
+      description: Some(desc),
+      field_type: field_type,
+      arguments: dict.new(),
+      resolver: Some(resolve_fn),
+      is_deprecated: False,
+      deprecation_reason: None,
+    )
+  ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
+}
+
+/// Add a list query field: `name: [ItemType]`
+pub fn list_query(
+  obj: ObjectType,
+  name: String,
+  item_type: String,
+  desc: String,
+  resolve_fn: Resolver,
+) -> ObjectType {
+  resolver_field(obj, name, List(Named(item_type)), desc, resolve_fn)
+}
+
+/// Add a reference query field: `name: TypeName`
+pub fn ref_query(
+  obj: ObjectType,
+  name: String,
+  type_name: String,
+  desc: String,
+  resolve_fn: Resolver,
+) -> ObjectType {
+  resolver_field(obj, name, Named(type_name), desc, resolve_fn)
+}
+
+/// Add a query field with arguments
+pub fn query_with_args(
+  obj: ObjectType,
+  name: String,
+  field_type: FieldType,
+  args: List(ArgumentDefinition),
+  desc: String,
+  resolve_fn: Resolver,
+) -> ObjectType {
+  let f =
+    FieldDefinition(
+      name: name,
+      description: Some(desc),
+      field_type: field_type,
+      arguments: list.fold(args, dict.new(), fn(acc, a) {
+        dict.insert(acc, a.name, a)
+      }),
+      resolver: Some(resolve_fn),
+      is_deprecated: False,
+      deprecation_reason: None,
+    )
+  ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
+}
+
 // Argument definition builder
 pub fn arg(name: String, arg_type: FieldType) -> ArgumentDefinition {
   ArgumentDefinition(

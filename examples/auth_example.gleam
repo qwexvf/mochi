@@ -196,45 +196,24 @@ pub fn build_schema() -> schema.Schema {
       |> schema.resolver(author_resolver()),
     )
 
-  // Query type
+  // Query type - using query field helpers
   let query_type =
     schema.object("Query")
-    // Public query - no auth required
-    |> schema.field(
-      schema.field_def("publicPosts", schema.list_type(schema.named_type("Post")))
-      |> schema.field_description("Get all published posts (public)")
-      |> schema.resolver(public_posts_resolver()),
-    )
-    // Protected query - requires authentication
-    |> schema.field(
-      schema.field_def("myPosts", schema.list_type(schema.named_type("Post")))
-      |> schema.field_description("Get current user's posts (requires auth)")
-      |> schema.resolver(my_posts_resolver()),
-    )
-    // Protected query - requires authentication
-    |> schema.field(
-      schema.field_def("me", schema.named_type("User"))
-      |> schema.field_description("Get current user (requires auth)")
-      |> schema.resolver(me_resolver()),
-    )
-    // Admin-only query
-    |> schema.field(
-      schema.field_def("allUsers", schema.list_type(schema.named_type("User")))
-      |> schema.field_description("Get all users (admin only)")
-      |> schema.resolver(all_users_resolver()),
-    )
-    // Admin-only query
-    |> schema.field(
-      schema.field_def("allPosts", schema.list_type(schema.named_type("Post")))
-      |> schema.field_description("Get all posts including drafts (admin only)")
-      |> schema.resolver(all_posts_resolver()),
-    )
-    // Public query with optional auth enhancement
-    |> schema.field(
-      schema.field_def("user", schema.named_type("User"))
-      |> schema.field_description("Get user by ID (public, but email hidden for non-admins)")
-      |> schema.argument(schema.arg("id", schema.non_null(schema.id_type())))
-      |> schema.resolver(user_resolver()),
+    // Public queries
+    |> schema.list_query("publicPosts", "Post", "Get all published posts (public)", public_posts_resolver())
+    // Protected queries (require auth)
+    |> schema.list_query("myPosts", "Post", "Get current user's posts (requires auth)", my_posts_resolver())
+    |> schema.ref_query("me", "User", "Get current user (requires auth)", me_resolver())
+    // Admin-only queries
+    |> schema.list_query("allUsers", "User", "Get all users (admin only)", all_users_resolver())
+    |> schema.list_query("allPosts", "Post", "Get all posts including drafts (admin only)", all_posts_resolver())
+    // Query with arguments
+    |> schema.query_with_args(
+      "user",
+      schema.named_type("User"),
+      [schema.arg("id", schema.non_null(schema.id_type()))],
+      "Get user by ID (public, but email hidden for non-admins)",
+      user_resolver(),
     )
 
   query.new()
