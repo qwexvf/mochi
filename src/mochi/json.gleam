@@ -116,28 +116,60 @@ fn do_format(
                 Ok("}") -> do_format(rest, depth, indent, acc <> "{", False)
                 _ -> {
                   let d = depth + 1
-                  do_format(rest, d, indent, acc <> "{\n" <> spaces(d, indent), False)
+                  do_format(
+                    rest,
+                    d,
+                    indent,
+                    acc <> "{\n" <> spaces(d, indent),
+                    False,
+                  )
                 }
               }
             "}" -> {
               let d = depth - 1
-              do_format(rest, d, indent, acc <> "\n" <> spaces(d, indent) <> "}", False)
+              do_format(
+                rest,
+                d,
+                indent,
+                acc <> "\n" <> spaces(d, indent) <> "}",
+                False,
+              )
             }
             "[" ->
               case string.first(rest) {
                 Ok("]") -> do_format(rest, depth, indent, acc <> "[", False)
                 _ -> {
                   let d = depth + 1
-                  do_format(rest, d, indent, acc <> "[\n" <> spaces(d, indent), False)
+                  do_format(
+                    rest,
+                    d,
+                    indent,
+                    acc <> "[\n" <> spaces(d, indent),
+                    False,
+                  )
                 }
               }
             "]" -> {
               let d = depth - 1
-              do_format(rest, d, indent, acc <> "\n" <> spaces(d, indent) <> "]", False)
+              do_format(
+                rest,
+                d,
+                indent,
+                acc <> "\n" <> spaces(d, indent) <> "]",
+                False,
+              )
             }
-            "," -> do_format(rest, depth, indent, acc <> ",\n" <> spaces(depth, indent), False)
+            "," ->
+              do_format(
+                rest,
+                depth,
+                indent,
+                acc <> ",\n" <> spaces(depth, indent),
+                False,
+              )
             ":" -> do_format(rest, depth, indent, acc <> ": ", False)
-            " " | "\t" | "\n" | "\r" -> do_format(rest, depth, indent, acc, False)
+            " " | "\t" | "\n" | "\r" ->
+              do_format(rest, depth, indent, acc, False)
             _ -> do_format(rest, depth, indent, acc <> c, False)
           }
       }

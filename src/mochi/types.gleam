@@ -20,6 +20,53 @@ import mochi/schema.{
 @external(javascript, "./mochi_coerce_ffi.mjs", "identity")
 pub fn to_dynamic(value: a) -> Dynamic
 
+/// Build a Dynamic dict from a list of field tuples
+///
+/// This is a convenience helper for creating DataLoader encoders.
+///
+/// ## Example
+///
+/// ```gleam
+/// fn user_to_dynamic(u: User) -> Dynamic {
+///   types.record([
+///     #("id", types.to_dynamic(u.id)),
+///     #("name", types.to_dynamic(u.name)),
+///     #("email", types.to_dynamic(u.email)),
+///   ])
+/// }
+/// ```
+pub fn record(fields: List(#(String, Dynamic))) -> Dynamic {
+  to_dynamic(dict.from_list(fields))
+}
+
+/// Convert an Option to Dynamic (None becomes Nil/null)
+///
+/// ## Example
+///
+/// ```gleam
+/// #("age", types.option(user.age))
+/// ```
+pub fn option(opt: Option(a)) -> Dynamic {
+  case opt {
+    Some(v) -> to_dynamic(v)
+    None -> to_dynamic(Nil)
+  }
+}
+
+/// Shorthand: wrap a value in to_dynamic with a field name
+///
+/// ## Example
+///
+/// ```gleam
+/// types.record([
+///   types.field("id", user.id),
+///   types.field("name", user.name),
+/// ])
+/// ```
+pub fn field(name: String, value: a) -> #(String, Dynamic) {
+  #(name, to_dynamic(value))
+}
+
 // ============================================================================
 // Type Builder
 // ============================================================================

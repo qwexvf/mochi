@@ -449,6 +449,61 @@ pub fn string_batch_loader(
 }
 
 // ============================================================================
+// Result-based Loader Constructors (even less boilerplate)
+// ============================================================================
+
+/// Create a DataLoader from a Result-returning find function
+///
+/// This is the most concise way to create a loader - just provide
+/// your existing find function, an encoder, and an error message.
+///
+/// ## Example
+///
+/// ```gleam
+/// let pokemon_loader = dataloader.int_loader_result(
+///   data.find_pokemon,
+///   pokemon_to_dynamic,
+///   "Pokemon not found",
+/// )
+/// ```
+pub fn int_loader_result(
+  find_fn: fn(Int) -> Result(a, e),
+  encoder: fn(a) -> Dynamic,
+  not_found_error: String,
+) -> DataLoader(Dynamic, Dynamic) {
+  int_loader(fn(id) {
+    case find_fn(id) {
+      Ok(value) -> Ok(encoder(value))
+      Error(_) -> Error(not_found_error)
+    }
+  })
+}
+
+/// Create a DataLoader from a Result-returning find function (String keys)
+///
+/// ## Example
+///
+/// ```gleam
+/// let user_loader = dataloader.string_loader_result(
+///   data.find_user_by_email,
+///   user_to_dynamic,
+///   "User not found",
+/// )
+/// ```
+pub fn string_loader_result(
+  find_fn: fn(String) -> Result(a, e),
+  encoder: fn(a) -> Dynamic,
+  not_found_error: String,
+) -> DataLoader(Dynamic, Dynamic) {
+  string_loader(fn(key) {
+    case find_fn(key) {
+      Ok(value) -> Ok(encoder(value))
+      Error(_) -> Error(not_found_error)
+    }
+  })
+}
+
+// ============================================================================
 // Dynamic Key Helpers
 // ============================================================================
 

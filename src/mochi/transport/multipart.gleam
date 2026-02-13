@@ -6,9 +6,9 @@
 import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/int
 import gleam/json
-import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -389,11 +389,9 @@ fn process_file_part(
               Ok(#(part.name, file))
             }
             Error(err) ->
-              Error(
-                InvalidMultipartFormat(
-                  "Failed to write file: " <> simplifile.describe_error(err),
-                ),
-              )
+              Error(InvalidMultipartFormat(
+                "Failed to write file: " <> simplifile.describe_error(err),
+              ))
           }
         }
       }
@@ -541,7 +539,12 @@ fn extract_string_field(value: Dynamic, field: String) -> Result(String, Nil) {
 }
 
 fn extract_variables(value: Dynamic) -> Dict(String, Dynamic) {
-  case decode.run(value, decode.at(["variables"], decode.dict(decode.string, decode.dynamic))) {
+  case
+    decode.run(
+      value,
+      decode.at(["variables"], decode.dict(decode.string, decode.dynamic)),
+    )
+  {
     Ok(d) -> d
     Error(_) -> dict.new()
   }

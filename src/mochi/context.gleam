@@ -26,7 +26,8 @@ pub type RequestInfo {
 /// A function that builds/transforms context from request info
 /// Takes the request info and current context, returns modified context or error
 pub type ContextBuilder =
-  fn(RequestInfo, Dict(String, Dynamic)) -> Result(Dict(String, Dynamic), String)
+  fn(RequestInfo, Dict(String, Dynamic)) ->
+    Result(Dict(String, Dynamic), String)
 
 /// Pipeline of context builders that execute in order
 pub opaque type ContextPipeline {

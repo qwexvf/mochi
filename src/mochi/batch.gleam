@@ -424,6 +424,9 @@ fn extract_dict_field(
   value: Dynamic,
   field: String,
 ) -> Result(Dict(String, Dynamic), Nil) {
-  decode.run(value, decode.at([field], decode.dict(decode.string, decode.dynamic)))
+  decode.run(
+    value,
+    decode.at([field], decode.dict(decode.string, decode.dynamic)),
+  )
   |> result.map_error(fn(_) { Nil })
 }
