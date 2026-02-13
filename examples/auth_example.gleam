@@ -170,46 +170,27 @@ fn post_to_dynamic(p: Post) -> Dynamic {
 // ============================================================================
 
 pub fn build_schema() -> schema.Schema {
-  // User type
+  // User type - using simple field helpers
   let user_type =
     schema.object("User")
-    |> schema.field(
-      schema.field_def("id", schema.non_null(schema.id_type()))
-      |> schema.resolver(field_resolver("id")),
-    )
-    |> schema.field(
-      schema.field_def("name", schema.non_null(schema.string_type()))
-      |> schema.resolver(field_resolver("name")),
-    )
+    |> schema.id_field("id")
+    |> schema.required_string_field("name")
+    // email has custom resolver for field-level auth
     |> schema.field(
       schema.field_def("email", schema.non_null(schema.string_type()))
       |> schema.field_description("Only visible to the user themselves or admins")
       |> schema.resolver(email_resolver()),
     )
-    |> schema.field(
-      schema.field_def("role", schema.non_null(schema.string_type()))
-      |> schema.resolver(field_resolver("role")),
-    )
+    |> schema.required_string_field("role")
 
-  // Post type
+  // Post type - using simple field helpers
   let post_type =
     schema.object("Post")
-    |> schema.field(
-      schema.field_def("id", schema.non_null(schema.id_type()))
-      |> schema.resolver(field_resolver("id")),
-    )
-    |> schema.field(
-      schema.field_def("title", schema.non_null(schema.string_type()))
-      |> schema.resolver(field_resolver("title")),
-    )
-    |> schema.field(
-      schema.field_def("content", schema.non_null(schema.string_type()))
-      |> schema.resolver(field_resolver("content")),
-    )
-    |> schema.field(
-      schema.field_def("isDraft", schema.non_null(schema.boolean_type()))
-      |> schema.resolver(field_resolver("isDraft")),
-    )
+    |> schema.id_field("id")
+    |> schema.required_string_field("title")
+    |> schema.required_string_field("content")
+    |> schema.required_bool_field("isDraft")
+    // author has custom resolver to fetch related User
     |> schema.field(
       schema.field_def("author", schema.named_type("User"))
       |> schema.resolver(author_resolver()),
@@ -266,28 +247,6 @@ pub fn build_schema() -> schema.Schema {
 // ============================================================================
 // Resolvers
 // ============================================================================
-
-/// Generic field resolver for simple field extraction
-fn field_resolver(field_name: String) -> schema.Resolver {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) -> {
-        case
-          decode.run(parent, decode.dict(decode.string, decode.dynamic))
-        {
-          Ok(d) -> {
-            case dict.get(d, field_name) {
-              Ok(value) -> Ok(value)
-              Error(_) -> Error("Field not found: " <> field_name)
-            }
-          }
-          Error(_) -> Error("Invalid parent type")
-        }
-      }
-      None -> Error("No parent")
-    }
-  }
-}
 
 /// Email resolver - only shows email to self or admins
 fn email_resolver() -> schema.Resolver {

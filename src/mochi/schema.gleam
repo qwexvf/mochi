@@ -563,6 +563,126 @@ pub fn resolver(field: FieldDefinition, resolve_fn: Resolver) -> FieldDefinition
   FieldDefinition(..field, resolver: Some(resolve_fn))
 }
 
+// ============================================================================
+// Simple Field Helpers
+// ============================================================================
+// These helpers reduce boilerplate for Dynamic-based schemas where fields
+// are extracted from a Dict parent.
+
+import gleam/dynamic/decode
+
+/// Create a resolver that auto-extracts a field from parent by name
+pub fn auto_resolver(field_name: String) -> Resolver {
+  fn(info: ResolverInfo) {
+    case info.parent {
+      Some(parent) -> {
+        case decode.run(parent, decode.dict(decode.string, decode.dynamic)) {
+          Ok(d) -> {
+            case dict.get(d, field_name) {
+              Ok(value) -> Ok(value)
+              Error(_) -> Error("Field not found: " <> field_name)
+            }
+          }
+          Error(_) -> Error("Invalid parent type")
+        }
+      }
+      None -> Error("No parent")
+    }
+  }
+}
+
+/// Add a field with auto-resolver (extracts field by name from parent)
+pub fn auto_field(
+  obj: ObjectType,
+  name: String,
+  field_type: FieldType,
+) -> ObjectType {
+  let f =
+    FieldDefinition(
+      name: name,
+      description: None,
+      field_type: field_type,
+      arguments: dict.new(),
+      resolver: Some(auto_resolver(name)),
+      is_deprecated: False,
+      deprecation_reason: None,
+    )
+  ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
+}
+
+/// Add a non-null ID field with auto-resolver
+pub fn id_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, NonNull(Named("ID")))
+}
+
+/// Add a nullable String field with auto-resolver
+pub fn string_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, Named("String"))
+}
+
+/// Add a non-null String field with auto-resolver
+pub fn required_string_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, NonNull(Named("String")))
+}
+
+/// Add a nullable Int field with auto-resolver
+pub fn int_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, Named("Int"))
+}
+
+/// Add a non-null Int field with auto-resolver
+pub fn required_int_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, NonNull(Named("Int")))
+}
+
+/// Add a nullable Boolean field with auto-resolver
+pub fn bool_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, Named("Boolean"))
+}
+
+/// Add a non-null Boolean field with auto-resolver
+pub fn required_bool_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, NonNull(Named("Boolean")))
+}
+
+/// Add a nullable Float field with auto-resolver
+pub fn float_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, Named("Float"))
+}
+
+/// Add a non-null Float field with auto-resolver
+pub fn required_float_field(obj: ObjectType, name: String) -> ObjectType {
+  auto_field(obj, name, NonNull(Named("Float")))
+}
+
+/// Add a list field with auto-resolver
+pub fn list_field(obj: ObjectType, name: String, item_type: String) -> ObjectType {
+  auto_field(obj, name, List(Named(item_type)))
+}
+
+/// Add a non-null list field with auto-resolver
+pub fn required_list_field(
+  obj: ObjectType,
+  name: String,
+  item_type: String,
+) -> ObjectType {
+  auto_field(obj, name, NonNull(List(Named(item_type))))
+}
+
+/// Add a reference field to another type with auto-resolver
+pub fn ref_field(obj: ObjectType, name: String, type_name: String) -> ObjectType {
+  auto_field(obj, name, Named(type_name))
+}
+
+/// Add a non-null reference field with auto-resolver
+pub fn required_ref_field(
+  obj: ObjectType,
+  name: String,
+  type_name: String,
+) -> ObjectType {
+  auto_field(obj, name, NonNull(Named(type_name)))
+}
+
 // Argument definition builder
 pub fn arg(name: String, arg_type: FieldType) -> ArgumentDefinition {
   ArgumentDefinition(
