@@ -10,6 +10,7 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -224,54 +225,104 @@ pub fn build_schema() -> schema.Schema {
 }
 
 // ============================================================================
-// Resolvers
+// Resolver Helpers (eliminate nested case statements)
+// ============================================================================
+
+/// Get parent as a Dict
+fn get_parent_dict(
+  info: schema.ResolverInfo,
+) -> Result(Dict(String, Dynamic), String) {
+  use parent <- result.try(option.to_result(info.parent, "No parent"))
+  decode.run(parent, decode.dict(decode.string, decode.dynamic))
+  |> result.map_error(fn(_) { "Invalid parent type" })
+}
+
+/// Get a field from parent dict
+fn get_parent_field(
+  info: schema.ResolverInfo,
+  field: String,
+) -> Result(Dynamic, String) {
+  use d <- result.try(get_parent_dict(info))
+  dict.get(d, field)
+  |> result.map_error(fn(_) { "Field not found: " <> field })
+}
+
+/// Get an int field from parent
+fn get_parent_int(
+  info: schema.ResolverInfo,
+  field: String,
+) -> Result(Int, String) {
+  use value <- result.try(get_parent_field(info, field))
+  decode.run(value, decode.int)
+  |> result.map_error(fn(_) { "Invalid int: " <> field })
+}
+
+/// Require authentication, return the user
+fn require_auth(ctx: schema.ExecutionContext) -> Result(User, String) {
+  get_auth_context(ctx).user
+  |> option.to_result("Authentication required")
+}
+
+/// Require admin role
+fn require_admin(ctx: schema.ExecutionContext) -> Result(Nil, String) {
+  case has_role(ctx, Admin) {
+    True -> Ok(Nil)
+    False -> Error("Forbidden: Admin access required")
+  }
+}
+
+/// Parse ID argument (handles both int and string)
+fn get_id_arg(args: Dict(String, Dynamic)) -> Result(Int, String) {
+  use id_dyn <- result.try(
+    dict.get(args, "id")
+    |> result.map_error(fn(_) { "Missing id argument" }),
+  )
+  // Try int first
+  case decode.run(id_dyn, decode.int) {
+    Ok(id) -> Ok(id)
+    Error(_) -> {
+      // Try string and parse
+      use id_str <- result.try(
+        decode.run(id_dyn, decode.string)
+        |> result.map_error(fn(_) { "Invalid user ID" }),
+      )
+      int.parse(id_str)
+      |> result.map_error(fn(_) { "Invalid user ID" })
+    }
+  }
+}
+
+// ============================================================================
+// Resolvers (clean, flat, readable)
 // ============================================================================
 
 /// Email resolver - only shows email to self or admins
 fn email_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) -> {
-        let auth = get_auth_context(info.context)
+    use parent_dict <- result.try(get_parent_dict(info))
+    use email <- result.try(
+      dict.get(parent_dict, "email")
+      |> result.map_error(fn(_) { "Email field not found" }),
+    )
 
-        // Get the user being queried
-        case decode.run(parent, decode.dict(decode.string, decode.dynamic)) {
-          Ok(parent_dict) -> {
-            case dict.get(parent_dict, "email") {
-              Ok(email) -> {
-                // Check authorization
-                case auth.user {
-                  Some(current_user) -> {
-                    // Get the ID of the user being queried
-                    case dict.get(parent_dict, "id") {
-                      Ok(id_dyn) -> {
-                        case decode.run(id_dyn, decode.int) {
-                          Ok(user_id) -> {
-                            // Allow if admin or viewing own profile
-                            case
-                              current_user.role == Admin
-                              || current_user.id == user_id
-                            {
-                              True -> Ok(email)
-                              False -> Ok(types.to_dynamic("[hidden]"))
-                            }
-                          }
-                          Error(_) -> Ok(types.to_dynamic("[hidden]"))
-                        }
-                      }
-                      Error(_) -> Ok(types.to_dynamic("[hidden]"))
-                    }
-                  }
-                  None -> Ok(types.to_dynamic("[hidden]"))
-                }
-              }
-              Error(_) -> Error("Email field not found")
-            }
-          }
-          Error(_) -> Error("Invalid parent")
+    let auth = get_auth_context(info.context)
+    let can_see = case auth.user {
+      Some(current_user) ->
+        current_user.role == Admin
+        || {
+          dict.get(parent_dict, "id")
+          |> result.try(fn(id_dyn) {
+            decode.run(id_dyn, decode.int)
+            |> result.map(fn(user_id) { current_user.id == user_id })
+          })
+          |> result.unwrap(False)
         }
-      }
-      None -> Error("No parent")
+      None -> False
+    }
+
+    case can_see {
+      True -> Ok(email)
+      False -> Ok(types.to_dynamic("[hidden]"))
     }
   }
 }
@@ -279,135 +330,71 @@ fn email_resolver() -> schema.Resolver {
 /// Author resolver for posts
 fn author_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) -> {
-        case decode.run(parent, decode.dict(decode.string, decode.dynamic)) {
-          Ok(d) -> {
-            case dict.get(d, "authorId") {
-              Ok(author_id_dyn) -> {
-                case decode.run(author_id_dyn, decode.int) {
-                  Ok(author_id) -> {
-                    case find_user(author_id) {
-                      Ok(user) -> Ok(user_to_dynamic(user))
-                      Error(e) -> Error(e)
-                    }
-                  }
-                  Error(_) -> Error("Invalid author ID")
-                }
-              }
-              Error(_) -> Error("No authorId field")
-            }
-          }
-          Error(_) -> Error("Invalid parent")
-        }
-      }
-      None -> Error("No parent")
-    }
+    use author_id <- result.try(get_parent_int(info, "authorId"))
+    use user <- result.try(find_user(author_id))
+    Ok(user_to_dynamic(user))
   }
 }
 
 /// Public posts resolver - returns only published posts
 fn public_posts_resolver() -> schema.Resolver {
   fn(_info: schema.ResolverInfo) {
-    let published =
-      get_posts()
-      |> list.filter(fn(p) { !p.is_draft })
-      |> list.map(post_to_dynamic)
-    Ok(types.to_dynamic(published))
+    get_posts()
+    |> list.filter(fn(p) { !p.is_draft })
+    |> list.map(post_to_dynamic)
+    |> types.to_dynamic
+    |> Ok
   }
 }
 
 /// My posts resolver - requires authentication
 fn my_posts_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    let auth = get_auth_context(info.context)
-    case auth.user {
-      Some(user) -> {
-        let my_posts =
-          get_posts()
-          |> list.filter(fn(p) { p.author_id == user.id })
-          |> list.map(post_to_dynamic)
-        Ok(types.to_dynamic(my_posts))
-      }
-      None -> Error("Authentication required")
-    }
+    use user <- result.try(require_auth(info.context))
+    get_posts()
+    |> list.filter(fn(p) { p.author_id == user.id })
+    |> list.map(post_to_dynamic)
+    |> types.to_dynamic
+    |> Ok
   }
 }
 
 /// Me resolver - returns current user
 fn me_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    let auth = get_auth_context(info.context)
-    case auth.user {
-      Some(user) -> Ok(user_to_dynamic(user))
-      None -> Error("Authentication required")
-    }
+    use user <- result.try(require_auth(info.context))
+    Ok(user_to_dynamic(user))
   }
 }
 
 /// All users resolver - admin only
 fn all_users_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    case has_role(info.context, Admin) {
-      True -> {
-        let users = get_users() |> list.map(user_to_dynamic)
-        Ok(types.to_dynamic(users))
-      }
-      False -> Error("Forbidden: Admin access required")
-    }
+    use _ <- result.try(require_admin(info.context))
+    get_users()
+    |> list.map(user_to_dynamic)
+    |> types.to_dynamic
+    |> Ok
   }
 }
 
 /// All posts resolver - admin only, includes drafts
 fn all_posts_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    case has_role(info.context, Admin) {
-      True -> {
-        let posts = get_posts() |> list.map(post_to_dynamic)
-        Ok(types.to_dynamic(posts))
-      }
-      False -> Error("Forbidden: Admin access required")
-    }
+    use _ <- result.try(require_admin(info.context))
+    get_posts()
+    |> list.map(post_to_dynamic)
+    |> types.to_dynamic
+    |> Ok
   }
 }
 
 /// User by ID resolver
 fn user_resolver() -> schema.Resolver {
   fn(info: schema.ResolverInfo) {
-    case dict.get(info.arguments, "id") {
-      Ok(id_dyn) -> {
-        case decode.run(id_dyn, decode.int) {
-          Ok(id) -> {
-            case find_user(id) {
-              Ok(user) -> Ok(user_to_dynamic(user))
-              Error(e) -> Error(e)
-            }
-          }
-          Error(_) -> {
-            // Try as string
-            case decode.run(id_dyn, decode.string) {
-              Ok(id_str) -> {
-                case
-                  id_str
-                  |> dynamic.from
-                  |> decode.run(decode.int)
-                {
-                  Ok(id) -> {
-                    case find_user(id) {
-                      Ok(user) -> Ok(user_to_dynamic(user))
-                      Error(e) -> Error(e)
-                    }
-                  }
-                  Error(_) -> Error("Invalid user ID")
-                }
-              }
-              Error(_) -> Error("Invalid user ID")
-            }
-          }
-        }
-      }
-      Error(_) -> Error("Missing id argument")
-    }
+    use id <- result.try(get_id_arg(info.arguments))
+    use user <- result.try(find_user(id))
+    Ok(user_to_dynamic(user))
   }
 }
 
