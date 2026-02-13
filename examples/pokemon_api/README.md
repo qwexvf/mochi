@@ -141,3 +141,40 @@ pokemon_api/
 - **GraphQL Playgrounds** - Multiple IDE options
 - **Complex Types** - Enums, lists, nullable fields, nested objects
 - **Field Resolvers** - Custom resolution logic per field
+- **DataLoader** - Batch loading infrastructure for N+1 prevention
+
+## DataLoader
+
+The example includes DataLoader setup for efficient data fetching:
+
+```gleam
+// src/pokemon_api/loaders.gleam
+
+// Create loaders for each entity type
+pub fn create_pokemon_loader() -> DataLoader(Dynamic, Dynamic)
+pub fn create_move_loader() -> DataLoader(Dynamic, Dynamic)
+pub fn create_trainer_loader() -> DataLoader(Dynamic, Dynamic)
+
+// Create an ExecutionContext with all loaders initialized
+pub fn create_context() -> schema.ExecutionContext
+
+// Load helpers that handle context threading
+pub fn load_pokemon(ctx, id) -> #(ExecutionContext, Result(Dynamic, String))
+pub fn load_pokemon_many(ctx, ids) -> #(ExecutionContext, List(Result))
+```
+
+This solves the N+1 problem when fetching nested data:
+
+```graphql
+{
+  trainer(id: 1) {
+    team {        # Would be 5 separate queries without batching
+      moves {     # Each Pokemon's moves - more queries
+        name
+      }
+    }
+  }
+}
+```
+
+With DataLoader, all Pokemon and Move fetches are batched into minimal queries.

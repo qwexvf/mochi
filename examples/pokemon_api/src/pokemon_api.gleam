@@ -30,7 +30,7 @@ import mochi/parser
 import mochi/playground
 import mochi/response
 import mochi/schema
-import mochi/types as mochi_types
+import pokemon_api/loaders
 import pokemon_api/schema as pokemon_schema
 import simplifile
 import wisp.{type Request, type Response}
@@ -237,7 +237,8 @@ fn handle_graphql(req: Request, gql_schema: schema.Schema) -> Response {
 
       case parse_graphql_request(body) {
         Ok(#(query, variables)) -> {
-          let ctx = schema.execution_context(mochi_types.to_dynamic(dict.new()))
+          // Create execution context with DataLoaders for batching
+          let ctx = loaders.create_context()
 
           case parser.parse(query) {
             Ok(document) -> {
