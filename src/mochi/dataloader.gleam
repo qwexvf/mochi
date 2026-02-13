@@ -1,5 +1,5 @@
 /// DataLoader implementation for efficient data fetching in GraphQL
-/// 
+///
 /// DataLoader solves the N+1 query problem by:
 /// 1. Batching multiple individual loads into single batch requests
 /// 2. Caching results to avoid duplicate requests within the same request context
@@ -7,7 +7,25 @@
 ///
 /// Based on Facebook's DataLoader specification:
 /// https://github.com/graphql/dataloader
+///
+/// ## Quick Start
+///
+/// ```gleam
+/// // Create a loader from a simple lookup function
+/// let pokemon_loader = dataloader.int_loader(fn(id) {
+///   case find_pokemon(id) {
+///     Ok(p) -> Ok(pokemon_to_dynamic(p))
+///     Error(_) -> Error("Not found")
+///   }
+/// })
+///
+/// // Add to execution context
+/// let ctx = schema.execution_context(user_ctx)
+///   |> schema.add_data_loader("pokemon", pokemon_loader)
+/// ```
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 
@@ -313,3 +331,138 @@ fn fold2(
     // Mismatched lengths
   }
 }
+
+// ============================================================================
+// Convenient Loader Constructors
+// ============================================================================
+
+/// Create a DataLoader for Int keys from a simple lookup function
+///
+/// This is the most common pattern - looking up entities by integer ID.
+///
+/// ## Example
+///
+/// ```gleam
+/// let pokemon_loader = dataloader.int_loader(fn(id) {
+///   case data.find_pokemon(id) {
+///     Ok(pokemon) -> Ok(to_dynamic(pokemon))
+///     Error(_) -> Error("Pokemon not found")
+///   }
+/// })
+/// ```
+pub fn int_loader(
+  lookup: fn(Int) -> Result(Dynamic, String),
+) -> DataLoader(Dynamic, Dynamic) {
+  new(fn(keys: List(Dynamic)) {
+    Ok(
+      list.map(keys, fn(key) {
+        case decode.run(key, decode.int) {
+          Ok(id) -> lookup(id)
+          Error(_) -> Error("Invalid integer key")
+        }
+      }),
+    )
+  })
+}
+
+/// Create a DataLoader for String keys from a simple lookup function
+///
+/// ## Example
+///
+/// ```gleam
+/// let user_loader = dataloader.string_loader(fn(email) {
+///   case data.find_user_by_email(email) {
+///     Ok(user) -> Ok(to_dynamic(user))
+///     Error(_) -> Error("User not found")
+///   }
+/// })
+/// ```
+pub fn string_loader(
+  lookup: fn(String) -> Result(Dynamic, String),
+) -> DataLoader(Dynamic, Dynamic) {
+  new(fn(keys: List(Dynamic)) {
+    Ok(
+      list.map(keys, fn(key) {
+        case decode.run(key, decode.string) {
+          Ok(s) -> lookup(s)
+          Error(_) -> Error("Invalid string key")
+        }
+      }),
+    )
+  })
+}
+
+/// Create a DataLoader with a batch lookup function for Int keys
+///
+/// Use this when your data source supports efficient batch fetching.
+/// The batch function receives all IDs at once and should return results
+/// in the same order.
+///
+/// ## Example
+///
+/// ```gleam
+/// let pokemon_loader = dataloader.int_batch_loader(fn(ids) {
+///   // Single database query for all IDs
+///   case db.find_pokemon_batch(ids) {
+///     Ok(results) -> Ok(list.map(results, to_dynamic))
+///     Error(e) -> Error(e)
+///   }
+/// })
+/// ```
+pub fn int_batch_loader(
+  batch_lookup: fn(List(Int)) -> Result(List(Dynamic), String),
+) -> DataLoader(Dynamic, Dynamic) {
+  new(fn(keys: List(Dynamic)) {
+    let int_keys =
+      list.filter_map(keys, fn(key) {
+        case decode.run(key, decode.int) {
+          Ok(id) -> Ok(id)
+          Error(_) -> Error(Nil)
+        }
+      })
+
+    case batch_lookup(int_keys) {
+      Ok(results) -> Ok(list.map(results, Ok))
+      Error(e) -> Error(e)
+    }
+  })
+}
+
+/// Create a DataLoader with a batch lookup function for String keys
+pub fn string_batch_loader(
+  batch_lookup: fn(List(String)) -> Result(List(Dynamic), String),
+) -> DataLoader(Dynamic, Dynamic) {
+  new(fn(keys: List(Dynamic)) {
+    let string_keys =
+      list.filter_map(keys, fn(key) {
+        case decode.run(key, decode.string) {
+          Ok(s) -> Ok(s)
+          Error(_) -> Error(Nil)
+        }
+      })
+
+    case batch_lookup(string_keys) {
+      Ok(results) -> Ok(list.map(results, Ok))
+      Error(e) -> Error(e)
+    }
+  })
+}
+
+// ============================================================================
+// Dynamic Key Helpers
+// ============================================================================
+
+/// Convert an Int to a Dynamic key for use with DataLoader
+pub fn int_key(id: Int) -> Dynamic {
+  to_dynamic(id)
+}
+
+/// Convert a String to a Dynamic key for use with DataLoader
+pub fn string_key(s: String) -> Dynamic {
+  to_dynamic(s)
+}
+
+/// Internal: Convert any value to Dynamic (identity function)
+@external(erlang, "gleam_stdlib", "identity")
+@external(javascript, "../mochi/mochi_coerce_ffi.mjs", "identity")
+fn to_dynamic(value: a) -> Dynamic

@@ -1,5 +1,6 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import mochi/dataloader.{type DataLoader}
 
@@ -325,6 +326,108 @@ pub fn update_data_loader(
     ..context,
     data_loaders: dict.insert(context.data_loaders, name, loader),
   )
+}
+
+/// Add multiple DataLoaders to the execution context at once
+///
+/// ## Example
+///
+/// ```gleam
+/// let ctx = schema.execution_context(user_ctx)
+///   |> schema.with_loaders([
+///     #("pokemon", pokemon_loader),
+///     #("move", move_loader),
+///     #("trainer", trainer_loader),
+///   ])
+/// ```
+pub fn with_loaders(
+  context: ExecutionContext,
+  loaders: List(#(String, DataLoader(Dynamic, Dynamic))),
+) -> ExecutionContext {
+  list.fold(loaders, context, fn(ctx, loader_pair) {
+    let #(name, loader) = loader_pair
+    add_data_loader(ctx, name, loader)
+  })
+}
+
+/// Load a value using a named DataLoader, returning updated context and result
+///
+/// This handles the context threading automatically.
+///
+/// ## Example
+///
+/// ```gleam
+/// let #(ctx, result) = schema.load(ctx, "pokemon", dataloader.int_key(25))
+/// ```
+pub fn load(
+  context: ExecutionContext,
+  loader_name: String,
+  key: Dynamic,
+) -> #(ExecutionContext, Result(Dynamic, String)) {
+  case get_data_loader(context, loader_name) {
+    Ok(loader) -> {
+      let #(new_loader, result) = dataloader.load(loader, key)
+      let new_ctx = update_data_loader(context, loader_name, new_loader)
+      #(new_ctx, result)
+    }
+    Error(e) -> #(context, Error(e))
+  }
+}
+
+/// Load multiple values using a named DataLoader
+///
+/// ## Example
+///
+/// ```gleam
+/// let keys = list.map([1, 2, 3], dataloader.int_key)
+/// let #(ctx, results) = schema.load_many(ctx, "pokemon", keys)
+/// ```
+pub fn load_many(
+  context: ExecutionContext,
+  loader_name: String,
+  keys: List(Dynamic),
+) -> #(ExecutionContext, List(Result(Dynamic, String))) {
+  case get_data_loader(context, loader_name) {
+    Ok(loader) -> {
+      let #(new_loader, results) = dataloader.load_many(loader, keys)
+      let new_ctx = update_data_loader(context, loader_name, new_loader)
+      #(new_ctx, results)
+    }
+    Error(e) -> #(context, list.map(keys, fn(_) { Error(e) }))
+  }
+}
+
+/// Load an entity by Int ID using a named DataLoader
+///
+/// Convenience wrapper for the common case of loading by integer ID.
+///
+/// ## Example
+///
+/// ```gleam
+/// let #(ctx, pokemon) = schema.load_by_id(ctx, "pokemon", 25)
+/// ```
+pub fn load_by_id(
+  context: ExecutionContext,
+  loader_name: String,
+  id: Int,
+) -> #(ExecutionContext, Result(Dynamic, String)) {
+  load(context, loader_name, dataloader.int_key(id))
+}
+
+/// Load multiple entities by Int IDs using a named DataLoader
+///
+/// ## Example
+///
+/// ```gleam
+/// let #(ctx, pokemon_list) = schema.load_many_by_id(ctx, "pokemon", [1, 4, 7, 25])
+/// ```
+pub fn load_many_by_id(
+  context: ExecutionContext,
+  loader_name: String,
+  ids: List(Int),
+) -> #(ExecutionContext, List(Result(Dynamic, String))) {
+  let keys = list.map(ids, dataloader.int_key)
+  load_many(context, loader_name, keys)
 }
 
 // Builder API
