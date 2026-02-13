@@ -341,7 +341,10 @@ fn generate_fields(current: Int, max: Int, acc: List(String)) -> List(String) {
   case current > max {
     True -> acc
     False -> {
-      let field = "  field" <> int.to_string(current) <> ": user(id: \"user-1\") { id username }"
+      let field =
+        "  field"
+        <> int.to_string(current)
+        <> ": user(id: \"user-1\") { id username }"
       generate_fields(current + 1, max, [field, ..acc])
     }
   }
@@ -392,11 +395,14 @@ fn benchmark(name: String, iterations: Int, f: fn() -> a) -> Nil {
   let ops_per_sec = 1_000_000.0 /. avg_us
 
   io.println(
-    pad_right(name, 30) <>
-    format_time(avg_us) <>
-    pad_left(format_ops(ops_per_sec) <> " ops/sec", 18) <>
-    "  (min: " <> format_time_compact(int.to_float(min_us)) <>
-    ", max: " <> format_time_compact(int.to_float(max_us)) <> ")"
+    pad_right(name, 30)
+    <> format_time(avg_us)
+    <> pad_left(format_ops(ops_per_sec) <> " ops/sec", 18)
+    <> "  (min: "
+    <> format_time_compact(int.to_float(min_us))
+    <> ", max: "
+    <> format_time_compact(int.to_float(max_us))
+    <> ")",
   )
 }
 
@@ -483,12 +489,18 @@ fn run_parsing_benchmarks() -> Nil {
   benchmark("Parse simple", 5000, fn() { parser.parse(simple_query) })
   benchmark("Parse medium", 5000, fn() { parser.parse(medium_query) })
   benchmark("Parse nested", 3000, fn() { parser.parse(nested_query) })
-  benchmark("Parse deeply nested", 2000, fn() { parser.parse(deeply_nested_query) })
-  benchmark("Parse multiple roots", 2000, fn() { parser.parse(multiple_roots_query) })
+  benchmark("Parse deeply nested", 2000, fn() {
+    parser.parse(deeply_nested_query)
+  })
+  benchmark("Parse multiple roots", 2000, fn() {
+    parser.parse(multiple_roots_query)
+  })
   benchmark("Parse fragments", 2000, fn() { parser.parse(fragment_query) })
   benchmark("Parse directives", 3000, fn() { parser.parse(directive_query) })
   benchmark("Parse large", 1000, fn() { parser.parse(large_query) })
-  benchmark("Parse complex combined", 1000, fn() { parser.parse(complex_combined_query) })
+  benchmark("Parse complex combined", 1000, fn() {
+    parser.parse(complex_combined_query)
+  })
 
   io.println("")
   io.println("Generated queries (scaling test):")
@@ -515,7 +527,13 @@ fn print_query_size(name: String, query: String) -> Nil {
   let chars = string.length(query)
   let bytes = string.byte_size(query)
   io.println(
-    "  " <> pad_right(name, 20) <> ": " <> int.to_string(chars) <> " chars, " <> int.to_string(bytes) <> " bytes"
+    "  "
+    <> pad_right(name, 20)
+    <> ": "
+    <> int.to_string(chars)
+    <> " chars, "
+    <> int.to_string(bytes)
+    <> " bytes",
   )
 }
 
@@ -557,18 +575,23 @@ fn run_execution_benchmarks(gql_schema: schema.Schema) -> Nil {
 
   io.println("")
   io.println("With variables:")
-  let vars = dict.from_list([
-    #("userId", types.to_dynamic("user-1")),
-    #("postId", types.to_dynamic("post-1")),
-    #("limit", types.to_dynamic(10)),
-  ])
+  let vars =
+    dict.from_list([
+      #("userId", types.to_dynamic("user-1")),
+      #("postId", types.to_dynamic("post-1")),
+      #("limit", types.to_dynamic(10)),
+    ])
 
   benchmark("Execute with vars", 500, fn() {
     executor.execute_query_with_variables(gql_schema, variable_query, vars)
   })
 
   benchmark("Execute complex with vars", 100, fn() {
-    executor.execute_query_with_variables(gql_schema, complex_combined_query, vars)
+    executor.execute_query_with_variables(
+      gql_schema,
+      complex_combined_query,
+      vars,
+    )
   })
 
   Nil
@@ -595,7 +618,16 @@ fn run_query_complexity_analysis() -> Nil {
   ]
 
   io.println("Query complexity metrics:")
-  io.println(pad_right("Query", 18) <> " | " <> pad_right("Chars", 8) <> " | " <> pad_right("Tokens*", 8) <> " | " <> pad_right("Parse µs", 10) <> " | µs/char")
+  io.println(
+    pad_right("Query", 18)
+    <> " | "
+    <> pad_right("Chars", 8)
+    <> " | "
+    <> pad_right("Tokens*", 8)
+    <> " | "
+    <> pad_right("Parse µs", 10)
+    <> " | µs/char",
+  )
   io.println(string.repeat("-", 65))
 
   list.each(queries, fn(pair) {
@@ -606,11 +638,15 @@ fn run_query_complexity_analysis() -> Nil {
     let us_per_char = int.to_float(parse_us) /. int.to_float(chars)
 
     io.println(
-      pad_right(name, 18) <> " | " <>
-      pad_left(int.to_string(chars), 8) <> " | " <>
-      pad_left(int.to_string(tokens_est), 8) <> " | " <>
-      pad_left(int.to_string(parse_us), 10) <> " | " <>
-      float_to_string_2(us_per_char)
+      pad_right(name, 18)
+      <> " | "
+      <> pad_left(int.to_string(chars), 8)
+      <> " | "
+      <> pad_left(int.to_string(tokens_est), 8)
+      <> " | "
+      <> pad_left(int.to_string(parse_us), 10)
+      <> " | "
+      <> float_to_string_2(us_per_char),
     )
   })
 
@@ -622,7 +658,8 @@ fn run_query_complexity_analysis() -> Nil {
 
 fn estimate_tokens(query: String) -> Int {
   // Rough estimate: count words, punctuation, etc.
-  string.length(query) / 4  // Approximate average token length
+  string.length(query) / 4
+  // Approximate average token length
 }
 
 // ============================================================================
@@ -661,11 +698,13 @@ fn run_cache_vs_nocache_comparison(gql_schema: schema.Schema) -> Nil {
       }
     })
     let elapsed_nocache = monotonic_time_us() - start_nocache
-    let ops_nocache = int.to_float(iterations) *. 1_000_000.0 /. int.to_float(elapsed_nocache)
+    let ops_nocache =
+      int.to_float(iterations) *. 1_000_000.0 /. int.to_float(elapsed_nocache)
 
     // With cache - parse once, reuse
     query_cache.clear()
-    let _ = query_cache.get_or_parse(query)  // Prime
+    let _ = query_cache.get_or_parse(query)
+    // Prime
 
     let start_cached = monotonic_time_us()
     repeat(iterations, fn() {
@@ -679,7 +718,8 @@ fn run_cache_vs_nocache_comparison(gql_schema: schema.Schema) -> Nil {
       }
     })
     let elapsed_cached = monotonic_time_us() - start_cached
-    let ops_cached = int.to_float(iterations) *. 1_000_000.0 /. int.to_float(elapsed_cached)
+    let ops_cached =
+      int.to_float(iterations) *. 1_000_000.0 /. int.to_float(elapsed_cached)
 
     let speedup = ops_cached /. ops_nocache
 
@@ -691,7 +731,13 @@ fn run_cache_vs_nocache_comparison(gql_schema: schema.Schema) -> Nil {
 
   // Show final cache stats
   let stats = query_cache.stats()
-  io.println("Cache stats: " <> int.to_string(stats.hits) <> " hits, " <> int.to_string(stats.misses) <> " misses")
+  io.println(
+    "Cache stats: "
+    <> int.to_string(stats.hits)
+    <> " hits, "
+    <> int.to_string(stats.misses)
+    <> " misses",
+  )
 
   Nil
 }

@@ -17,7 +17,7 @@ import mochi/schema.{
 /// Convert any Gleam value to Dynamic
 /// This uses unsafe_coerce under the hood
 @external(erlang, "gleam_stdlib", "identity")
-@external(javascript, "../mochi_ffi.mjs", "identity")
+@external(javascript, "./mochi_coerce_ffi.mjs", "identity")
 pub fn to_dynamic(value: a) -> Dynamic
 
 // ============================================================================

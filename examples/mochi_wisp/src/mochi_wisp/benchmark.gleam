@@ -96,7 +96,8 @@ fn run_throughput_test() -> Nil {
   let body = "{\"query\": \"{ users { id name email role } }\"}"
 
   // Run for a fixed duration and count operations
-  let duration_ms = 1000  // 1 second
+  let duration_ms = 1000
+  // 1 second
   let start = monotonic_time_us()
   let ops = run_for_duration(schema, body, start, duration_ms * 1000, 0)
   let elapsed_us = monotonic_time_us() - start
@@ -110,7 +111,7 @@ fn run_throughput_test() -> Nil {
     <> " ops/sec"
     <> "  (avg latency: "
     <> format_time(latency_us)
-    <> ")"
+    <> ")",
   )
   Nil
 }
@@ -130,11 +131,13 @@ fn run_for_duration(
       case graphql_handler.parse_graphql_request(body) {
         Ok(req) -> {
           let vars = option.unwrap(req.variables, dict.new())
-          let result = executor.execute_query_with_variables(gql_schema, req.query, vars)
+          let result =
+            executor.execute_query_with_variables(gql_schema, req.query, vars)
           let _ = graphql_handler.execution_result_to_json(result)
           run_for_duration(gql_schema, body, start, duration_us, count + 1)
         }
-        Error(_) -> run_for_duration(gql_schema, body, start, duration_us, count)
+        Error(_) ->
+          run_for_duration(gql_schema, body, start, duration_us, count)
       }
     }
   }
@@ -158,7 +161,8 @@ fn run_cached_throughput_test() -> Nil {
   let _ = query_cache.get_or_parse(query)
 
   // Run for a fixed duration and count operations
-  let duration_ms = 1000  // 1 second
+  let duration_ms = 1000
+  // 1 second
   let start = monotonic_time_us()
   let ops = run_cached_for_duration(schema, query, start, duration_ms * 1000, 0)
   let elapsed_us = monotonic_time_us() - start
@@ -172,7 +176,7 @@ fn run_cached_throughput_test() -> Nil {
     <> " ops/sec"
     <> "  (avg latency: "
     <> format_time(latency_us)
-    <> ")"
+    <> ")",
   )
 
   // Show cache stats
@@ -184,7 +188,7 @@ fn run_cached_throughput_test() -> Nil {
     <> int.to_string(stats.misses)
     <> " misses, "
     <> int.to_string(stats.size)
-    <> " entries"
+    <> " entries",
   )
   Nil
 }
@@ -204,11 +208,19 @@ fn run_cached_for_duration(
       case query_cache.get_or_parse(query) {
         Ok(document) -> {
           let ctx = schema.execution_context(types.to_dynamic(dict.new()))
-          let result = executor.execute(gql_schema, document, None, ctx, dict.new())
+          let result =
+            executor.execute(gql_schema, document, None, ctx, dict.new())
           let _ = graphql_handler.execution_result_to_json(result)
-          run_cached_for_duration(gql_schema, query, start, duration_us, count + 1)
+          run_cached_for_duration(
+            gql_schema,
+            query,
+            start,
+            duration_us,
+            count + 1,
+          )
         }
-        Error(_) -> run_cached_for_duration(gql_schema, query, start, duration_us, count)
+        Error(_) ->
+          run_cached_for_duration(gql_schema, query, start, duration_us, count)
       }
     }
   }
@@ -254,9 +266,14 @@ fn run_parsing_benchmarks() -> Nil {
   let complex_query =
     "query GetUser($id: ID!) { user(id: $id) { id name email role } users { id name } }"
 
-  let _ = benchmark("Parse simple query", 10_000, fn() { parser.parse(simple_query) })
-  let _ = benchmark("Parse medium query", 10_000, fn() { parser.parse(medium_query) })
-  let _ = benchmark("Parse complex query", 10_000, fn() { parser.parse(complex_query) })
+  let _ =
+    benchmark("Parse simple query", 10_000, fn() { parser.parse(simple_query) })
+  let _ =
+    benchmark("Parse medium query", 10_000, fn() { parser.parse(medium_query) })
+  let _ =
+    benchmark("Parse complex query", 10_000, fn() {
+      parser.parse(complex_query)
+    })
   Nil
 }
 
@@ -277,41 +294,50 @@ fn run_cache_benchmarks() -> Nil {
     "query GetUser($id: ID!) { user(id: $id) { id name email role } users { id name } }"
 
   // Benchmark cache miss (first parse)
-  let _ = benchmark("Cache MISS (simple)", 10_000, fn() {
-    query_cache.clear()
-    query_cache.get_or_parse(simple_query)
-  })
+  let _ =
+    benchmark("Cache MISS (simple)", 10_000, fn() {
+      query_cache.clear()
+      query_cache.get_or_parse(simple_query)
+    })
 
   // Benchmark cache hit
   query_cache.clear()
-  let _ = query_cache.get_or_parse(simple_query)  // Prime the cache
-  let _ = benchmark("Cache HIT (simple)", 10_000, fn() {
-    query_cache.get_or_parse(simple_query)
-  })
+  let _ = query_cache.get_or_parse(simple_query)
+  // Prime the cache
+  let _ =
+    benchmark("Cache HIT (simple)", 10_000, fn() {
+      query_cache.get_or_parse(simple_query)
+    })
 
   // Benchmark cache miss vs hit for medium query
-  let _ = benchmark("Cache MISS (medium)", 10_000, fn() {
-    query_cache.clear()
-    query_cache.get_or_parse(medium_query)
-  })
+  let _ =
+    benchmark("Cache MISS (medium)", 10_000, fn() {
+      query_cache.clear()
+      query_cache.get_or_parse(medium_query)
+    })
 
   query_cache.clear()
-  let _ = query_cache.get_or_parse(medium_query)  // Prime the cache
-  let _ = benchmark("Cache HIT (medium)", 10_000, fn() {
-    query_cache.get_or_parse(medium_query)
-  })
+  let _ = query_cache.get_or_parse(medium_query)
+  // Prime the cache
+  let _ =
+    benchmark("Cache HIT (medium)", 10_000, fn() {
+      query_cache.get_or_parse(medium_query)
+    })
 
   // Benchmark cache miss vs hit for complex query
-  let _ = benchmark("Cache MISS (complex)", 10_000, fn() {
-    query_cache.clear()
-    query_cache.get_or_parse(complex_query)
-  })
+  let _ =
+    benchmark("Cache MISS (complex)", 10_000, fn() {
+      query_cache.clear()
+      query_cache.get_or_parse(complex_query)
+    })
 
   query_cache.clear()
-  let _ = query_cache.get_or_parse(complex_query)  // Prime the cache
-  let _ = benchmark("Cache HIT (complex)", 10_000, fn() {
-    query_cache.get_or_parse(complex_query)
-  })
+  let _ = query_cache.get_or_parse(complex_query)
+  // Prime the cache
+  let _ =
+    benchmark("Cache HIT (complex)", 10_000, fn() {
+      query_cache.get_or_parse(complex_query)
+    })
 
   // Clear for subsequent tests
   query_cache.clear()
@@ -340,26 +366,30 @@ fn run_execution_benchmarks() -> Nil {
 
   let schema = wisp_schema.build_schema()
 
-  let _ = benchmark("Execute users query", 1000, fn() {
-    executor.execute_query(schema, "{ users { id name email } }")
-  })
+  let _ =
+    benchmark("Execute users query", 1000, fn() {
+      executor.execute_query(schema, "{ users { id name email } }")
+    })
 
-  let _ = benchmark("Execute users + role", 1000, fn() {
-    executor.execute_query(schema, "{ users { id name email role } }")
-  })
+  let _ =
+    benchmark("Execute users + role", 1000, fn() {
+      executor.execute_query(schema, "{ users { id name email role } }")
+    })
 
-  let _ = benchmark("Execute user by id", 1000, fn() {
-    executor.execute_query(schema, "{ user(id: \"1\") { id name } }")
-  })
+  let _ =
+    benchmark("Execute user by id", 1000, fn() {
+      executor.execute_query(schema, "{ user(id: \"1\") { id name } }")
+    })
 
-  let _ = benchmark("Execute with variables", 1000, fn() {
-    let vars = dict.from_list([#("id", types.to_dynamic("1"))])
-    executor.execute_query_with_variables(
-      schema,
-      "query GetUser($id: ID!) { user(id: $id) { id name } }",
-      vars,
-    )
-  })
+  let _ =
+    benchmark("Execute with variables", 1000, fn() {
+      let vars = dict.from_list([#("id", types.to_dynamic("1"))])
+      executor.execute_query_with_variables(
+        schema,
+        "query GetUser($id: ID!) { user(id: $id) { id name } }",
+        vars,
+      )
+    })
   Nil
 }
 
@@ -371,11 +401,13 @@ fn run_json_benchmarks() -> Nil {
   io.println("--- JSON Serialization ---")
 
   let schema = wisp_schema.build_schema()
-  let result = executor.execute_query(schema, "{ users { id name email role } }")
+  let result =
+    executor.execute_query(schema, "{ users { id name email role } }")
 
-  let _ = benchmark("Serialize result to JSON", 10_000, fn() {
-    graphql_handler.execution_result_to_json(result)
-  })
+  let _ =
+    benchmark("Serialize result to JSON", 10_000, fn() {
+      graphql_handler.execution_result_to_json(result)
+    })
 
   // Test with errors
   let error_result =
@@ -384,9 +416,10 @@ fn run_json_benchmarks() -> Nil {
       executor.ResolverError("Another error", ["other"]),
     ])
 
-  let _ = benchmark("Serialize error result", 10_000, fn() {
-    graphql_handler.execution_result_to_json(error_result)
-  })
+  let _ =
+    benchmark("Serialize error result", 10_000, fn() {
+      graphql_handler.execution_result_to_json(error_result)
+    })
   Nil
 }
 
@@ -399,43 +432,53 @@ fn run_e2e_benchmarks() -> Nil {
 
   let schema = wisp_schema.build_schema()
 
-  let _ = benchmark("E2E simple query", 1000, fn() {
-    let query = "{ users { id name } }"
-    case graphql_handler.parse_graphql_request("{\"query\": \"" <> query <> "\"}") {
-      Ok(req) -> {
-        let vars = option.unwrap(req.variables, dict.new())
-        let result = executor.execute_query_with_variables(schema, req.query, vars)
-        graphql_handler.execution_result_to_json(result)
+  let _ =
+    benchmark("E2E simple query", 1000, fn() {
+      let query = "{ users { id name } }"
+      case
+        graphql_handler.parse_graphql_request(
+          "{\"query\": \"" <> query <> "\"}",
+        )
+      {
+        Ok(req) -> {
+          let vars = option.unwrap(req.variables, dict.new())
+          let result =
+            executor.execute_query_with_variables(schema, req.query, vars)
+          graphql_handler.execution_result_to_json(result)
+        }
+        Error(_) -> ""
       }
-      Error(_) -> ""
-    }
-  })
+    })
 
-  let _ = benchmark("E2E complex query", 1000, fn() {
-    let body =
-      "{\"query\": \"{ users { id name email role } user(id: \\\"1\\\") { id name } }\"}"
-    case graphql_handler.parse_graphql_request(body) {
-      Ok(req) -> {
-        let vars = option.unwrap(req.variables, dict.new())
-        let result = executor.execute_query_with_variables(schema, req.query, vars)
-        graphql_handler.execution_result_to_json(result)
+  let _ =
+    benchmark("E2E complex query", 1000, fn() {
+      let body =
+        "{\"query\": \"{ users { id name email role } user(id: \\\"1\\\") { id name } }\"}"
+      case graphql_handler.parse_graphql_request(body) {
+        Ok(req) -> {
+          let vars = option.unwrap(req.variables, dict.new())
+          let result =
+            executor.execute_query_with_variables(schema, req.query, vars)
+          graphql_handler.execution_result_to_json(result)
+        }
+        Error(_) -> ""
       }
-      Error(_) -> ""
-    }
-  })
+    })
 
-  let _ = benchmark("E2E with variables", 1000, fn() {
-    let body =
-      "{\"query\": \"query GetUser($id: ID!) { user(id: $id) { id name email } }\", \"variables\": {\"id\": \"2\"}}"
-    case graphql_handler.parse_graphql_request(body) {
-      Ok(req) -> {
-        let vars = option.unwrap(req.variables, dict.new())
-        let result = executor.execute_query_with_variables(schema, req.query, vars)
-        graphql_handler.execution_result_to_json(result)
+  let _ =
+    benchmark("E2E with variables", 1000, fn() {
+      let body =
+        "{\"query\": \"query GetUser($id: ID!) { user(id: $id) { id name email } }\", \"variables\": {\"id\": \"2\"}}"
+      case graphql_handler.parse_graphql_request(body) {
+        Ok(req) -> {
+          let vars = option.unwrap(req.variables, dict.new())
+          let result =
+            executor.execute_query_with_variables(schema, req.query, vars)
+          graphql_handler.execution_result_to_json(result)
+        }
+        Error(_) -> ""
       }
-      Error(_) -> ""
-    }
-  })
+    })
   Nil
 }
 

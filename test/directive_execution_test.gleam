@@ -3,8 +3,10 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/list
 import gleam/option
+import gleam/result
 import gleam/string
 import gleeunit/should
 import mochi/executor
@@ -24,15 +26,17 @@ fn decode_message(_dyn: Dynamic) -> Result(Message, String) {
   Ok(Message("1", "hello", 5))
 }
 
-// Helper to try to extract a string from Dynamic using FFI
-@external(erlang, "mochi_ffi", "try_extract_string")
-@external(javascript, "./mochi_ffi.mjs", "try_extract_string")
-fn try_get_string(value: Dynamic) -> Result(String, String)
+// Helper to try to extract a string from Dynamic
+fn try_get_string(value: Dynamic) -> Result(String, String) {
+  decode.run(value, decode.string)
+  |> result.map_error(fn(_) { "Not a string" })
+}
 
-// Helper to try to extract an int from Dynamic using FFI
-@external(erlang, "mochi_ffi", "try_extract_int")
-@external(javascript, "./mochi_ffi.mjs", "try_extract_int")
-fn try_get_int(value: Dynamic) -> Result(Int, String)
+// Helper to try to extract an int from Dynamic
+fn try_get_int(value: Dynamic) -> Result(Int, String) {
+  decode.run(value, decode.int)
+  |> result.map_error(fn(_) { "Not an int" })
+}
 
 // ============================================================================
 // @uppercase Directive - Transforms string to uppercase

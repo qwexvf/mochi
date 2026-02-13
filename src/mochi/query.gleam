@@ -424,6 +424,7 @@ pub type SchemaBuilder {
     enums: List(schema.EnumType),
     interfaces: List(schema.InterfaceType),
     unions: List(schema.UnionType),
+    scalars: List(schema.ScalarType),
   )
 }
 
@@ -437,6 +438,7 @@ pub fn new() -> SchemaBuilder {
     enums: [],
     interfaces: [],
     unions: [],
+    scalars: [],
   )
 }
 
@@ -493,6 +495,11 @@ pub fn add_union(builder: SchemaBuilder, u: schema.UnionType) -> SchemaBuilder {
   SchemaBuilder(..builder, unions: [u, ..builder.unions])
 }
 
+/// Add a custom scalar type (e.g., Upload, DateTime, JSON)
+pub fn add_scalar(builder: SchemaBuilder, s: schema.ScalarType) -> SchemaBuilder {
+  SchemaBuilder(..builder, scalars: [s, ..builder.scalars])
+}
+
 /// Build the final schema
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
@@ -543,7 +550,12 @@ pub fn build(builder: SchemaBuilder) -> Schema {
       schema.add_type(s, schema.InterfaceTypeDef(i))
     })
 
-  list.fold(builder.unions, with_interfaces, fn(s, u) {
-    schema.add_type(s, schema.UnionTypeDef(u))
+  let with_unions =
+    list.fold(builder.unions, with_interfaces, fn(s, u) {
+      schema.add_type(s, schema.UnionTypeDef(u))
+    })
+
+  list.fold(builder.scalars, with_unions, fn(s, scalar) {
+    schema.add_type(s, schema.ScalarTypeDef(scalar))
   })
 }

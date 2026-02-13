@@ -1,11 +1,9 @@
 ---
-version: 1.3.2
+version: 1.5.4
 title: JSON object encoding with mixed types
-file: ./test/mochi_snapshot_test.gleam
-test_name: json_object_encoding_test
 ---
 {
-  "name": "Alice",
+  "active": true,
   "age": 30,
-  "active": true
+  "name": "Alice"
 }

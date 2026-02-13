@@ -576,7 +576,9 @@ pub fn comment_type() -> schema.ObjectType {
 @external(javascript, "../../mochi_wisp_ffi.mjs", "get_field_safe")
 fn get_field_ffi(data: Dynamic, field: String) -> option.Option(Dynamic)
 
-fn field_resolver(field_name: String) -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn field_resolver(
+  field_name: String,
+) -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -609,7 +611,8 @@ fn user_posts_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
   }
 }
 
-fn user_comments_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn user_comments_resolver() -> fn(schema.ResolverInfo) ->
+  Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -650,7 +653,8 @@ fn post_author_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) 
   }
 }
 
-fn post_comments_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn post_comments_resolver() -> fn(schema.ResolverInfo) ->
+  Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -670,7 +674,8 @@ fn post_comments_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String
   }
 }
 
-fn comment_author_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn comment_author_resolver() -> fn(schema.ResolverInfo) ->
+  Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -712,7 +717,8 @@ fn comment_post_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String)
   }
 }
 
-fn comment_parent_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn comment_parent_resolver() -> fn(schema.ResolverInfo) ->
+  Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -734,7 +740,8 @@ fn comment_parent_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, Strin
   }
 }
 
-fn comment_replies_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
+fn comment_replies_resolver() -> fn(schema.ResolverInfo) ->
+  Result(Dynamic, String) {
   fn(info: schema.ResolverInfo) {
     case info.parent {
       Some(parent) ->
@@ -758,15 +765,21 @@ fn comment_replies_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, Stri
 // Query Resolvers
 // ============================================================================
 
-pub fn users_resolver(_ctx: schema.ExecutionContext) -> Result(List(User), String) {
+pub fn users_resolver(
+  _ctx: schema.ExecutionContext,
+) -> Result(List(User), String) {
   Ok(sample_users())
 }
 
-pub fn posts_resolver(_ctx: schema.ExecutionContext) -> Result(List(Post), String) {
+pub fn posts_resolver(
+  _ctx: schema.ExecutionContext,
+) -> Result(List(Post), String) {
   Ok(sample_posts())
 }
 
-pub fn published_posts_resolver(_ctx: schema.ExecutionContext) -> Result(List(Post), String) {
+pub fn published_posts_resolver(
+  _ctx: schema.ExecutionContext,
+) -> Result(List(Post), String) {
   Ok(list.filter(sample_posts(), fn(p) { p.status == Published }))
 }
 
@@ -774,7 +787,9 @@ pub type UserByIdArgs {
   UserByIdArgs(id: String)
 }
 
-pub fn decode_id_args(args: Dict(String, Dynamic)) -> Result(UserByIdArgs, String) {
+pub fn decode_id_args(
+  args: Dict(String, Dynamic),
+) -> Result(UserByIdArgs, String) {
   case dict.get(args, "id") {
     Ok(id_dyn) ->
       case decode.run(id_dyn, decode.string) {
@@ -812,9 +827,12 @@ pub fn post_by_id_resolver(
 pub fn build_complex_schema() -> schema.Schema {
   // Queries
   let users_q =
-    query.query("users", schema.non_null(schema.List(schema.non_null(schema.Named("User")))), users_resolver, fn(users) {
-      types.to_dynamic(list.map(users, user_to_dynamic))
-    })
+    query.query(
+      "users",
+      schema.non_null(schema.List(schema.non_null(schema.Named("User")))),
+      users_resolver,
+      fn(users) { types.to_dynamic(list.map(users, user_to_dynamic)) },
+    )
     |> query.query_description("Get all users")
 
   let user_q =
@@ -829,9 +847,12 @@ pub fn build_complex_schema() -> schema.Schema {
     |> query.query_description("Get user by ID")
 
   let posts_q =
-    query.query("posts", schema.non_null(schema.List(schema.non_null(schema.Named("Post")))), posts_resolver, fn(posts) {
-      types.to_dynamic(list.map(posts, post_to_dynamic))
-    })
+    query.query(
+      "posts",
+      schema.non_null(schema.List(schema.non_null(schema.Named("Post")))),
+      posts_resolver,
+      fn(posts) { types.to_dynamic(list.map(posts, post_to_dynamic)) },
+    )
     |> query.query_description("Get all posts")
 
   let post_q =

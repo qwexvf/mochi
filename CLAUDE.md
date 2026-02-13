@@ -142,8 +142,6 @@ src/
 │   │   ├── typescript.gleam     # TS codegen
 │   │   └── sdl.gleam            # SDL codegen
 │   └── ...
-├── mochi_ffi.mjs                # JavaScript FFI
-├── mochi_ffi.erl                # Erlang FFI
 test/
 ├── mochi_test.gleam             # Parser tests
 ├── code_first_test.gleam        # Code First API tests

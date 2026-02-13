@@ -10,9 +10,9 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import mochi/ast.{
-  type Argument, type Definition, type Document, type Field,
-  type Fragment, type Operation, type OperationType, type Selection,
-  type SelectionSet, type Type, type Value, type VariableDefinition,
+  type Argument, type Definition, type Document, type Field, type Fragment,
+  type Operation, type OperationType, type Selection, type SelectionSet,
+  type Type, type Value, type VariableDefinition,
 }
 
 // ============================================================================
@@ -136,8 +136,7 @@ fn expect(
     Ok(#(tok, new_cursor)) ->
       case tokens_match(tok.token, expected) {
         True -> Ok(#(tok, new_cursor))
-        False ->
-          Error(UnexpectedToken(description, token_to_string(tok.token)))
+        False -> Error(UnexpectedToken(description, token_to_string(tok.token)))
       }
     Error(_) -> Error(UnexpectedEOF(description))
   }
@@ -254,7 +253,9 @@ fn parse_operation_definition(
     | Ok(TokenWithPos(Subscription, _)) -> {
       use #(op_type, cursor) <- result.try(parse_operation_type(cursor))
       use #(name, cursor) <- result.try(parse_optional_name(cursor))
-      use #(variable_defs, cursor) <- result.try(parse_variable_definitions(cursor))
+      use #(variable_defs, cursor) <- result.try(parse_variable_definitions(
+        cursor,
+      ))
       use #(directives, cursor) <- result.try(parse_directives(cursor))
       use #(selection_set, cursor) <- result.try(parse_selection_set(cursor))
       Ok(#(
@@ -365,7 +366,10 @@ fn parse_fragment_spread(
   use #(name, cursor) <- result.try(parse_name(cursor))
   use #(directives, cursor) <- result.try(parse_directives(cursor))
   Ok(#(
-    ast.FragmentSpread(ast.FragmentSpreadValue(name: name, directives: directives)),
+    ast.FragmentSpread(ast.FragmentSpreadValue(
+      name: name,
+      directives: directives,
+    )),
     cursor,
   ))
 }
@@ -373,20 +377,18 @@ fn parse_fragment_spread(
 fn parse_inline_fragment(
   cursor: Cursor,
 ) -> Result(#(Selection, Cursor), ParseError) {
-  use #(type_condition, cursor) <- result.try(
-    case peek(cursor) {
-      Ok(TokenWithPos(On, _)) -> {
-        case advance(cursor) {
-          Ok(#(_, cursor)) -> {
-            use #(name, cursor) <- result.try(parse_name(cursor))
-            Ok(#(Some(name), cursor))
-          }
-          Error(_) -> Ok(#(None, cursor))
+  use #(type_condition, cursor) <- result.try(case peek(cursor) {
+    Ok(TokenWithPos(On, _)) -> {
+      case advance(cursor) {
+        Ok(#(_, cursor)) -> {
+          use #(name, cursor) <- result.try(parse_name(cursor))
+          Ok(#(Some(name), cursor))
         }
+        Error(_) -> Ok(#(None, cursor))
       }
-      _ -> Ok(#(None, cursor))
-    },
-  )
+    }
+    _ -> Ok(#(None, cursor))
+  })
   use #(directives, cursor) <- result.try(parse_directives(cursor))
   use #(selection_set, cursor) <- result.try(parse_selection_set(cursor))
   Ok(#(
@@ -403,24 +405,24 @@ fn parse_field(cursor: Cursor) -> Result(#(Field, Cursor), ParseError) {
   use #(name_or_alias, cursor) <- result.try(parse_name(cursor))
 
   // Check for alias
-  use #(name, alias, cursor) <- result.try(
-    case peek(cursor) {
-      Ok(TokenWithPos(Colon, _)) -> {
-        case advance(cursor) {
-          Ok(#(_, cursor)) -> {
-            use #(actual_name, cursor) <- result.try(parse_name(cursor))
-            Ok(#(actual_name, Some(name_or_alias), cursor))
-          }
-          Error(_) -> Ok(#(name_or_alias, None, cursor))
+  use #(name, alias, cursor) <- result.try(case peek(cursor) {
+    Ok(TokenWithPos(Colon, _)) -> {
+      case advance(cursor) {
+        Ok(#(_, cursor)) -> {
+          use #(actual_name, cursor) <- result.try(parse_name(cursor))
+          Ok(#(actual_name, Some(name_or_alias), cursor))
         }
+        Error(_) -> Ok(#(name_or_alias, None, cursor))
       }
-      _ -> Ok(#(name_or_alias, None, cursor))
-    },
-  )
+    }
+    _ -> Ok(#(name_or_alias, None, cursor))
+  })
 
   use #(arguments, cursor) <- result.try(parse_arguments(cursor))
   use #(directives, cursor) <- result.try(parse_directives(cursor))
-  use #(selection_set, cursor) <- result.try(parse_optional_selection_set(cursor))
+  use #(selection_set, cursor) <- result.try(parse_optional_selection_set(
+    cursor,
+  ))
 
   Ok(#(
     ast.Field(
@@ -510,12 +512,9 @@ fn parse_value(cursor: Cursor) -> Result(#(Value, Cursor), ParseError) {
       use #(name, cursor) <- result.try(parse_name(cursor))
       Ok(#(ast.VariableValue(name), cursor))
     }
-    Ok(#(TokenWithPos(LeftBracket, _), cursor)) ->
-      parse_list_value(cursor)
-    Ok(#(TokenWithPos(LeftBrace, _), cursor)) ->
-      parse_object_value(cursor)
-    Ok(#(TokenWithPos(Name(n), _), cursor)) ->
-      Ok(#(ast.EnumValue(n), cursor))
+    Ok(#(TokenWithPos(LeftBracket, _), cursor)) -> parse_list_value(cursor)
+    Ok(#(TokenWithPos(LeftBrace, _), cursor)) -> parse_object_value(cursor)
+    Ok(#(TokenWithPos(Name(n), _), cursor)) -> Ok(#(ast.EnumValue(n), cursor))
     Ok(#(TokenWithPos(tok, _), _)) ->
       Error(UnexpectedToken("value", token_to_string(tok)))
     Error(_) -> Error(UnexpectedEOF("value"))

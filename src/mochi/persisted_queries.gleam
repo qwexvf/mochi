@@ -2,6 +2,8 @@
 // Automatic Persisted Queries (APQ) support
 // Allows clients to send query hashes instead of full query strings
 
+import gleam/bit_array
+import gleam/crypto
 import gleam/dict.{type Dict}
 import gleam/dynamic
 import gleam/list
@@ -140,10 +142,14 @@ pub fn hash_query(query: String) -> String {
   |> do_sha256_hash
 }
 
-/// SHA256 hash via Erlang's crypto module
-@external(erlang, "mochi_hash_ffi", "sha256_hex")
-@external(javascript, "../mochi_hash_ffi.mjs", "sha256_hex")
-fn do_sha256_hash(input: String) -> String
+/// SHA256 hash using gleam_crypto
+fn do_sha256_hash(input: String) -> String {
+  input
+  |> bit_array.from_string
+  |> crypto.hash(crypto.Sha256, _)
+  |> bit_array.base16_encode
+  |> string.lowercase
+}
 
 /// Normalize a query for consistent hashing
 /// Removes extra whitespace while preserving string literals

@@ -1,14 +1,12 @@
 ---
-version: 1.3.2
+version: 1.5.4
 title: GraphQL error with extensions
-file: ./test/mochi_snapshot_test.gleam
-test_name: error_with_extensions_test
 ---
 {
-  "message": "Authentication required",
   "extensions": {
-    "retryAfter": 60,
+    "category": "AUTHENTICATION",
     "code": "UNAUTHENTICATED",
-    "category": "AUTHENTICATION"
-  }
+    "retryAfter": 60
+  },
+  "message": "Authentication required"
 }

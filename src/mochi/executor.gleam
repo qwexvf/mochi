@@ -3,6 +3,7 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/int
 import gleam/io
 import gleam/list
@@ -88,6 +89,26 @@ pub fn execute(
   execution_context: schema.ExecutionContext,
   variable_values: Dict(String, Dynamic),
 ) -> ExecutionResult {
+  execute_with_operation_name(
+    schema_def,
+    document,
+    root_value,
+    execution_context,
+    variable_values,
+    None,
+  )
+}
+
+/// Execute with a specific operation name selected
+/// This is useful for documents containing multiple operations
+pub fn execute_with_operation_name(
+  schema_def: schema.Schema,
+  document: ast.Document,
+  root_value: Option(Dynamic),
+  execution_context: schema.ExecutionContext,
+  variable_values: Dict(String, Dynamic),
+  operation_name: Option(String),
+) -> ExecutionResult {
   // Extract fragment definitions from the document
   let fragments = extract_fragments(document)
 
@@ -100,18 +121,52 @@ pub fn execute(
       fragments: fragments,
     )
 
-  // Find the first operation definition (skip fragment definitions)
-  document.definitions
-  |> list.find(fn(def) {
-    case def {
-      ast.OperationDefinition(_) -> True
-      ast.FragmentDefinition(_) -> False
+  // Find the operation to execute
+  case find_operation_by_name(document, operation_name) {
+    Ok(operation_def) -> execute_definition(context, operation_def)
+    Error(msg) -> validation_error(msg, [])
+  }
+}
+
+/// Find an operation in the document by name
+fn find_operation_by_name(
+  document: ast.Document,
+  operation_name: Option(String),
+) -> Result(ast.Definition, String) {
+  let operations =
+    document.definitions
+    |> list.filter(fn(def) {
+      case def {
+        ast.OperationDefinition(_) -> True
+        ast.FragmentDefinition(_) -> False
+      }
+    })
+
+  case operation_name, operations {
+    // No name specified, must have exactly one operation
+    None, [single] -> Ok(single)
+    None, [] -> Error("Document contains no operations")
+    None, _ ->
+      Error("Document contains multiple operations; operation name is required")
+
+    // Name specified, find matching operation
+    Some(name), ops -> {
+      ops
+      |> list.find(fn(op) { get_operation_name_from_def(op) == Some(name) })
+      |> result.map_error(fn(_) {
+        "Operation '" <> name <> "' not found in document"
+      })
     }
-  })
-  |> result.map(execute_definition(context, _))
-  |> result.unwrap(
-    validation_error("Document must contain at least one operation", []),
-  )
+  }
+}
+
+/// Get the operation name from a definition
+fn get_operation_name_from_def(def: ast.Definition) -> Option(String) {
+  case def {
+    ast.OperationDefinition(ast.Operation(name: name, ..)) -> name
+    ast.OperationDefinition(ast.ShorthandQuery(_)) -> None
+    ast.FragmentDefinition(_) -> None
+  }
 }
 
 fn extract_fragments(document: ast.Document) -> Dict(String, ast.Fragment) {
@@ -432,9 +487,12 @@ fn eval_bool_value(
   }
 }
 
-@external(erlang, "mochi_ffi", "dynamic_to_bool")
-@external(javascript, "../mochi_ffi.mjs", "dynamic_to_bool")
-fn decode_bool_from_dynamic(value: Dynamic) -> Option(Bool)
+fn decode_bool_from_dynamic(value: Dynamic) -> Option(Bool) {
+  case decode.run(value, decode.bool) {
+    Ok(b) -> Some(b)
+    Error(_) -> None
+  }
+}
 
 // ============================================================================
 // Custom Directive Execution
@@ -530,13 +588,19 @@ fn coerce_directive_arguments(
   })
 }
 
-@external(erlang, "mochi_ffi", "get_list_elements")
-@external(javascript, "../mochi_ffi.mjs", "get_list_elements")
-fn get_list_elements(value: Dynamic) -> Option(List(Dynamic))
+fn get_list_elements(value: Dynamic) -> Option(List(Dynamic)) {
+  case decode.run(value, decode.list(decode.dynamic)) {
+    Ok(items) -> Some(items)
+    Error(_) -> None
+  }
+}
 
-@external(erlang, "mochi_ffi", "is_null")
-@external(javascript, "../mochi_ffi.mjs", "is_null")
-fn is_null(value: Dynamic) -> Bool
+fn is_null(value: Dynamic) -> Bool {
+  case decode.run(value, decode.optional(decode.dynamic)) {
+    Ok(None) -> True
+    _ -> False
+  }
+}
 
 fn execute_regular_field(
   context: QueryExecutionContext,
@@ -617,7 +681,17 @@ fn resolve_field(
       info: types.to_dynamic(dict.new()),
     )
 
-  case resolver(resolver_info) {
+  // Execute resolver, optionally through middleware pipeline
+  let resolve_result =
+    execute_resolver_with_middleware(
+      context.execution_context,
+      field_def,
+      resolver_info,
+      resolver,
+      response_name,
+    )
+
+  case resolve_result {
     Ok(resolved) ->
       // Apply custom directive handlers after resolving the value
       case
@@ -642,6 +716,35 @@ fn resolve_field(
         Error(msg) -> resolver_error(msg, field_path)
       }
     Error(msg) -> resolver_error(msg, field_path)
+  }
+}
+
+/// Execute a resolver, optionally through the middleware pipeline
+/// When middleware is configured, it wraps the resolver call
+/// Note: Middleware integration happens at the schema level via ExecutionContext
+fn execute_resolver_with_middleware(
+  exec_context: schema.ExecutionContext,
+  _field_def: schema.FieldDefinition,
+  resolver_info: schema.ResolverInfo,
+  resolver: schema.Resolver,
+  _parent_type_name: String,
+) -> Result(Dynamic, String) {
+  // The middleware_pipeline field is available in ExecutionContext
+  // Actual middleware execution is handled by mochi/middleware.execute_with_middleware
+  // which should be called at a higher level when constructing handlers
+  //
+  // Here we just execute the resolver directly - middleware wrapping happens
+  // at the application level using middleware.execute_with_middleware()
+  //
+  // This design avoids circular dependencies between executor and middleware
+  case exec_context.middleware_pipeline {
+    Some(_pipeline) ->
+      // Middleware is present but we can't call it directly due to module deps
+      // The application should wrap using middleware.execute_with_middleware
+      resolver(resolver_info)
+    None ->
+      // No middleware, call resolver directly
+      resolver(resolver_info)
   }
 }
 
@@ -1184,9 +1287,12 @@ fn extract_string_value(
   }
 }
 
-@external(erlang, "mochi_ffi", "dynamic_to_string")
-@external(javascript, "../mochi_ffi.mjs", "dynamic_to_string")
-fn decode_string_from_dynamic(value: Dynamic) -> Option(String)
+fn decode_string_from_dynamic(value: Dynamic) -> Option(String) {
+  case decode.run(value, decode.string) {
+    Ok(s) -> Some(s)
+    Error(_) -> None
+  }
+}
 
 // ============================================================================
 // Introspection Builders

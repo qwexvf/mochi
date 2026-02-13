@@ -14,6 +14,8 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
+import gleam/json as gj
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -544,34 +546,45 @@ fn decode_pong(dyn: Dynamic) -> Result(ClientMessage, DecodeError) {
 }
 
 // ============================================================================
-// JSON Parsing Helpers (FFI)
+// JSON Parsing Helpers
 // ============================================================================
 
-@external(erlang, "mochi_websocket_ffi", "parse_json")
-@external(javascript, "../../mochi_websocket_ffi.mjs", "parse_json")
-fn parse_json(json_str: String) -> Result(Dynamic, String)
-
-@external(erlang, "mochi_websocket_ffi", "get_field")
-@external(javascript, "../../mochi_websocket_ffi.mjs", "get_field")
-fn get_field_raw(dyn: Dynamic, field: String) -> Result(Dynamic, Nil)
-
-@external(erlang, "mochi_websocket_ffi", "get_string")
-@external(javascript, "../../mochi_websocket_ffi.mjs", "get_string")
-fn get_string_raw(dyn: Dynamic) -> Result(String, Nil)
-
-@external(erlang, "mochi_websocket_ffi", "get_dict")
-@external(javascript, "../../mochi_websocket_ffi.mjs", "get_dict")
-fn get_dict_raw(dyn: Dynamic) -> Result(Dict(String, Dynamic), Nil)
+fn parse_json(json_str: String) -> Result(Dynamic, String) {
+  gj.parse(json_str, decode.dynamic)
+  |> result.map_error(fn(_) { "Invalid JSON" })
+}
 
 fn get_field(dyn: Dynamic, field: String) -> Result(Dynamic, DecodeError) {
-  get_field_raw(dyn, field)
+  decode.run(dyn, decode.at([field], decode.dynamic))
   |> result.map_error(fn(_) { MissingField(field) })
 }
 
 fn get_string_field(dyn: Dynamic, field: String) -> Result(String, DecodeError) {
-  use field_dyn <- result.try(get_field(dyn, field))
-  get_string_raw(field_dyn)
-  |> result.map_error(fn(_) { InvalidPayload("Expected string for " <> field) })
+  // First check if field exists
+  case decode.run(dyn, decode.at([field], decode.dynamic)) {
+    Error(_) -> Error(MissingField(field))
+    Ok(field_dyn) ->
+      // Then check if it's a string
+      case decode.run(field_dyn, decode.string) {
+        Ok(s) -> Ok(s)
+        Error(_) -> Error(InvalidPayload("Expected string for " <> field))
+      }
+  }
+}
+
+fn get_dict_raw(dyn: Dynamic) -> Result(Dict(String, Dynamic), Nil) {
+  decode.run(dyn, decode.dict(decode.string, decode.dynamic))
+  |> result.map_error(fn(_) { Nil })
+}
+
+fn get_field_raw(dyn: Dynamic, field: String) -> Result(Dynamic, Nil) {
+  decode.run(dyn, decode.at([field], decode.dynamic))
+  |> result.map_error(fn(_) { Nil })
+}
+
+fn get_string_raw(dyn: Dynamic) -> Result(String, Nil) {
+  decode.run(dyn, decode.string)
+  |> result.map_error(fn(_) { Nil })
 }
 
 fn get_optional_string_field(dyn: Dynamic, field: String) -> Option(String) {

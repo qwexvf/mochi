@@ -91,7 +91,9 @@ fn start_http_server(app_state: supervisor.AppState) -> Nil {
   logging.log(logging.Info, "Configuring HTTP server...")
 
   // Create a combined handler that routes WebSocket upgrades separately
-  let handler = fn(req: request.Request(Connection)) -> response.Response(ResponseData) {
+  let handler = fn(req: request.Request(Connection)) -> response.Response(
+    ResponseData,
+  ) {
     // Check if this is a WebSocket upgrade request to /graphql
     case is_websocket_upgrade(req), request.path_segments(req) {
       True, ["graphql"] -> {
@@ -112,33 +114,47 @@ fn start_http_server(app_state: supervisor.AppState) -> Nil {
     |> mist.bind("0.0.0.0")
     |> mist.start
 
-  logging.log(logging.Info, "Server started successfully on port " <> int.to_string(port))
+  logging.log(
+    logging.Info,
+    "Server started successfully on port " <> int.to_string(port),
+  )
   logging.log(logging.Info, "")
   logging.log(logging.Info, "Endpoints:")
   logging.log(logging.Info, "  POST /graphql     - Execute GraphQL queries")
-  logging.log(logging.Info, "  WS /graphql       - WebSocket subscriptions (graphql-ws)")
+  logging.log(
+    logging.Info,
+    "  WS /graphql       - WebSocket subscriptions (graphql-ws)",
+  )
   logging.log(logging.Info, "  OPTIONS /graphql  - CORS preflight")
   logging.log(logging.Info, "  GET /health       - Health check")
   logging.log(logging.Info, "")
   logging.log(logging.Info, "Example query:")
-  logging.log(logging.Info, "  curl -X POST http://localhost:" <> int.to_string(port) <> "/graphql \\")
+  logging.log(
+    logging.Info,
+    "  curl -X POST http://localhost:" <> int.to_string(port) <> "/graphql \\",
+  )
   logging.log(logging.Info, "    -H \"Content-Type: application/json\" \\")
-  logging.log(logging.Info, "    -d '{\"query\": \"{ users { id name email } }\"}'")
+  logging.log(
+    logging.Info,
+    "    -d '{\"query\": \"{ users { id name email } }\"}'",
+  )
   logging.log(logging.Info, "")
   logging.log(logging.Info, "Set DEBUG=1 for verbose logging")
 
   // Also print to stdout for immediate feedback
   io.println("")
-  io.println("GraphQL server running at http://localhost:" <> int.to_string(port) <> "/graphql")
+  io.println(
+    "GraphQL server running at http://localhost:"
+    <> int.to_string(port)
+    <> "/graphql",
+  )
   io.println("")
 
   // Print initial metrics
   let stats = supervisor.get_cache_stats(app_state)
   logging.log(
     logging.Info,
-    "Cache stats: " <>
-      int.to_string(stats.size) <>
-      " queries cached",
+    "Cache stats: " <> int.to_string(stats.size) <> " queries cached",
   )
 
   // Keep the process alive

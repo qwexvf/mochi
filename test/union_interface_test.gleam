@@ -1,5 +1,6 @@
 import gleam/dict
 import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/option
 import gleeunit/should
 import mochi/executor
@@ -31,9 +32,12 @@ fn resolve_animal_type(value: dynamic.Dynamic) -> Result(String, String) {
   }
 }
 
-@external(erlang, "mochi_ffi", "dict_has_key")
-@external(javascript, "./mochi_ffi.mjs", "dict_has_key")
-fn decode_dict_has_key(value: dynamic.Dynamic, key: String) -> Bool
+fn decode_dict_has_key(value: dynamic.Dynamic, key: String) -> Bool {
+  case decode.run(value, decode.at([key], decode.dynamic)) {
+    Ok(_) -> True
+    Error(_) -> False
+  }
+}
 
 fn build_interface_schema() -> schema.Schema {
   // Define the Animal interface

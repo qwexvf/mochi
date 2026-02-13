@@ -3,6 +3,15 @@ import gleam/dynamic.{type Dynamic}
 import gleam/option.{type Option, None, Some}
 import mochi/dataloader.{type DataLoader}
 
+// Forward declarations for types defined in other modules
+// These are opaque references to avoid circular dependencies
+
+/// Opaque type for middleware pipeline (defined in mochi/middleware.gleam)
+pub type MiddlewarePipeline
+
+/// Opaque type for telemetry context (defined in mochi/telemetry.gleam)
+pub type TelemetryContext
+
 // Core schema types
 pub type Schema {
   Schema(
@@ -179,6 +188,10 @@ pub type ExecutionContext {
     user_context: Dynamic,
     /// DataLoader instances for batching and caching
     data_loaders: Dict(String, DataLoader(Dynamic, Dynamic)),
+    /// Optional middleware pipeline for field resolution
+    middleware_pipeline: Option(MiddlewarePipeline),
+    /// Optional telemetry context for instrumentation
+    telemetry: Option(TelemetryContext),
   )
 }
 
@@ -196,7 +209,68 @@ pub type ResolverInfo {
 
 /// Create a new execution context
 pub fn execution_context(user_context: Dynamic) -> ExecutionContext {
-  ExecutionContext(user_context: user_context, data_loaders: dict.new())
+  ExecutionContext(
+    user_context: user_context,
+    data_loaders: dict.new(),
+    middleware_pipeline: None,
+    telemetry: None,
+  )
+}
+
+/// Create an execution context with middleware
+pub fn execution_context_with_middleware(
+  user_context: Dynamic,
+  middleware: MiddlewarePipeline,
+) -> ExecutionContext {
+  ExecutionContext(
+    user_context: user_context,
+    data_loaders: dict.new(),
+    middleware_pipeline: Some(middleware),
+    telemetry: None,
+  )
+}
+
+/// Create an execution context with telemetry
+pub fn execution_context_with_telemetry(
+  user_context: Dynamic,
+  telemetry: TelemetryContext,
+) -> ExecutionContext {
+  ExecutionContext(
+    user_context: user_context,
+    data_loaders: dict.new(),
+    middleware_pipeline: None,
+    telemetry: Some(telemetry),
+  )
+}
+
+/// Create a full execution context with all options
+pub fn full_execution_context(
+  user_context: Dynamic,
+  middleware: Option(MiddlewarePipeline),
+  telemetry: Option(TelemetryContext),
+) -> ExecutionContext {
+  ExecutionContext(
+    user_context: user_context,
+    data_loaders: dict.new(),
+    middleware_pipeline: middleware,
+    telemetry: telemetry,
+  )
+}
+
+/// Set middleware pipeline on an execution context
+pub fn with_middleware(
+  context: ExecutionContext,
+  middleware: MiddlewarePipeline,
+) -> ExecutionContext {
+  ExecutionContext(..context, middleware_pipeline: Some(middleware))
+}
+
+/// Set telemetry on an execution context
+pub fn with_telemetry(
+  context: ExecutionContext,
+  telemetry: TelemetryContext,
+) -> ExecutionContext {
+  ExecutionContext(..context, telemetry: Some(telemetry))
 }
 
 /// Add a DataLoader to the execution context
@@ -209,6 +283,24 @@ pub fn add_data_loader(
     ..context,
     data_loaders: dict.insert(context.data_loaders, name, loader),
   )
+}
+
+/// Get the middleware pipeline from context
+pub fn get_middleware(context: ExecutionContext) -> Option(MiddlewarePipeline) {
+  context.middleware_pipeline
+}
+
+/// Get the telemetry context
+pub fn get_telemetry(context: ExecutionContext) -> Option(TelemetryContext) {
+  context.telemetry
+}
+
+/// Update the telemetry context
+pub fn update_telemetry(
+  context: ExecutionContext,
+  telemetry: TelemetryContext,
+) -> ExecutionContext {
+  ExecutionContext(..context, telemetry: Some(telemetry))
 }
 
 /// Get a DataLoader from the execution context

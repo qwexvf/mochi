@@ -10,6 +10,7 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -418,6 +419,9 @@ fn merge_field_results(results: List(Dynamic)) -> Dynamic {
   types.to_dynamic(results)
 }
 
-@external(erlang, "mochi_ffi", "extract_field")
-@external(javascript, "../mochi_ffi.mjs", "extract_field")
-fn extract_field_from_dynamic(data: Dynamic, field: String) -> Dynamic
+fn extract_field_from_dynamic(data: Dynamic, field: String) -> Dynamic {
+  case decode.run(data, decode.at([field], decode.dynamic)) {
+    Ok(value) -> value
+    Error(_) -> types.to_dynamic(Nil)
+  }
+}

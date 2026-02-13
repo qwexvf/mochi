@@ -40,17 +40,33 @@ pub fn handle_graphql(req: WispRequest, schema: Schema) -> WispResponse {
   use body <- wisp.require_string_body(req)
 
   let body_size = string.byte_size(body)
-  logging.log(logging.Debug, "[" <> request_id <> "] Request body size: " <> int.to_string(body_size) <> " bytes")
+  logging.log(
+    logging.Debug,
+    "["
+      <> request_id
+      <> "] Request body size: "
+      <> int.to_string(body_size)
+      <> " bytes",
+  )
 
   case parse_graphql_request(body) {
     Ok(graphql_req) -> {
       log_graphql_request(request_id, graphql_req)
       let response = execute_and_respond(request_id, graphql_req, schema)
-      logging.log(logging.Info, "[" <> request_id <> "] Response status: " <> int.to_string(response.status))
+      logging.log(
+        logging.Info,
+        "["
+          <> request_id
+          <> "] Response status: "
+          <> int.to_string(response.status),
+      )
       response
     }
     Error(msg) -> {
-      logging.log(logging.Warning, "[" <> request_id <> "] Parse error: " <> msg)
+      logging.log(
+        logging.Warning,
+        "[" <> request_id <> "] Parse error: " <> msg,
+      )
       error_response(msg)
     }
   }
@@ -83,7 +99,8 @@ fn log_graphql_request(request_id: String, req: GraphQLRequest) -> Nil {
 
   // Log operation name if present
   case req.operation_name {
-    Some(name) -> logging.log(logging.Debug, "[" <> request_id <> "] Operation: " <> name)
+    Some(name) ->
+      logging.log(logging.Debug, "[" <> request_id <> "] Operation: " <> name)
     None -> Nil
   }
 
@@ -91,7 +108,14 @@ fn log_graphql_request(request_id: String, req: GraphQLRequest) -> Nil {
   case req.variables {
     Some(vars) -> {
       let var_count = dict.size(vars)
-      logging.log(logging.Debug, "[" <> request_id <> "] Variables: " <> int.to_string(var_count) <> " provided")
+      logging.log(
+        logging.Debug,
+        "["
+          <> request_id
+          <> "] Variables: "
+          <> int.to_string(var_count)
+          <> " provided",
+      )
     }
     None -> Nil
   }
@@ -113,15 +137,17 @@ fn truncate_string(s: String, max_len: Int) -> String {
 /// Uses FFI because we need to preserve Dynamic values for variables
 @external(erlang, "mochi_wisp_ffi", "parse_graphql_request_full")
 @external(javascript, "../../mochi_wisp_ffi.mjs", "parse_graphql_request_full")
-pub fn parse_graphql_request(
-  body: String,
-) -> Result(GraphQLRequest, String)
+pub fn parse_graphql_request(body: String) -> Result(GraphQLRequest, String)
 
 // ============================================================================
 // Execution
 // ============================================================================
 
-fn execute_and_respond(request_id: String, req: GraphQLRequest, schema: Schema) -> WispResponse {
+fn execute_and_respond(
+  request_id: String,
+  req: GraphQLRequest,
+  schema: Schema,
+) -> WispResponse {
   let variables = option.unwrap(req.variables, dict.new())
 
   logging.log(logging.Debug, "[" <> request_id <> "] Executing query...")
@@ -131,23 +157,44 @@ fn execute_and_respond(request_id: String, req: GraphQLRequest, schema: Schema) 
 
   // Log execution result
   case result.errors {
-    [] -> logging.log(logging.Debug, "[" <> request_id <> "] Query executed successfully")
+    [] ->
+      logging.log(
+        logging.Debug,
+        "[" <> request_id <> "] Query executed successfully",
+      )
     errors -> {
       let error_count = count_list(errors)
-      logging.log(logging.Warning, "[" <> request_id <> "] Query returned " <> int.to_string(error_count) <> " error(s)")
+      logging.log(
+        logging.Warning,
+        "["
+          <> request_id
+          <> "] Query returned "
+          <> int.to_string(error_count)
+          <> " error(s)",
+      )
       log_errors(request_id, errors)
     }
   }
 
   let json_body = execution_result_to_json(result)
   let response_size = string.byte_size(json_body)
-  logging.log(logging.Debug, "[" <> request_id <> "] Response size: " <> int.to_string(response_size) <> " bytes")
+  logging.log(
+    logging.Debug,
+    "["
+      <> request_id
+      <> "] Response size: "
+      <> int.to_string(response_size)
+      <> " bytes",
+  )
 
   wisp.json_response(json_body, 200)
   |> add_cors_headers
 }
 
-fn execute_and_respond_quiet(req: GraphQLRequest, schema: Schema) -> WispResponse {
+fn execute_and_respond_quiet(
+  req: GraphQLRequest,
+  schema: Schema,
+) -> WispResponse {
   let variables = option.unwrap(req.variables, dict.new())
 
   // Use cached parsing for better performance
@@ -179,14 +226,12 @@ fn execute_with_cache(
       executor.execute(schema_def, document, None, ctx, variables)
     }
     Error(_parse_error) -> {
-      executor.ExecutionResult(
-        data: None,
-        errors: [executor.ValidationError("Failed to parse query", [])],
-      )
+      executor.ExecutionResult(data: None, errors: [
+        executor.ValidationError("Failed to parse query", []),
+      ])
     }
   }
 }
-
 
 /// Log execution errors
 fn log_errors(request_id: String, errors: List(executor.ExecutionError)) -> Nil {
@@ -200,7 +245,10 @@ fn log_errors(request_id: String, errors: List(executor.ExecutionError)) -> Nil 
         executor.NullValueError(m, p) -> #("NullValueError: " <> m, p)
       }
       let path_str = string.join(path, ".")
-      logging.log(logging.Warning, "[" <> request_id <> "]   - " <> msg <> " at " <> path_str)
+      logging.log(
+        logging.Warning,
+        "[" <> request_id <> "]   - " <> msg <> " at " <> path_str,
+      )
       log_errors(request_id, rest)
     }
   }

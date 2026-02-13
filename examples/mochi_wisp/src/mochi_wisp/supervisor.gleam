@@ -85,7 +85,9 @@ fn handle_cache_message(
       })
       logging.log(
         logging.Info,
-        "Cache warmed with " <> int.to_string(list.length(queries)) <> " queries",
+        "Cache warmed with "
+          <> int.to_string(list.length(queries))
+          <> " queries",
       )
       actor.continue(state)
     }
@@ -137,7 +139,10 @@ pub type MetricsState {
 }
 
 /// Start the metrics collector actor
-pub fn start_metrics_collector() -> Result(Subject(MetricsMessage), actor.StartError) {
+pub fn start_metrics_collector() -> Result(
+  Subject(MetricsMessage),
+  actor.StartError,
+) {
   actor.new(MetricsState(
     total_requests: 0,
     successful_requests: 0,
@@ -176,11 +181,10 @@ fn handle_metrics_message(
     }
 
     GetMetrics(reply_to) -> {
-      let avg =
-        case state.total_requests {
-          0 -> 0.0
-          n -> int.to_float(state.total_duration_us) /. int.to_float(n)
-        }
+      let avg = case state.total_requests {
+        0 -> 0.0
+        n -> int.to_float(state.total_duration_us) /. int.to_float(n)
+      }
       actor.send(
         reply_to,
         Metrics(
@@ -201,16 +205,14 @@ fn handle_metrics_message(
 
     ResetMetrics -> {
       logging.log(logging.Info, "Metrics reset")
-      actor.continue(
-        MetricsState(
-          total_requests: 0,
-          successful_requests: 0,
-          failed_requests: 0,
-          total_duration_us: 0,
-          max_duration_us: 0,
-          min_duration_us: 999_999_999,
-        ),
-      )
+      actor.continue(MetricsState(
+        total_requests: 0,
+        successful_requests: 0,
+        failed_requests: 0,
+        total_duration_us: 0,
+        max_duration_us: 0,
+        min_duration_us: 999_999_999,
+      ))
     }
   }
 }
@@ -253,7 +255,10 @@ pub fn init_app() -> Result(AppState, String) {
 
   logging.log(logging.Info, "OTP application initialized successfully")
 
-  Ok(AppState(cache_manager: cache_manager, metrics_collector: metrics_collector))
+  Ok(AppState(
+    cache_manager: cache_manager,
+    metrics_collector: metrics_collector,
+  ))
 }
 
 // ============================================================================

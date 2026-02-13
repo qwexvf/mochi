@@ -541,10 +541,7 @@ pub fn multiple_fields_query_test() {
   let s = wisp_schema.build_schema()
   // Query both users list and a specific user
   let result =
-    executor.execute_query(
-      s,
-      "{ users { id } user(id: \"1\") { name } }",
-    )
+    executor.execute_query(s, "{ users { id } user(id: \"1\") { name } }")
   should.equal(result.errors, [])
 }
 

@@ -1,24 +1,22 @@
 ---
-version: 1.3.2
+version: 1.5.4
 title: GraphQL error with path and location
-file: ./test/mochi_snapshot_test.gleam
-test_name: error_with_path_and_location_test
 ---
 {
+  "extensions": {
+    "code": "VALIDATION_ERROR"
+  },
+  "locations": [
+    {
+      "column": 15,
+      "line": 10
+    }
+  ],
+  "message": "Field 'email' is not valid",
   "path": [
     "query",
     "users",
     0,
     "email"
-  ],
-  "message": "Field 'email' is not valid",
-  "locations": [
-    {
-      "line": 10,
-      "column": 15
-    }
-  ],
-  "extensions": {
-    "code": "VALIDATION_ERROR"
-  }
+  ]
 }

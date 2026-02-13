@@ -1,23 +1,21 @@
 ---
-version: 1.3.2
+version: 1.5.4
 title: GraphQL partial response with errors
-file: ./test/mochi_snapshot_test.gleam
-test_name: response_with_errors_test
 ---
 {
+  "data": {
+    "user": null
+  },
   "errors": [
     {
+      "extensions": {
+        "code": "NOT_FOUND"
+      },
+      "message": "User not found",
       "path": [
         "query",
         "user"
-      ],
-      "message": "User not found",
-      "extensions": {
-        "code": "NOT_FOUND"
-      }
+      ]
     }
-  ],
-  "data": {
-    "user": null
-  }
+  ]
 }
