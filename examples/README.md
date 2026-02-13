@@ -1,90 +1,132 @@
-# GeQL Examples
+# Mochi Examples
 
-This directory contains complete examples showing how to use GeQL in real-world applications.
+This directory contains complete examples showing how to use Mochi in real-world applications.
 
-## 🧚‍♀️ Core Library Examples
+## Pokemon API
 
-**[`core_library_examples/`](core_library_examples/)** - Pure GraphQL functionality:
+**[`pokemon_api/`](pokemon_api/)** - A complete GraphQL API demonstrating:
 
-- **📝 GraphQL Parsing** - Parse queries into AST
-- **🏗️ Schema Definition** - Fluent builder API
-- **🔧 Schema Generation** - Auto-generate from Gleam types  
-- **⚡ Query Execution** - Struct-based resolvers
-- **❌ Error Handling** - Comprehensive GraphQL errors
-
-```sh
-cd core_library_examples
-gleam run  # Pure GraphQL examples
-```
-
-## 🌐 Web Application Example
-
-**[`geql_web_app/`](geql_web_app/)** - A complete web application demonstrating:
-
-- **🚀 HTTP Server** - Wisp 2.0 web framework
-- **🗄️ Database Integration** - PostgreSQL with Cake query builder
-- **📊 Database Migrations** - Version management with Cigogne
-- **🎯 GraphiQL Playground** - Interactive query development
-- **⚡ Type-Safe Resolvers** - Database-backed GraphQL resolvers
-- **🏗️ Production Architecture** - Clean separation of concerns
+- **Code First Schema** - Define types with Gleam, generate GraphQL SDL
+- **TypeScript Codegen** - Auto-generate TypeScript types
+- **Wisp Integration** - HTTP server with Wisp 2.0
+- **GraphiQL/Playground** - Interactive query development
+- **Complex Types** - Enums, nested objects, lists, nullable fields
 
 ### Quick Start
 
 ```sh
-cd geql_web_app
-gleam deps download
-gleam run  # http://localhost:8080
+cd pokemon_api
+gleam run                    # Start server at http://localhost:8000
+gleam run -- codegen         # Generate types.ts and schema.graphql
 ```
 
-### What You'll Learn
+### Example Queries
 
-1. **Pure GraphQL Library Usage** - How to use GeQL without any web/database dependencies
-2. **Web Integration Patterns** - Best practices for HTTP server integration
-3. **Database-Backed Resolvers** - How to connect GraphQL to real databases
-4. **Production Architecture** - Proper separation between GraphQL core and application logic
+```graphql
+# Get Pikachu with stats
+{
+  pokemon(id: 25) {
+    name
+    types
+    stats { hp attack speed total }
+    moves { name power type }
+  }
+}
 
-## 🎯 Key Architecture Principle
+# Get all Fire type Pokemon
+{
+  pokemonByType(type: FIRE) {
+    name
+    pokedexNumber
+  }
+}
 
-The examples demonstrate GeQL's **clean separation philosophy**:
+# Get trainer Red's team
+{
+  trainer(id: 1) {
+    name
+    badges
+    team { name types }
+  }
+}
+```
+
+### Endpoints
+
+- `POST /graphql` - Execute queries
+- `GET /graphiql` - GraphiQL IDE
+- `GET /playground` - GraphQL Playground
+- `GET /schema.graphql` - Download SDL
+- `GET /types.ts` - Download TypeScript types
+
+---
+
+## Mochi + Wisp Integration
+
+**[`mochi_wisp/`](mochi_wisp/)** - Advanced Wisp integration with benchmarks:
+
+- **GraphQL Handler** - HTTP request handling
+- **Benchmark Suite** - Performance testing
+- **Complex Schema** - Real-world schema patterns
+
+```sh
+cd mochi_wisp
+gleam run
+```
+
+---
+
+## Core Library Examples
+
+**[`core_library_examples/`](core_library_examples/)** - Pure GraphQL functionality:
+
+- **GraphQL Parsing** - Parse queries into AST
+- **Schema Definition** - Fluent builder API
+- **Query Execution** - Struct-based resolvers
+- **Error Handling** - GraphQL-spec compliant errors
+
+```sh
+cd core_library_examples
+gleam run
+```
+
+---
+
+## Standalone Examples
+
+Single-file examples demonstrating specific features:
+
+| File | Description |
+|------|-------------|
+| `basic_schema.gleam` | Simple schema definition |
+| `code_first_example.gleam` | Code First API usage |
+| `codegen_example.gleam` | TypeScript/SDL generation |
+| `custom_directives.gleam` | Custom directive handlers |
+| `with_mutations.gleam` | Mutations and input types |
+
+---
+
+## Architecture
+
+Mochi follows a **clean separation philosophy**:
 
 ```
 ┌─────────────────────────────────────┐
 │        Your Application            │
-│  • Web server (Wisp)               │
-│  • Database (Cake + Cigogne)       │
-│  • Business logic & resolvers      │
-│  • Authentication & authorization   │
+│  - Web server (Wisp/Mist)          │
+│  - Database integration            │
+│  - Business logic & resolvers      │
+│  - Authentication                  │
 └─────────────────────────────────────┘
                │ uses
                ▼
 ┌─────────────────────────────────────┐
-│         GeQL Library               │
-│  • Pure GraphQL functionality      │
-│  • Schema definition & validation  │
-│  • Query parsing & execution       │
-│  • Zero external dependencies      │
+│         Mochi Library              │
+│  - GraphQL parsing & execution     │
+│  - Schema definition               │
+│  - TypeScript/SDL codegen          │
+│  - Subscriptions & DataLoader      │
 └─────────────────────────────────────┘
 ```
 
-**GeQL remains pure** - it only handles GraphQL specification compliance. Your application handles everything else (HTTP, database, auth, etc.).
-
-## 🚀 Adding More Examples
-
-We welcome contributions of additional examples showing:
-
-- **Authentication & Authorization** - JWT tokens, role-based access
-- **Real-time Subscriptions** - WebSocket-based live queries  
-- **Microservices** - GraphQL federation and schema stitching
-- **Testing Strategies** - Unit testing GraphQL schemas and resolvers
-- **Deployment** - Docker, CI/CD, and production deployment patterns
-
-Each example should:
-- ✅ Use GeQL as a pure library dependency
-- ✅ Show clear separation of concerns
-- ✅ Include comprehensive documentation
-- ✅ Provide working code that can be run locally
-- ✅ Demonstrate clean architecture patterns
-
----
-
-Happy GraphQL development with GeQL! 🧚‍♀️✨
+**Mochi handles GraphQL** - your application handles everything else.

@@ -1,0 +1,19 @@
+name = "pokemon_api"
+version = "1.0.0"
+
+description = "Pokemon GraphQL API built with Mochi"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0"
+gleam_erlang = ">= 1.0.0"
+gleam_http = ">= 3.7.0"
+gleam_json = ">= 3.0.0"
+wisp = ">= 1.0.0"
+mist = ">= 1.0.0"
+mochi = { path = "../../" }
+logging = ">= 1.3.0 and < 2.0.0"
+argv = ">= 1.0.0"
+simplifile = ">= 2.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
