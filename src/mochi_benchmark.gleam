@@ -52,7 +52,7 @@ fn test_parsing_performance(name: String, query: String, iterations: Int) -> Nil
   )
 
   let results =
-    list.range(1, iterations)
+    list.repeat(Nil, iterations)
     |> list.map(fn(_) { parser.parse(query) })
 
   let successful =
@@ -86,7 +86,7 @@ fn test_execution_performance(
   )
 
   let results =
-    list.range(1, iterations)
+    list.repeat(Nil, iterations)
     |> list.map(fn(_) { executor.execute_query(schema, query) })
 
   let successful =
