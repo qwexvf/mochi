@@ -11,6 +11,7 @@ This directory contains complete examples showing how to use Mochi in real-world
 - **Wisp Integration** - HTTP server with Wisp 2.0
 - **GraphiQL/Playground** - Interactive query development
 - **Complex Types** - Enums, nested objects, lists, nullable fields
+- **DataLoader** - N+1 query prevention with batching and caching
 
 ### Quick Start
 

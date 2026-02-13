@@ -248,6 +248,44 @@ let role_enum = types.enum_type("Role")
   |> types.build_enum
 ```
 
+#### Dynamic Conversion Helpers
+
+When building DataLoader encoders or custom resolvers, use these helpers for cleaner code:
+
+```gleam
+import mochi/types
+
+// Convert any value to Dynamic
+let dyn = types.to_dynamic(user)
+
+// Build a record (dict) from field tuples - great for DataLoader encoders
+fn user_to_dynamic(u: User) -> Dynamic {
+  types.record([
+    types.field("id", u.id),
+    types.field("name", u.name),
+    types.field("email", u.email),
+    types.field("age", u.age),
+    #("profile", profile_to_dynamic(u.profile)),  // Nested object
+  ])
+}
+
+// Handle Option types (None becomes null)
+fn post_to_dynamic(p: Post) -> Dynamic {
+  types.record([
+    types.field("id", p.id),
+    types.field("title", p.title),
+    #("published_at", types.option(p.published_at)),  // Option(Time)
+  ])
+}
+```
+
+| Function | Description |
+|----------|-------------|
+| `to_dynamic(value)` | Convert any Gleam value to Dynamic |
+| `record(fields)` | Build Dynamic dict from `List(#(String, Dynamic))` |
+| `field(name, value)` | Shorthand for `#(name, to_dynamic(value))` |
+| `option(opt)` | Convert `Option(a)` to Dynamic (None → null) |
+
 ### Query Builders (`mochi/query`)
 
 Define queries and mutations with type-safe resolvers:
@@ -673,10 +711,58 @@ Prevent N+1 queries with automatic batching:
 ```gleam
 import mochi/dataloader
 import mochi/schema
+import mochi/types
+
+// === Quick Start (Recommended) ===
+
+// Create loader from an existing find function - one line!
+let pokemon_loader = dataloader.int_loader_result(
+  data.find_pokemon,      // fn(Int) -> Result(Pokemon, _)
+  pokemon_to_dynamic,     // fn(Pokemon) -> Dynamic
+  "Pokemon not found",    // Error message
+)
+
+// Same for String keys
+let user_loader = dataloader.string_loader_result(
+  data.find_user_by_email,
+  user_to_dynamic,
+  "User not found",
+)
+
+// Register multiple loaders at once
+let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+  |> schema.with_loaders([
+    #("pokemon", pokemon_loader),
+    #("user", user_loader),
+    #("trainer", trainer_loader),
+  ])
+
+// Load by ID (convenience helper)
+let #(ctx, result) = schema.load_by_id(ctx, "pokemon", 25)
+let #(ctx, results) = schema.load_many_by_id(ctx, "pokemon", [1, 4, 7])
+
+// === Custom Loader (Advanced) ===
+
+// Create loader with custom logic
+let user_loader = dataloader.int_loader(fn(id) {
+  case db.find_user(id) {
+    Ok(user) -> Ok(types.to_dynamic(user))
+    Error(_) -> Error("User not found")
+  }
+})
+
+// Batch loader for efficient bulk fetching
+let user_loader = dataloader.int_batch_loader(fn(ids) {
+  case db.get_users_by_ids(ids) {
+    Ok(users) -> Ok(list.map(users, types.to_dynamic))
+    Error(e) -> Error(e)
+  }
+})
+
+// === Full Control (Low-Level) ===
 
 // Create a batch loading function
 fn batch_load_users(ids: List(String)) -> Result(List(Result(User, String)), String) {
-  // Load all users in a single database query
   let users = db.get_users_by_ids(ids)
   Ok(list.map(ids, fn(id) {
     case list.find(users, fn(u) { u.id == id }) {
@@ -686,28 +772,33 @@ fn batch_load_users(ids: List(String)) -> Result(List(Result(User, String)), Str
   }))
 }
 
-// Create DataLoader
 let user_loader = dataloader.new(batch_load_users)
 
-// Or with custom options
+// With custom options
 let user_loader = dataloader.new_with_options(
   batch_load_users,
   dataloader.DataLoaderOptions(max_batch_size: 50, cache_enabled: True),
 )
 
-// Load data (automatically batched)
-let #(loader, result) = dataloader.load(user_loader, "user-1")
-let #(loader, results) = dataloader.load_many(loader, ["user-2", "user-3"])
-
 // Cache management
 let loader = dataloader.prime(loader, "user-4", user)  // Pre-populate cache
 let loader = dataloader.clear_key(loader, "user-1")    // Clear specific key
 let loader = dataloader.clear_cache(loader)            // Clear all cache
-
-// Use with execution context
-let ctx = schema.execution_context(types.to_dynamic(Nil))
-  |> schema.add_data_loader("users", user_loader)
 ```
+
+#### DataLoader Helper Summary
+
+| Function | Description |
+|----------|-------------|
+| `int_loader_result(find, encode, err)` | One-liner from Result-returning find function |
+| `string_loader_result(find, encode, err)` | Same for String keys |
+| `int_loader(fn)` | Custom loader with Int keys |
+| `string_loader(fn)` | Custom loader with String keys |
+| `int_batch_loader(fn)` | Batch loader with Int keys |
+| `string_batch_loader(fn)` | Batch loader with String keys |
+| `schema.with_loaders(ctx, loaders)` | Register multiple loaders |
+| `schema.load_by_id(ctx, name, id)` | Load by Int ID |
+| `schema.load_many_by_id(ctx, name, ids)` | Load multiple by Int IDs |
 
 ### Codegen Configuration
 
