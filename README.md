@@ -8,9 +8,9 @@
 Inspired by:
 - [Absinthe](https://github.com/absinthe-graphql/absinthe) - The GraphQL toolkit for Elixir
 - [dataloader](https://github.com/graphql/dataloader) - DataLoader pattern for batching and caching
-- [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b) - Code First GraphQL for Go
+- [gqlkit](https://github.com/izumin5210/gqlkit) - Write TypeScript, generate GraphQL
 - [Pothos](https://github.com/hayes/pothos) - Code First GraphQL for TypeScript
-- [TypeGraphQL](https://github.com/MichalLyworski/type-graphql) - Code First GraphQL with TypeScript decorators
+- [TypeGraphQL](https://github.com/MichalLytek/type-graphql) - Code First GraphQL with TypeScript decorators
 - [Nexus](https://github.com/graphql-nexus/nexus) - Declarative, Code First GraphQL for TypeScript
 
 ## Installation
