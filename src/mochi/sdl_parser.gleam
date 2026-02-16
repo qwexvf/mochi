@@ -171,9 +171,9 @@ fn parse_directive_usage(
   // Parse directive name
   use #(name, parser) <- result.try(parse_name(parser))
   // Parse optional arguments
-  use #(arguments, parser) <- result.try(
-    parse_optional_directive_arguments(parser),
-  )
+  use #(arguments, parser) <- result.try(parse_optional_directive_arguments(
+    parser,
+  ))
 
   Ok(#(sdl_ast.DirectiveUsage(name: name, arguments: arguments), parser))
 }

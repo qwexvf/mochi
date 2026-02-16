@@ -656,7 +656,11 @@ pub fn required_float_field(obj: ObjectType, name: String) -> ObjectType {
 }
 
 /// Add a list field with auto-resolver
-pub fn list_field(obj: ObjectType, name: String, item_type: String) -> ObjectType {
+pub fn list_field(
+  obj: ObjectType,
+  name: String,
+  item_type: String,
+) -> ObjectType {
   auto_field(obj, name, List(Named(item_type)))
 }
 
