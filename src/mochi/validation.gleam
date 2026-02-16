@@ -701,7 +701,10 @@ fn validate_directives(
         True ->
           case is_repeatable_directive(ctx.schema, directive.name) {
             True -> #(seen_set, ctx)
-            False -> #(seen_set, add_error(ctx, DuplicateDirective(directive.name)))
+            False -> #(
+              seen_set,
+              add_error(ctx, DuplicateDirective(directive.name)),
+            )
           }
         False -> #(set.insert(seen_set, directive.name), ctx)
       }
@@ -723,8 +726,7 @@ fn validate_single_directive(
       // These are valid on FIELD, FRAGMENT_SPREAD, INLINE_FRAGMENT
       case location {
         "FIELD" | "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" -> ctx
-        _ ->
-          add_error(ctx, DirectiveNotAllowed(directive.name, location))
+        _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     "deprecated" ->
       // Valid on FIELD_DEFINITION, ARGUMENT_DEFINITION, INPUT_FIELD_DEFINITION, ENUM_VALUE
@@ -745,7 +747,12 @@ fn validate_single_directive(
       // Check custom directives from schema
       case dict.get(ctx.schema.directives, directive.name) {
         Ok(directive_def) ->
-          validate_directive_location(ctx, directive.name, directive_def, location)
+          validate_directive_location(
+            ctx,
+            directive.name,
+            directive_def,
+            location,
+          )
         Error(_) ->
           // Unknown directive
           add_error(ctx, UnknownDirective(directive.name))
@@ -864,8 +871,7 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" never matches type \""
       <> parent_type
       <> "\""
-    UnusedFragment(name) ->
-      "Fragment \"" <> name <> "\" is never used"
+    UnusedFragment(name) -> "Fragment \"" <> name <> "\" is never used"
     UndefinedVariable(name) -> "Variable \"$" <> name <> "\" is not defined"
     UnusedVariable(name) -> "Variable \"$" <> name <> "\" is never used"
     DuplicateVariable(name) ->
