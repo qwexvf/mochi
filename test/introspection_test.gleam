@@ -236,3 +236,136 @@ pub fn schema_query_type_test() {
     _ -> panic as "Schema should have query type"
   }
 }
+
+// ============================================================================
+// Directive Introspection Tests
+// ============================================================================
+
+import gleam/dynamic/decode
+import gleam/list
+
+pub fn execute_directive_introspection_test() {
+  let test_schema = create_test_schema()
+  let result =
+    executor.execute_query(
+      test_schema,
+      "{ __schema { directives { name description locations args { name } isRepeatable } } }",
+    )
+
+  // Check that we got data back
+  case result.data {
+    Some(data) -> {
+      // Should have directives array
+      case
+        decode.run(
+          data,
+          decode.at(["__schema", "directives"], decode.list(decode.dynamic)),
+        )
+      {
+        Ok(directives) -> {
+          // Should have at least the built-in directives
+          assert_true(
+            list.length(directives) >= 4,
+            "Should have at least 4 built-in directives (skip, include, deprecated, specifiedBy)",
+          )
+        }
+        Error(_) -> panic as "Should have directives array"
+      }
+    }
+    _ -> panic as "Should have data"
+  }
+}
+
+pub fn execute_skip_directive_introspection_test() {
+  let test_schema = create_test_schema()
+  let result =
+    executor.execute_query(
+      test_schema,
+      "{ __schema { directives { name locations } } }",
+    )
+
+  case result.data {
+    Some(data) -> {
+      case
+        decode.run(
+          data,
+          decode.at(["__schema", "directives"], decode.list(decode.dynamic)),
+        )
+      {
+        Ok(directives) -> {
+          // Find the skip directive
+          let skip_found =
+            list.any(directives, fn(d) {
+              case decode.run(d, decode.at(["name"], decode.string)) {
+                Ok("skip") -> True
+                _ -> False
+              }
+            })
+          assert_true(skip_found, "Should have @skip directive")
+        }
+        Error(_) -> panic as "Should have directives"
+      }
+    }
+    _ -> panic as "Should have data"
+  }
+}
+
+pub fn execute_include_directive_introspection_test() {
+  let test_schema = create_test_schema()
+  let result =
+    executor.execute_query(test_schema, "{ __schema { directives { name } } }")
+
+  case result.data {
+    Some(data) -> {
+      case
+        decode.run(
+          data,
+          decode.at(["__schema", "directives"], decode.list(decode.dynamic)),
+        )
+      {
+        Ok(directives) -> {
+          let include_found =
+            list.any(directives, fn(d) {
+              case decode.run(d, decode.at(["name"], decode.string)) {
+                Ok("include") -> True
+                _ -> False
+              }
+            })
+          assert_true(include_found, "Should have @include directive")
+        }
+        Error(_) -> panic as "Should have directives"
+      }
+    }
+    _ -> panic as "Should have data"
+  }
+}
+
+pub fn execute_deprecated_directive_introspection_test() {
+  let test_schema = create_test_schema()
+  let result =
+    executor.execute_query(test_schema, "{ __schema { directives { name } } }")
+
+  case result.data {
+    Some(data) -> {
+      case
+        decode.run(
+          data,
+          decode.at(["__schema", "directives"], decode.list(decode.dynamic)),
+        )
+      {
+        Ok(directives) -> {
+          let deprecated_found =
+            list.any(directives, fn(d) {
+              case decode.run(d, decode.at(["name"], decode.string)) {
+                Ok("deprecated") -> True
+                _ -> False
+              }
+            })
+          assert_true(deprecated_found, "Should have @deprecated directive")
+        }
+        Error(_) -> panic as "Should have directives"
+      }
+    }
+    _ -> panic as "Should have data"
+  }
+}
