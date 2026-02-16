@@ -77,7 +77,9 @@ pub type AuthContext {
 
 /// Extract auth context from execution context
 fn get_auth_context(ctx: schema.ExecutionContext) -> AuthContext {
-  case decode.run(ctx.user_context, decode.dict(decode.string, decode.dynamic)) {
+  case
+    decode.run(ctx.user_context, decode.dict(decode.string, decode.dynamic))
+  {
     Ok(ctx_dict) -> {
       case dict.get(ctx_dict, "current_user") {
         Ok(user_dyn) -> {
@@ -179,7 +181,9 @@ pub fn build_schema() -> schema.Schema {
     // email has custom resolver for field-level auth
     |> schema.field(
       schema.field_def("email", schema.non_null(schema.string_type()))
-      |> schema.field_description("Only visible to the user themselves or admins")
+      |> schema.field_description(
+        "Only visible to the user themselves or admins",
+      )
       |> schema.resolver(email_resolver()),
     )
     |> schema.required_string_field("role")
@@ -201,13 +205,38 @@ pub fn build_schema() -> schema.Schema {
   let query_type =
     schema.object("Query")
     // Public queries
-    |> schema.list_query("publicPosts", "Post", "Get all published posts (public)", public_posts_resolver())
+    |> schema.list_query(
+      "publicPosts",
+      "Post",
+      "Get all published posts (public)",
+      public_posts_resolver(),
+    )
     // Protected queries (require auth)
-    |> schema.list_query("myPosts", "Post", "Get current user's posts (requires auth)", my_posts_resolver())
-    |> schema.ref_query("me", "User", "Get current user (requires auth)", me_resolver())
+    |> schema.list_query(
+      "myPosts",
+      "Post",
+      "Get current user's posts (requires auth)",
+      my_posts_resolver(),
+    )
+    |> schema.ref_query(
+      "me",
+      "User",
+      "Get current user (requires auth)",
+      me_resolver(),
+    )
     // Admin-only queries
-    |> schema.list_query("allUsers", "User", "Get all users (admin only)", all_users_resolver())
-    |> schema.list_query("allPosts", "Post", "Get all posts including drafts (admin only)", all_posts_resolver())
+    |> schema.list_query(
+      "allUsers",
+      "User",
+      "Get all users (admin only)",
+      all_users_resolver(),
+    )
+    |> schema.list_query(
+      "allPosts",
+      "Post",
+      "Get all posts including drafts (admin only)",
+      all_posts_resolver(),
+    )
     // Query with arguments
     |> schema.query_with_args(
       "user",
@@ -484,7 +513,12 @@ pub fn main() {
   io.println("1. Public query (no auth):")
   io.println("   Query: { publicPosts { title } }")
   let ctx1 = create_context_from_headers(dict.new())
-  let result1 = executor.execute_query_with_context(my_schema, "{ publicPosts { title } }", ctx1)
+  let result1 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ publicPosts { title } }",
+      ctx1,
+    )
   io.println("   Result: " <> result_summary(result1))
   io.println("")
 
@@ -492,7 +526,8 @@ pub fn main() {
   io.println("2. Protected query WITHOUT auth:")
   io.println("   Query: { me { name } }")
   let ctx2 = create_context_from_headers(dict.new())
-  let result2 = executor.execute_query_with_context(my_schema, "{ me { name } }", ctx2)
+  let result2 =
+    executor.execute_query_with_context(my_schema, "{ me { name } }", ctx2)
   io.println("   Result: " <> result_summary(result2))
   io.println("")
 
@@ -503,7 +538,12 @@ pub fn main() {
     create_context_from_headers(
       dict.from_list([#("authorization", "Bearer member-token")]),
     )
-  let result3 = executor.execute_query_with_context(my_schema, "{ me { name email } }", ctx3)
+  let result3 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ me { name email } }",
+      ctx3,
+    )
   io.println("   Result: " <> result_summary(result3))
   io.println("")
 
@@ -514,7 +554,12 @@ pub fn main() {
     create_context_from_headers(
       dict.from_list([#("authorization", "Bearer member-token")]),
     )
-  let result4 = executor.execute_query_with_context(my_schema, "{ allUsers { name } }", ctx4)
+  let result4 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ allUsers { name } }",
+      ctx4,
+    )
   io.println("   Result: " <> result_summary(result4))
   io.println("")
 
@@ -525,7 +570,12 @@ pub fn main() {
     create_context_from_headers(
       dict.from_list([#("authorization", "Bearer admin-token")]),
     )
-  let result5 = executor.execute_query_with_context(my_schema, "{ allUsers { name email } }", ctx5)
+  let result5 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ allUsers { name email } }",
+      ctx5,
+    )
   io.println("   Result: " <> result_summary(result5))
   io.println("")
 
@@ -536,9 +586,16 @@ pub fn main() {
     create_context_from_headers(
       dict.from_list([#("authorization", "Bearer member-token")]),
     )
-  let result6 = executor.execute_query_with_context(my_schema, "{ user(id: \"2\") { name email } }", ctx6)
+  let result6 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ user(id: \"2\") { name email } }",
+      ctx6,
+    )
   io.println("   Result: " <> result_summary(result6))
-  io.println("   (Email should be [hidden] since member can't see other's email)")
+  io.println(
+    "   (Email should be [hidden] since member can't see other's email)",
+  )
   io.println("")
 
   // Test 7: Field-level auth (admin can see all emails)
@@ -548,7 +605,12 @@ pub fn main() {
     create_context_from_headers(
       dict.from_list([#("authorization", "Bearer admin-token")]),
     )
-  let result7 = executor.execute_query_with_context(my_schema, "{ user(id: \"2\") { name email } }", ctx7)
+  let result7 =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ user(id: \"2\") { name email } }",
+      ctx7,
+    )
   io.println("   Result: " <> result_summary(result7))
   io.println("   (Admin can see the actual email)")
 

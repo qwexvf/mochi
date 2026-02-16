@@ -377,9 +377,31 @@ fn parse_name(parser: SDLParser) -> Result(#(String, SDLParser), SDLParseError) 
   case consume_token(parser) {
     Ok(#(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(name), _), parser)) ->
       Ok(#(name, parser))
-    Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), _)) ->
-      Error(UnexpectedToken("name", token, position))
+    // Keywords can be used as names in GraphQL (contextual keywords)
+    Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), parser)) ->
+      case keyword_to_name(token) {
+        Ok(name) -> Ok(#(name, parser))
+        Error(_) -> Error(UnexpectedToken("name", token, position))
+      }
     Error(_) -> Error(UnexpectedEOF("name"))
+  }
+}
+
+/// Convert a keyword token to its string representation
+/// GraphQL keywords are contextual and can be used as names
+fn keyword_to_name(token: sdl_lexer.SDLToken) -> Result(String, Nil) {
+  case token {
+    sdl_lexer.Type -> Ok("type")
+    sdl_lexer.Interface -> Ok("interface")
+    sdl_lexer.Union -> Ok("union")
+    sdl_lexer.Scalar -> Ok("scalar")
+    sdl_lexer.Enum -> Ok("enum")
+    sdl_lexer.Input -> Ok("input")
+    sdl_lexer.Directive -> Ok("directive")
+    sdl_lexer.Schema -> Ok("schema")
+    sdl_lexer.Extend -> Ok("extend")
+    sdl_lexer.Implements -> Ok("implements")
+    _ -> Error(Nil)
   }
 }
 
@@ -556,8 +578,21 @@ fn parse_argument_definitions(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightParen, _)) ->
       Ok(#(list.reverse(acc), parser))
+    // Accept Name tokens
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
-    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
+    | // Accept keywords (which can be used as names in GraphQL)
+      Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Interface, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Union, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Scalar, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Input, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Directive, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Schema, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Implements, _))
+    | // Accept description strings (for documented arguments)
+      Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
     | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
       use #(argument, parser) <- result.try(parse_argument_definition(parser))
       parse_argument_definitions(parser, [argument, ..acc])
