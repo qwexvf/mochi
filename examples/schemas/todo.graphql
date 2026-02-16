@@ -1,0 +1,92 @@
+"""
+Simple todo app schema - great for getting started
+"""
+
+type Todo {
+  id: ID!
+  title: String!
+  description: String
+  completed: Boolean!
+  priority: Priority!
+  dueDate: String
+  tags: [String!]!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type TodoList {
+  id: ID!
+  name: String!
+  description: String
+  todos: [Todo!]!
+  completedCount: Int!
+  totalCount: Int!
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+input CreateTodoInput {
+  title: String!
+  description: String
+  priority: Priority
+  dueDate: String
+  tags: [String!]
+  listId: ID
+}
+
+input UpdateTodoInput {
+  title: String
+  description: String
+  completed: Boolean
+  priority: Priority
+  dueDate: String
+  tags: [String!]
+}
+
+type Query {
+  "Get all todos"
+  todos(completed: Boolean): [Todo!]!
+
+  "Get a single todo by ID"
+  todo(id: ID!): Todo
+
+  "Get all todo lists"
+  lists: [TodoList!]!
+
+  "Get a single list by ID"
+  list(id: ID!): TodoList
+
+  "Search todos by title"
+  searchTodos(query: String!): [Todo!]!
+}
+
+type Mutation {
+  "Create a new todo"
+  createTodo(input: CreateTodoInput!): Todo!
+
+  "Update a todo"
+  updateTodo(id: ID!, input: UpdateTodoInput!): Todo!
+
+  "Delete a todo"
+  deleteTodo(id: ID!): Boolean!
+
+  "Toggle todo completion"
+  toggleTodo(id: ID!): Todo!
+
+  "Create a new list"
+  createList(name: String!, description: String): TodoList!
+
+  "Delete a list"
+  deleteList(id: ID!): Boolean!
+
+  "Move todo to a different list"
+  moveTodo(todoId: ID!, listId: ID!): Todo!
+
+  "Clear completed todos"
+  clearCompleted: Int!
+}

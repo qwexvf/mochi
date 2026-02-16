@@ -1,0 +1,262 @@
+"""
+E-commerce schema with products, orders, and payments
+"""
+
+type Product {
+  id: ID!
+  name: String!
+  description: String!
+  price: Float!
+  compareAtPrice: Float
+  sku: String!
+  inventory: Int!
+  images: [String!]!
+  category: Category!
+  variants: [ProductVariant!]!
+  reviews: [Review!]!
+  averageRating: Float
+  createdAt: String!
+}
+
+type ProductVariant {
+  id: ID!
+  name: String!
+  sku: String!
+  price: Float!
+  inventory: Int!
+  options: [VariantOption!]!
+}
+
+type VariantOption {
+  name: String!
+  value: String!
+}
+
+type Category {
+  id: ID!
+  name: String!
+  slug: String!
+  description: String
+  parent: Category
+  children: [Category!]!
+  products: [Product!]!
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  title: String
+  content: String!
+  author: Customer!
+  product: Product!
+  verified: Boolean!
+  createdAt: String!
+}
+
+type Customer {
+  id: ID!
+  email: String!
+  firstName: String!
+  lastName: String!
+  phone: String
+  addresses: [Address!]!
+  orders: [Order!]!
+  wishlist: [Product!]!
+}
+
+type Address {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  company: String
+  address1: String!
+  address2: String
+  city: String!
+  province: String!
+  country: String!
+  zip: String!
+  phone: String
+  isDefault: Boolean!
+}
+
+type Order {
+  id: ID!
+  orderNumber: String!
+  customer: Customer!
+  items: [OrderItem!]!
+  shippingAddress: Address!
+  billingAddress: Address!
+  subtotal: Float!
+  shipping: Float!
+  tax: Float!
+  total: Float!
+  status: OrderStatus!
+  paymentStatus: PaymentStatus!
+  fulfillmentStatus: FulfillmentStatus!
+  notes: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type OrderItem {
+  id: ID!
+  product: Product!
+  variant: ProductVariant
+  quantity: Int!
+  price: Float!
+  total: Float!
+}
+
+type Cart {
+  id: ID!
+  items: [CartItem!]!
+  subtotal: Float!
+  itemCount: Int!
+}
+
+type CartItem {
+  id: ID!
+  product: Product!
+  variant: ProductVariant
+  quantity: Int!
+  price: Float!
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+}
+
+enum ProductSortKey {
+  TITLE
+  PRICE
+  CREATED_AT
+  BEST_SELLING
+  RELEVANCE
+}
+
+input ProductFilterInput {
+  categoryId: ID
+  minPrice: Float
+  maxPrice: Float
+  inStock: Boolean
+  search: String
+}
+
+input AddToCartInput {
+  productId: ID!
+  variantId: ID
+  quantity: Int!
+}
+
+input CreateOrderInput {
+  cartId: ID!
+  shippingAddressId: ID!
+  billingAddressId: ID
+  notes: String
+}
+
+input AddressInput {
+  firstName: String!
+  lastName: String!
+  company: String
+  address1: String!
+  address2: String
+  city: String!
+  province: String!
+  country: String!
+  zip: String!
+  phone: String
+  isDefault: Boolean
+}
+
+type Query {
+  "Get a product by ID"
+  product(id: ID!): Product
+
+  "Get a product by handle/slug"
+  productByHandle(handle: String!): Product
+
+  "List products with filtering"
+  products(
+    filter: ProductFilterInput
+    first: Int
+    after: String
+    sortKey: ProductSortKey
+  ): [Product!]!
+
+  "Get a category by slug"
+  category(slug: String!): Category
+
+  "Get all root categories"
+  categories: [Category!]!
+
+  "Get the current customer"
+  customer: Customer
+
+  "Get an order by ID"
+  order(id: ID!): Order
+
+  "Get the current cart"
+  cart: Cart
+
+  "Search products"
+  searchProducts(query: String!, limit: Int): [Product!]!
+}
+
+type Mutation {
+  "Add item to cart"
+  addToCart(input: AddToCartInput!): Cart!
+
+  "Update cart item quantity"
+  updateCartItem(itemId: ID!, quantity: Int!): Cart!
+
+  "Remove item from cart"
+  removeFromCart(itemId: ID!): Cart!
+
+  "Clear the cart"
+  clearCart: Cart!
+
+  "Create an order from cart"
+  createOrder(input: CreateOrderInput!): Order!
+
+  "Cancel an order"
+  cancelOrder(id: ID!): Order!
+
+  "Add a shipping address"
+  addAddress(input: AddressInput!): Address!
+
+  "Update an address"
+  updateAddress(id: ID!, input: AddressInput!): Address!
+
+  "Delete an address"
+  deleteAddress(id: ID!): Boolean!
+
+  "Add product to wishlist"
+  addToWishlist(productId: ID!): Customer!
+
+  "Remove product from wishlist"
+  removeFromWishlist(productId: ID!): Customer!
+
+  "Submit a product review"
+  submitReview(productId: ID!, rating: Int!, title: String, content: String!): Review!
+}
