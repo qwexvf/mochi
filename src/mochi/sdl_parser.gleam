@@ -2,7 +2,7 @@
 // Converts SDL tokens into an AST that can be used to build schemas
 
 import gleam/list
-import gleam/option.{None}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import mochi/sdl_ast.{type SDLDocument, type TypeSystemDefinition}
 import mochi/sdl_lexer.{
@@ -57,9 +57,12 @@ fn parse_definitions(
 fn parse_type_system_definition(
   parser: SDLParser,
 ) -> Result(#(TypeSystemDefinition, SDLParser), SDLParseError) {
+  // First, check for an optional description
+  let #(description, parser) = parse_optional_description(parser)
+
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _)) ->
-      parse_object_type_definition(parser)
+      parse_object_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.ObjectTypeDefinition(result.0)),
@@ -68,7 +71,7 @@ fn parse_type_system_definition(
       })
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Interface, _)) ->
-      parse_interface_type_definition(parser)
+      parse_interface_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.InterfaceTypeDefinition(result.0)),
@@ -77,7 +80,7 @@ fn parse_type_system_definition(
       })
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Union, _)) ->
-      parse_union_type_definition(parser)
+      parse_union_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.UnionTypeDefinition(result.0)),
@@ -86,7 +89,7 @@ fn parse_type_system_definition(
       })
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Scalar, _)) ->
-      parse_scalar_type_definition(parser)
+      parse_scalar_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.ScalarTypeDefinition(result.0)),
@@ -95,7 +98,7 @@ fn parse_type_system_definition(
       })
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _)) ->
-      parse_enum_type_definition(parser)
+      parse_enum_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.EnumTypeDefinition(result.0)),
@@ -104,7 +107,7 @@ fn parse_type_system_definition(
       })
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Input, _)) ->
-      parse_input_object_type_definition(parser)
+      parse_input_object_type_definition(parser, description)
       |> result.map(fn(result) {
         #(
           sdl_ast.TypeDefinition(sdl_ast.InputObjectTypeDefinition(result.0)),
@@ -119,9 +122,115 @@ fn parse_type_system_definition(
   }
 }
 
+/// Parse optional description (triple-quoted string)
+fn parse_optional_description(parser: SDLParser) -> #(Option(String), SDLParser) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(content), _)) -> {
+      case consume_token(parser) {
+        Ok(#(_, new_parser)) -> #(Some(content), new_parser)
+        Error(_) -> #(None, parser)
+      }
+    }
+    // Also handle single-line string descriptions (GraphQL spec allows this)
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(content), _)) -> {
+      case consume_token(parser) {
+        Ok(#(_, new_parser)) -> #(Some(content), new_parser)
+        Error(_) -> #(None, parser)
+      }
+    }
+    _ -> #(None, parser)
+  }
+}
+
+/// Parse optional directives (@name or @name(args...))
+fn parse_optional_directives(
+  parser: SDLParser,
+) -> Result(#(List(sdl_ast.DirectiveUsage), SDLParser), SDLParseError) {
+  parse_directives_loop(parser, [])
+}
+
+fn parse_directives_loop(
+  parser: SDLParser,
+  acc: List(sdl_ast.DirectiveUsage),
+) -> Result(#(List(sdl_ast.DirectiveUsage), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.At, _)) -> {
+      use #(directive, parser) <- result.try(parse_directive_usage(parser))
+      parse_directives_loop(parser, [directive, ..acc])
+    }
+    _ -> Ok(#(list.reverse(acc), parser))
+  }
+}
+
+/// Parse a single directive usage: @name or @name(arg: value, ...)
+fn parse_directive_usage(
+  parser: SDLParser,
+) -> Result(#(sdl_ast.DirectiveUsage, SDLParser), SDLParseError) {
+  // Consume '@'
+  use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.At, "@"))
+  // Parse directive name
+  use #(name, parser) <- result.try(parse_name(parser))
+  // Parse optional arguments
+  use #(arguments, parser) <- result.try(
+    parse_optional_directive_arguments(parser),
+  )
+
+  Ok(#(sdl_ast.DirectiveUsage(name: name, arguments: arguments), parser))
+}
+
+/// Parse optional directive arguments: (arg: value, ...)
+fn parse_optional_directive_arguments(
+  parser: SDLParser,
+) -> Result(#(List(sdl_ast.DirectiveArgument), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftParen, _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("(") }),
+      )
+      use #(arguments, parser) <- result.try(
+        parse_directive_arguments_loop(parser, []),
+      )
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.RightParen,
+        ")",
+      ))
+      Ok(#(arguments, parser))
+    }
+    _ -> Ok(#([], parser))
+  }
+}
+
+fn parse_directive_arguments_loop(
+  parser: SDLParser,
+  acc: List(sdl_ast.DirectiveArgument),
+) -> Result(#(List(sdl_ast.DirectiveArgument), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightParen, _)) ->
+      Ok(#(list.reverse(acc), parser))
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+      use #(argument, parser) <- result.try(parse_directive_argument(parser))
+      parse_directive_arguments_loop(parser, [argument, ..acc])
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
+      Error(UnexpectedToken("argument or ')'", token, position))
+    Error(_) -> Error(UnexpectedEOF("argument or ')'"))
+  }
+}
+
+fn parse_directive_argument(
+  parser: SDLParser,
+) -> Result(#(sdl_ast.DirectiveArgument, SDLParser), SDLParseError) {
+  use #(name, parser) <- result.try(parse_name(parser))
+  use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Colon, ":"))
+  use #(value, parser) <- result.try(parse_value(parser))
+  Ok(#(sdl_ast.DirectiveArgument(name: name, value: value), parser))
+}
+
 /// Parse: type User { ... }
 fn parse_object_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.ObjectTypeDef, SDLParser), SDLParseError) {
   // Consume 'type' keyword
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Type, "type"))
@@ -132,17 +241,18 @@ fn parse_object_type_definition(
   // Parse optional implements clause
   use #(interfaces, parser) <- result.try(parse_optional_implements(parser))
 
+  // Parse optional directives
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
+
   // Parse field definitions
   use #(fields, parser) <- result.try(parse_fields_definition(parser))
 
   Ok(#(
     sdl_ast.ObjectTypeDef(
       name: name,
-      description: None,
-      // TODO: Handle descriptions
+      description: description,
       interfaces: interfaces,
-      directives: [],
-      // TODO: Handle directives
+      directives: directives,
       fields: fields,
     ),
     parser,
@@ -152,6 +262,7 @@ fn parse_object_type_definition(
 /// Parse: interface Node { ... }
 fn parse_interface_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.InterfaceTypeDef, SDLParser), SDLParseError) {
   use #(_, parser) <- result.try(expect_token(
     parser,
@@ -159,13 +270,14 @@ fn parse_interface_type_definition(
     "interface",
   ))
   use #(name, parser) <- result.try(parse_name(parser))
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
   use #(fields, parser) <- result.try(parse_fields_definition(parser))
 
   Ok(#(
     sdl_ast.InterfaceTypeDef(
       name: name,
-      description: None,
-      directives: [],
+      description: description,
+      directives: directives,
       fields: fields,
     ),
     parser,
@@ -175,17 +287,19 @@ fn parse_interface_type_definition(
 /// Parse: union SearchResult = User | Post
 fn parse_union_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.UnionTypeDef, SDLParser), SDLParseError) {
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Union, "union"))
   use #(name, parser) <- result.try(parse_name(parser))
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Equals, "="))
   use #(members, parser) <- result.try(parse_union_member_types(parser))
 
   Ok(#(
     sdl_ast.UnionTypeDef(
       name: name,
-      description: None,
-      directives: [],
+      description: description,
+      directives: directives,
       member_types: members,
     ),
     parser,
@@ -195,6 +309,7 @@ fn parse_union_type_definition(
 /// Parse: scalar DateTime
 fn parse_scalar_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.ScalarTypeDef, SDLParser), SDLParseError) {
   use #(_, parser) <- result.try(expect_token(
     parser,
@@ -202,9 +317,14 @@ fn parse_scalar_type_definition(
     "scalar",
   ))
   use #(name, parser) <- result.try(parse_name(parser))
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
 
   Ok(#(
-    sdl_ast.ScalarTypeDef(name: name, description: None, directives: []),
+    sdl_ast.ScalarTypeDef(
+      name: name,
+      description: description,
+      directives: directives,
+    ),
     parser,
   ))
 }
@@ -212,16 +332,18 @@ fn parse_scalar_type_definition(
 /// Parse: enum Status { ACTIVE INACTIVE }
 fn parse_enum_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.EnumTypeDef, SDLParser), SDLParseError) {
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Enum, "enum"))
   use #(name, parser) <- result.try(parse_name(parser))
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
   use #(values, parser) <- result.try(parse_enum_values_definition(parser))
 
   Ok(#(
     sdl_ast.EnumTypeDef(
       name: name,
-      description: None,
-      directives: [],
+      description: description,
+      directives: directives,
       values: values,
     ),
     parser,
@@ -231,16 +353,18 @@ fn parse_enum_type_definition(
 /// Parse: input CreateUserInput { ... }
 fn parse_input_object_type_definition(
   parser: SDLParser,
+  description: Option(String),
 ) -> Result(#(sdl_ast.InputObjectTypeDef, SDLParser), SDLParseError) {
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Input, "input"))
   use #(name, parser) <- result.try(parse_name(parser))
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
   use #(fields, parser) <- result.try(parse_input_fields_definition(parser))
 
   Ok(#(
     sdl_ast.InputObjectTypeDef(
       name: name,
-      description: None,
-      directives: [],
+      description: description,
+      directives: directives,
       fields: fields,
     ),
     parser,
@@ -308,7 +432,10 @@ fn parse_field_definitions(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) ->
       Ok(#(list.reverse(acc), parser))
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+    // Field can start with description, name, or string literal (for description)
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
       use #(field, parser) <- result.try(parse_field_definition(parser))
       parse_field_definitions(parser, [field, ..acc])
     }
@@ -321,20 +448,24 @@ fn parse_field_definitions(
 fn parse_field_definition(
   parser: SDLParser,
 ) -> Result(#(sdl_ast.FieldDef, SDLParser), SDLParseError) {
+  // Parse optional description
+  let #(description, parser) = parse_optional_description(parser)
   use #(name, parser) <- result.try(parse_name(parser))
   use #(arguments, parser) <- result.try(parse_optional_arguments_definition(
     parser,
   ))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Colon, ":"))
   use #(field_type, parser) <- result.try(parse_type(parser))
+  // Parse optional directives after type
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
 
   Ok(#(
     sdl_ast.FieldDef(
       name: name,
-      description: None,
+      description: description,
       arguments: arguments,
       field_type: field_type,
-      directives: [],
+      directives: directives,
     ),
     parser,
   ))
@@ -425,7 +556,9 @@ fn parse_argument_definitions(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightParen, _)) ->
       Ok(#(list.reverse(acc), parser))
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
       use #(argument, parser) <- result.try(parse_argument_definition(parser))
       parse_argument_definitions(parser, [argument, ..acc])
     }
@@ -438,20 +571,24 @@ fn parse_argument_definitions(
 fn parse_argument_definition(
   parser: SDLParser,
 ) -> Result(#(sdl_ast.ArgumentDef, SDLParser), SDLParseError) {
+  // Parse optional description
+  let #(description, parser) = parse_optional_description(parser)
   use #(name, parser) <- result.try(parse_name(parser))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Colon, ":"))
   use #(arg_type, parser) <- result.try(parse_type(parser))
   use #(default_value, parser) <- result.try(parse_optional_default_value(
     parser,
   ))
+  // Parse optional directives after default value
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
 
   Ok(#(
     sdl_ast.ArgumentDef(
       name: name,
-      description: None,
+      description: description,
       arg_type: arg_type,
       default_value: default_value,
-      directives: [],
+      directives: directives,
     ),
     parser,
   ))
@@ -556,7 +693,9 @@ fn parse_enum_values(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) ->
       Ok(#(list.reverse(acc), parser))
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
       use #(enum_value, parser) <- result.try(parse_enum_value_definition(
         parser,
       ))
@@ -571,10 +710,18 @@ fn parse_enum_values(
 fn parse_enum_value_definition(
   parser: SDLParser,
 ) -> Result(#(sdl_ast.EnumValueDef, SDLParser), SDLParseError) {
+  // Parse optional description
+  let #(description, parser) = parse_optional_description(parser)
   use #(name, parser) <- result.try(parse_name(parser))
+  // Parse optional directives
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
 
   Ok(#(
-    sdl_ast.EnumValueDef(name: name, description: None, directives: []),
+    sdl_ast.EnumValueDef(
+      name: name,
+      description: description,
+      directives: directives,
+    ),
     parser,
   ))
 }
@@ -595,7 +742,9 @@ fn parse_input_fields(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) ->
       Ok(#(list.reverse(acc), parser))
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
       use #(field, parser) <- result.try(parse_input_field_definition(parser))
       parse_input_fields(parser, [field, ..acc])
     }
@@ -608,20 +757,24 @@ fn parse_input_fields(
 fn parse_input_field_definition(
   parser: SDLParser,
 ) -> Result(#(sdl_ast.InputFieldDef, SDLParser), SDLParseError) {
+  // Parse optional description
+  let #(description, parser) = parse_optional_description(parser)
   use #(name, parser) <- result.try(parse_name(parser))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Colon, ":"))
   use #(field_type, parser) <- result.try(parse_type(parser))
   use #(default_value, parser) <- result.try(parse_optional_default_value(
     parser,
   ))
+  // Parse optional directives after default value
+  use #(directives, parser) <- result.try(parse_optional_directives(parser))
 
   Ok(#(
     sdl_ast.InputFieldDef(
       name: name,
-      description: None,
+      description: description,
       field_type: field_type,
       default_value: default_value,
-      directives: [],
+      directives: directives,
     ),
     parser,
   ))

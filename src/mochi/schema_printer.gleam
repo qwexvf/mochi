@@ -2,6 +2,10 @@
 // This allows you to serialize schemas, inspect them, and generate documentation
 
 import gleam/dict
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
+import gleam/float
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
@@ -195,8 +199,7 @@ fn print_input_field_definition(
 
   // Add default value if any
   let base = case field.default_value {
-    Some(_) -> base <> " = " <> "defaultValue"
-    // TODO: Proper value printing
+    Some(value) -> base <> " = " <> print_value(value)
     None -> base
   }
 
@@ -211,8 +214,7 @@ fn print_argument_definition(arg: schema.ArgumentDefinition) -> String {
   let base = arg.name <> ": " <> print_field_type(arg.arg_type)
 
   case arg.default_value {
-    Some(_) -> base <> " = " <> "defaultValue"
-    // TODO: Proper value printing
+    Some(value) -> base <> " = " <> print_value(value)
     None -> base
   }
 }
@@ -298,6 +300,52 @@ fn print_description(desc: String) -> String {
 /// Print description inline
 fn print_description_inline(desc: String) -> String {
   "# " <> desc
+}
+
+/// Print a Dynamic value in GraphQL SDL format
+fn print_value(value: Dynamic) -> String {
+  // Try to decode as various types
+  case decode.run(value, decode.string) {
+    Ok(s) -> "\"" <> escape_string(s) <> "\""
+    Error(_) ->
+      case decode.run(value, decode.int) {
+        Ok(i) -> int.to_string(i)
+        Error(_) ->
+          case decode.run(value, decode.float) {
+            Ok(f) -> float.to_string(f)
+            Error(_) ->
+              case decode.run(value, decode.bool) {
+                Ok(True) -> "true"
+                Ok(False) -> "false"
+                Error(_) ->
+                  case decode.run(value, decode.optional(decode.dynamic)) {
+                    Ok(None) -> "null"
+                    _ ->
+                      case decode.run(value, decode.list(decode.dynamic)) {
+                        Ok(items) -> {
+                          let printed =
+                            list.map(items, print_value) |> string.join(", ")
+                          "[" <> printed <> "]"
+                        }
+                        Error(_) ->
+                          // Fallback for unrecognized types
+                          "null"
+                      }
+                  }
+              }
+          }
+      }
+  }
+}
+
+/// Escape special characters in a string for SDL
+fn escape_string(s: String) -> String {
+  s
+  |> string.replace("\\", "\\\\")
+  |> string.replace("\"", "\\\"")
+  |> string.replace("\n", "\\n")
+  |> string.replace("\r", "\\r")
+  |> string.replace("\t", "\\t")
 }
 
 /// Demo function to show schema printing capabilities
