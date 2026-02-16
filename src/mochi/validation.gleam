@@ -28,14 +28,30 @@ pub type ValidationError {
   MissingRequiredArgument(field_name: String, argument_name: String)
   /// Unknown argument provided
   UnknownArgument(field_name: String, argument_name: String)
+  /// Duplicate argument name on a field
+  DuplicateArgument(field_name: String, argument_name: String)
   /// Fragment is not defined
   UndefinedFragment(fragment_name: String)
   /// Fragment type condition is invalid (type doesn't exist)
   InvalidTypeCondition(fragment_name: String, type_name: String)
+  /// Fragment type condition must be on composite type
+  FragmentOnNonCompositeType(fragment_name: String, type_name: String)
+  /// Fragment spread not possible (types don't overlap)
+  FragmentSpreadNotPossible(
+    fragment_name: String,
+    fragment_type: String,
+    parent_type: String,
+  )
+  /// Fragment is defined but not used
+  UnusedFragment(fragment_name: String)
   /// Variable is not defined
   UndefinedVariable(variable_name: String)
   /// Variable is defined but not used
   UnusedVariable(variable_name: String)
+  /// Duplicate variable definition
+  DuplicateVariable(variable_name: String)
+  /// Variable type must be an input type
+  VariableNotInputType(variable_name: String, type_name: String)
   /// Duplicate operation name
   DuplicateOperationName(name: String)
   /// Duplicate fragment name
@@ -50,10 +66,14 @@ pub type ValidationError {
   DirectiveNotAllowed(directive_name: String, location: String)
   /// Unknown directive
   UnknownDirective(directive_name: String)
+  /// Directive is used more than once where not allowed
+  DuplicateDirective(directive_name: String)
   /// Selection set required on non-leaf field
   SelectionSetRequired(field_name: String, type_name: String)
   /// Selection set not allowed on leaf field (scalar/enum)
   SelectionSetNotAllowed(field_name: String, type_name: String)
+  /// Fields with same response name cannot be merged
+  FieldsCannotMerge(field_name: String, reason: String)
 }
 
 /// Validation context tracks state during validation
@@ -63,6 +83,7 @@ pub type ValidationContext {
     fragments: Dict(String, ast.Fragment),
     defined_variables: Set(String),
     used_variables: Set(String),
+    used_fragments: Set(String),
     errors: List(ValidationError),
     current_type: Option(ObjectType),
     fragment_spread_path: List(String),
@@ -87,6 +108,7 @@ pub fn validate(
   let ctx = validate_document_operations(ctx, document)
   let ctx = validate_fragment_definitions(ctx, document)
   let ctx = validate_fragment_cycles(ctx, document)
+  let ctx = validate_unused_fragments(ctx)
 
   case ctx.errors {
     [] -> Ok(document)
@@ -117,6 +139,7 @@ fn init_context(schema: Schema, document: Document) -> ValidationContext {
     fragments: fragments,
     defined_variables: set.new(),
     used_variables: set.new(),
+    used_fragments: set.new(),
     errors: [],
     current_type: schema.query,
     fragment_spread_path: [],
@@ -246,9 +269,14 @@ fn track_defined_variables(
   ctx: ValidationContext,
   var_defs: List(ast.VariableDefinition),
 ) -> ValidationContext {
-  let defined =
-    list.fold(var_defs, set.new(), fn(acc, var_def) {
-      set.insert(acc, var_def.variable)
+  // Check for duplicate variable definitions
+  let #(defined, ctx) =
+    list.fold(var_defs, #(set.new(), ctx), fn(acc, var_def) {
+      let #(seen, ctx) = acc
+      case set.contains(seen, var_def.variable) {
+        True -> #(seen, add_error(ctx, DuplicateVariable(var_def.variable)))
+        False -> #(set.insert(seen, var_def.variable), ctx)
+      }
     })
   ValidationContext(
     ..ctx,
@@ -309,6 +337,9 @@ fn validate_selection(
 }
 
 fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext {
+  // Validate directives on field
+  let ctx = validate_directives(ctx, field.directives, "FIELD")
+
   use ctx <- skip_introspection_field(field.name, ctx, field.arguments)
   use obj_type <- require_current_type(ctx)
   use field_def <- require_field_def(ctx, obj_type, field.name)
@@ -361,9 +392,14 @@ fn validate_field_arguments(
   field: ast.Field,
   field_def: FieldDefinition,
 ) -> ValidationContext {
-  let provided_args =
-    list.fold(field.arguments, dict.new(), fn(acc, arg) {
-      dict.insert(acc, arg.name, True)
+  // Check for duplicate arguments and collect provided args
+  let #(provided_args, ctx) =
+    list.fold(field.arguments, #(set.new(), ctx), fn(acc, arg) {
+      let #(seen, ctx) = acc
+      case set.contains(seen, arg.name) {
+        True -> #(seen, add_error(ctx, DuplicateArgument(field.name, arg.name)))
+        False -> #(set.insert(seen, arg.name), ctx)
+      }
     })
 
   // Check for unknown arguments
@@ -379,7 +415,7 @@ fn validate_field_arguments(
   dict.fold(field_def.arguments, ctx, fn(ctx, arg_name, arg_def) {
     case is_required_type(arg_def.arg_type) {
       True ->
-        case dict.has_key(provided_args, arg_name) {
+        case set.contains(provided_args, arg_name) {
           True -> ctx
           False -> add_error(ctx, MissingRequiredArgument(field.name, arg_name))
         }
@@ -537,6 +573,16 @@ fn validate_fragment_spread(
   let fragment_result = dict.get(ctx.fragments, spread.name)
   let is_cycle = list.contains(ctx.fragment_spread_path, spread.name)
 
+  // Track fragment usage
+  let ctx =
+    ValidationContext(
+      ..ctx,
+      used_fragments: set.insert(ctx.used_fragments, spread.name),
+    )
+
+  // Validate directives on fragment spread
+  let ctx = validate_directives(ctx, spread.directives, "FRAGMENT_SPREAD")
+
   case fragment_result, is_cycle {
     Error(_), _ -> add_error(ctx, UndefinedFragment(spread.name))
     Ok(_), True -> ctx
@@ -561,6 +607,9 @@ fn validate_inline_fragment(
   ctx: ValidationContext,
   inline: ast.InlineFragmentValue,
 ) -> ValidationContext {
+  // Validate directives on inline fragment
+  let ctx = validate_directives(ctx, inline.directives, "INLINE_FRAGMENT")
+
   case inline.type_condition {
     Some(type_name) -> {
       let inner_type = get_object_type(ctx.schema, type_name)
@@ -618,6 +667,123 @@ fn get_fragment_spreads(selection_set: ast.SelectionSet) -> List(String) {
 }
 
 // ============================================================================
+// Unused Fragment Validation
+// ============================================================================
+
+fn validate_unused_fragments(ctx: ValidationContext) -> ValidationContext {
+  let defined_fragments =
+    dict.keys(ctx.fragments)
+    |> set.from_list
+  let unused = set.difference(defined_fragments, ctx.used_fragments)
+  set.fold(unused, ctx, fn(ctx, fragment_name) {
+    add_error(ctx, UnusedFragment(fragment_name))
+  })
+}
+
+// ============================================================================
+// Directive Validation
+// ============================================================================
+
+/// Validate directives on a field, fragment spread, or inline fragment
+fn validate_directives(
+  ctx: ValidationContext,
+  directives: List(ast.Directive),
+  location: String,
+) -> ValidationContext {
+  // Check for unknown directives and duplicate non-repeatable directives
+  let #(seen, ctx) =
+    list.fold(directives, #(set.new(), ctx), fn(acc, directive) {
+      let #(seen_set, ctx) = acc
+      let ctx = validate_single_directive(ctx, directive, location)
+
+      // Check for duplicate non-repeatable directives
+      case set.contains(seen_set, directive.name) {
+        True ->
+          case is_repeatable_directive(ctx.schema, directive.name) {
+            True -> #(seen_set, ctx)
+            False -> #(seen_set, add_error(ctx, DuplicateDirective(directive.name)))
+          }
+        False -> #(set.insert(seen_set, directive.name), ctx)
+      }
+    })
+
+  let _ = seen
+  ctx
+}
+
+/// Validate a single directive
+fn validate_single_directive(
+  ctx: ValidationContext,
+  directive: ast.Directive,
+  location: String,
+) -> ValidationContext {
+  // Built-in directives: skip, include, deprecated, specifiedBy
+  case directive.name {
+    "skip" | "include" ->
+      // These are valid on FIELD, FRAGMENT_SPREAD, INLINE_FRAGMENT
+      case location {
+        "FIELD" | "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" -> ctx
+        _ ->
+          add_error(ctx, DirectiveNotAllowed(directive.name, location))
+      }
+    "deprecated" ->
+      // Valid on FIELD_DEFINITION, ARGUMENT_DEFINITION, INPUT_FIELD_DEFINITION, ENUM_VALUE
+      case location {
+        "FIELD_DEFINITION"
+        | "ARGUMENT_DEFINITION"
+        | "INPUT_FIELD_DEFINITION"
+        | "ENUM_VALUE" -> ctx
+        _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
+      }
+    "specifiedBy" ->
+      // Valid only on SCALAR
+      case location {
+        "SCALAR" -> ctx
+        _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
+      }
+    _ ->
+      // Check custom directives from schema
+      case dict.get(ctx.schema.directives, directive.name) {
+        Ok(directive_def) ->
+          validate_directive_location(ctx, directive.name, directive_def, location)
+        Error(_) ->
+          // Unknown directive
+          add_error(ctx, UnknownDirective(directive.name))
+      }
+  }
+}
+
+/// Validate that a directive is allowed at the given location
+fn validate_directive_location(
+  ctx: ValidationContext,
+  directive_name: String,
+  directive_def: schema.DirectiveDefinition,
+  location: String,
+) -> ValidationContext {
+  let location_allowed =
+    list.any(directive_def.locations, fn(loc) {
+      schema.directive_location_to_string(loc) == location
+    })
+
+  case location_allowed {
+    True -> ctx
+    False -> add_error(ctx, DirectiveNotAllowed(directive_name, location))
+  }
+}
+
+/// Check if a directive is repeatable
+fn is_repeatable_directive(schema: Schema, directive_name: String) -> Bool {
+  case directive_name {
+    "skip" | "include" | "deprecated" | "specifiedBy" -> False
+    _ ->
+      case dict.get(schema.directives, directive_name) {
+        Ok(directive_def) -> directive_def.is_repeatable
+        Error(_) -> False
+      }
+  }
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -671,6 +837,12 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" on field \""
       <> field_name
       <> "\""
+    DuplicateArgument(field_name, arg_name) ->
+      "There can be only one argument named \""
+      <> arg_name
+      <> "\" on field \""
+      <> field_name
+      <> "\""
     UndefinedFragment(name) -> "Unknown fragment \"" <> name <> "\""
     InvalidTypeCondition(fragment_name, type_name) ->
       "Fragment \""
@@ -678,8 +850,32 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" cannot condition on non-existent type \""
       <> type_name
       <> "\""
+    FragmentOnNonCompositeType(fragment_name, type_name) ->
+      "Fragment \""
+      <> fragment_name
+      <> "\" cannot condition on non-composite type \""
+      <> type_name
+      <> "\""
+    FragmentSpreadNotPossible(fragment_name, fragment_type, parent_type) ->
+      "Fragment \""
+      <> fragment_name
+      <> "\" cannot be spread here as type \""
+      <> fragment_type
+      <> "\" never matches type \""
+      <> parent_type
+      <> "\""
+    UnusedFragment(name) ->
+      "Fragment \"" <> name <> "\" is never used"
     UndefinedVariable(name) -> "Variable \"$" <> name <> "\" is not defined"
     UnusedVariable(name) -> "Variable \"$" <> name <> "\" is never used"
+    DuplicateVariable(name) ->
+      "There can be only one variable named \"$" <> name <> "\""
+    VariableNotInputType(name, type_name) ->
+      "Variable \"$"
+      <> name
+      <> "\" cannot be non-input type \""
+      <> type_name
+      <> "\""
     DuplicateOperationName(name) ->
       "There can be only one operation named \"" <> name <> "\""
     DuplicateFragmentName(name) ->
@@ -710,6 +906,14 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" must not have a selection since type \""
       <> type_name
       <> "\" has no subfields"
+    DuplicateDirective(name) ->
+      "The directive \"@" <> name <> "\" can only be used once at this location"
+    FieldsCannotMerge(field_name, reason) ->
+      "Fields \""
+      <> field_name
+      <> "\" conflict because "
+      <> reason
+      <> ". Use different aliases on the fields to fetch both if this was intentional."
   }
 }
 
