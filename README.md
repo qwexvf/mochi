@@ -5,7 +5,13 @@
 
 **mochi** is a type-safe, Code First GraphQL library for Gleam. Define your GraphQL schemas using Gleam types and automatically generate TypeScript types and GraphQL SDL.
 
-Inspired by [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b).
+Inspired by:
+- [Absinthe](https://github.com/absinthe-graphql/absinthe) - The GraphQL toolkit for Elixir
+- [dataloader](https://github.com/graphql/dataloader) - DataLoader pattern for batching and caching
+- [gqlkit](https://zenn.dev/izumin/articles/da27a6dfffba0b) - Code First GraphQL for Go
+- [Pothos](https://github.com/hayes/pothos) - Code First GraphQL for TypeScript
+- [TypeGraphQL](https://github.com/MichalLyworski/type-graphql) - Code First GraphQL with TypeScript decorators
+- [Nexus](https://github.com/graphql-nexus/nexus) - Declarative, Code First GraphQL for TypeScript
 
 ## Installation
 
