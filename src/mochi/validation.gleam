@@ -427,29 +427,21 @@ fn get_base_type_name(field_type: schema.FieldType) -> String {
 }
 
 fn is_leaf_type(schema: Schema, type_name: String) -> Bool {
-  case type_name {
-    "String" | "Int" | "Float" | "Boolean" | "ID" -> True
-    _ -> {
-      case dict.get(schema.types, type_name) {
-        Ok(schema.ScalarTypeDef(_)) -> True
-        Ok(schema.EnumTypeDef(_)) -> True
-        _ -> False
-      }
-    }
+  case type_name, dict.get(schema.types, type_name) {
+    "String", _ | "Int", _ | "Float", _ | "Boolean", _ | "ID", _ -> True
+    _, Ok(schema.ScalarTypeDef(_)) -> True
+    _, Ok(schema.EnumTypeDef(_)) -> True
+    _, _ -> False
   }
 }
 
 fn get_object_type(schema: Schema, type_name: String) -> Option(ObjectType) {
-  case type_name {
-    "Query" -> schema.query
-    "Mutation" -> schema.mutation
-    "Subscription" -> schema.subscription
-    _ -> {
-      case dict.get(schema.types, type_name) {
-        Ok(schema.ObjectTypeDef(obj)) -> Some(obj)
-        _ -> None
-      }
-    }
+  case type_name, dict.get(schema.types, type_name) {
+    "Query", _ -> schema.query
+    "Mutation", _ -> schema.mutation
+    "Subscription", _ -> schema.subscription
+    _, Ok(schema.ObjectTypeDef(obj)) -> Some(obj)
+    _, _ -> None
   }
 }
 
@@ -542,31 +534,26 @@ fn validate_fragment_spread(
   ctx: ValidationContext,
   spread: ast.FragmentSpreadValue,
 ) -> ValidationContext {
-  case dict.get(ctx.fragments, spread.name) {
-    Ok(fragment) -> {
-      // Check for cycles
-      case list.contains(ctx.fragment_spread_path, spread.name) {
-        True -> ctx
-        // Cycle already detected in validate_fragment_cycles
-        False -> {
-          // Get fragment type and validate selection set
-          let fragment_type =
-            get_object_type(ctx.schema, fragment.type_condition)
-          let ctx = set_current_type(ctx, fragment_type)
-          let ctx =
-            ValidationContext(..ctx, fragment_spread_path: [
-              spread.name,
-              ..ctx.fragment_spread_path
-            ])
-          let ctx = validate_selection_set(ctx, fragment.selection_set)
-          ValidationContext(
-            ..ctx,
-            fragment_spread_path: list.drop(ctx.fragment_spread_path, 1),
-          )
-        }
-      }
+  let fragment_result = dict.get(ctx.fragments, spread.name)
+  let is_cycle = list.contains(ctx.fragment_spread_path, spread.name)
+
+  case fragment_result, is_cycle {
+    Error(_), _ -> add_error(ctx, UndefinedFragment(spread.name))
+    Ok(_), True -> ctx
+    Ok(fragment), False -> {
+      let fragment_type = get_object_type(ctx.schema, fragment.type_condition)
+      let ctx = set_current_type(ctx, fragment_type)
+      let ctx =
+        ValidationContext(..ctx, fragment_spread_path: [
+          spread.name,
+          ..ctx.fragment_spread_path
+        ])
+      let ctx = validate_selection_set(ctx, fragment.selection_set)
+      ValidationContext(
+        ..ctx,
+        fragment_spread_path: list.drop(ctx.fragment_spread_path, 1),
+      )
     }
-    Error(_) -> add_error(ctx, UndefinedFragment(spread.name))
   }
 }
 

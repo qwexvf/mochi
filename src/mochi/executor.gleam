@@ -268,16 +268,12 @@ fn execute_selection_set(
   let errors = list.reverse(errors_acc)
 
   // If any child propagated null (returned None data), this selection set is null
-  case has_none {
-    True -> ExecutionResult(data: None, errors: errors)
-    False -> {
-      case data_list, errors {
-        [], [] -> ok_result(types.to_dynamic(dict.new()))
-        [], _ -> ExecutionResult(data: None, errors: errors)
-        _, _ ->
-          ExecutionResult(data: Some(merge_results(data_list)), errors: errors)
-      }
-    }
+  case has_none, data_list, errors {
+    True, _, _ -> ExecutionResult(data: None, errors: errors)
+    False, [], [] -> ok_result(types.to_dynamic(dict.new()))
+    False, [], _ -> ExecutionResult(data: None, errors: errors)
+    False, _, _ ->
+      ExecutionResult(data: Some(merge_results(data_list)), errors: errors)
   }
 }
 
@@ -434,22 +430,14 @@ fn should_include_field(
   directives: List(ast.Directive),
   variables: Dict(String, Dynamic),
 ) -> Bool {
-  // Check @skip first - if @skip(if: true), exclude the field
   let skip_value = get_directive_bool_arg(directives, "skip", "if", variables)
-  case skip_value {
-    Some(True) -> False
-    // Skip this field
-    _ -> {
-      // Check @include - if @include(if: false), exclude the field
-      let include_value =
-        get_directive_bool_arg(directives, "include", "if", variables)
-      case include_value {
-        Some(False) -> False
-        // Exclude this field
-        _ -> True
-        // Include by default
-      }
-    }
+  let include_value =
+    get_directive_bool_arg(directives, "include", "if", variables)
+
+  case skip_value, include_value {
+    Some(True), _ -> False
+    _, Some(False) -> False
+    _, _ -> True
   }
 }
 
@@ -844,17 +832,14 @@ fn handle_sub_selection_result(
   field_type: schema.FieldType,
   response_name: String,
 ) -> ExecutionResult {
-  case sub_result.data {
-    Some(_) -> wrap_result_in_field(sub_result, response_name)
-    None ->
-      case is_non_null_type(field_type) {
-        True -> sub_result
-        False ->
-          ExecutionResult(
-            data: Some(make_field(response_name, types.to_dynamic(Nil))),
-            errors: sub_result.errors,
-          )
-      }
+  case sub_result.data, is_non_null_type(field_type) {
+    Some(_), _ -> wrap_result_in_field(sub_result, response_name)
+    None, True -> sub_result
+    None, False ->
+      ExecutionResult(
+        data: Some(make_field(response_name, types.to_dynamic(Nil))),
+        errors: sub_result.errors,
+      )
   }
 }
 
@@ -995,20 +980,17 @@ fn aggregate_list_results(
     })
 
   let errors = list.reverse(errors_acc)
+  let data_list = list.reverse(data_acc)
 
-  case has_null_error {
-    True -> handle_list_null_error(field_type, response_name, errors)
-    False -> {
-      let data_list = list.reverse(data_acc)
-      case errors {
-        [] -> ok_result(make_field(response_name, types.to_dynamic(data_list)))
-        _ ->
-          ExecutionResult(
-            data: Some(make_field(response_name, types.to_dynamic(data_list))),
-            errors: errors,
-          )
-      }
-    }
+  case has_null_error, errors {
+    True, _ -> handle_list_null_error(field_type, response_name, errors)
+    False, [] ->
+      ok_result(make_field(response_name, types.to_dynamic(data_list)))
+    False, _ ->
+      ExecutionResult(
+        data: Some(make_field(response_name, types.to_dynamic(data_list))),
+        errors: errors,
+      )
   }
 }
 
