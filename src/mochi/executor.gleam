@@ -9,9 +9,9 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/set
 import gleam/string
 import mochi/ast
+import mochi/input_coercion
 import mochi/parser
 import mochi/schema
 import mochi/types
@@ -572,7 +572,7 @@ fn coerce_directive_arguments(
   variables: Dict(String, Dynamic),
 ) -> Dict(String, Dynamic) {
   list.fold(args, dict.new(), fn(acc, arg) {
-    dict.insert(acc, arg.name, coerce_value(arg.value, variables))
+    dict.insert(acc, arg.name, coerce_value_simple(arg.value, variables))
   })
 }
 
@@ -600,33 +600,41 @@ fn execute_regular_field(
 ) -> ExecutionResult {
   use field_def <- require_field(object_type, field.name, field_path)
 
-  let field_args =
-    coerce_arguments(
+  // Coerce and validate arguments with the new input coercion module
+  case
+    input_coercion.coerce_arguments(
       field.arguments,
       field_def.arguments,
+      context.schema,
       context.variable_values,
+      field_path,
     )
-
-  case field_def.resolver {
-    Some(resolver) ->
-      resolve_field(
-        context,
-        field,
-        field_def,
-        field_args,
-        response_name,
-        field_path,
-        resolver,
-        field_context.parent_value,
-        field.directives,
-      )
-    None ->
-      resolve_from_parent(
-        field_context.parent_value,
-        field.name,
-        response_name,
-        field_path,
-      )
+  {
+    Ok(field_args) -> {
+      case field_def.resolver {
+        Some(resolver) ->
+          resolve_field(
+            context,
+            field,
+            field_def,
+            field_args,
+            response_name,
+            field_path,
+            resolver,
+            field_context.parent_value,
+            field.directives,
+          )
+        None ->
+          resolve_from_parent(
+            field_context.parent_value,
+            field.name,
+            response_name,
+            field_path,
+          )
+      }
+    }
+    Error(coercion_error) ->
+      validation_error(input_coercion.format_error(coercion_error), field_path)
   }
 }
 
@@ -1158,39 +1166,15 @@ fn get_field_type_definition(
 }
 
 // ============================================================================
-// Argument Processing
+// Value Coercion (unvalidated - used for directives)
 // ============================================================================
 
-fn coerce_arguments(
-  ast_args: List(ast.Argument),
-  arg_defs: Dict(String, schema.ArgumentDefinition),
+/// Coerce an AST value to Dynamic without type validation.
+/// Used for directive arguments where type checking is less critical.
+fn coerce_value_simple(
+  value: ast.Value,
   variables: Dict(String, Dynamic),
-) -> Dict(String, Dynamic) {
-  ast_args
-  |> list.fold(dict.new(), fn(acc, arg) {
-    dict.insert(acc, arg.name, coerce_value(arg.value, variables))
-  })
-  |> add_default_values(arg_defs, ast_args)
-}
-
-fn add_default_values(
-  args: Dict(String, Dynamic),
-  arg_defs: Dict(String, schema.ArgumentDefinition),
-  provided_args: List(ast.Argument),
-) -> Dict(String, Dynamic) {
-  // Use a Set for O(1) lookups instead of O(n) list.contains
-  let provided_names =
-    list.fold(provided_args, set.new(), fn(acc, a) { set.insert(acc, a.name) })
-
-  dict.fold(arg_defs, args, fn(acc, name, def) {
-    case set.contains(provided_names, name), def.default_value {
-      False, Some(default) -> dict.insert(acc, name, default)
-      _, _ -> acc
-    }
-  })
-}
-
-fn coerce_value(value: ast.Value, variables: Dict(String, Dynamic)) -> Dynamic {
+) -> Dynamic {
   case value {
     ast.IntValue(i) -> types.to_dynamic(i)
     ast.FloatValue(f) -> types.to_dynamic(f)
@@ -1201,11 +1185,11 @@ fn coerce_value(value: ast.Value, variables: Dict(String, Dynamic)) -> Dynamic {
     ast.VariableValue(name) ->
       dict.get(variables, name) |> result.unwrap(types.to_dynamic(Nil))
     ast.ListValue(values) ->
-      types.to_dynamic(list.map(values, coerce_value(_, variables)))
+      types.to_dynamic(list.map(values, coerce_value_simple(_, variables)))
     ast.ObjectValue(fields) ->
       types.to_dynamic(
         list.fold(fields, dict.new(), fn(acc, f) {
-          dict.insert(acc, f.name, coerce_value(f.value, variables))
+          dict.insert(acc, f.name, coerce_value_simple(f.value, variables))
         }),
       )
   }
