@@ -1282,7 +1282,238 @@ fn build_schema_introspection(
           )),
         ),
       ),
-      #("directives", types.to_dynamic([])),
+      #("directives", build_directives_introspection(schema_def)),
+    ]),
+  )
+}
+
+/// Build introspection data for all directives (built-in + custom)
+fn build_directives_introspection(schema_def: schema.Schema) -> Dynamic {
+  // Built-in directives per GraphQL spec
+  let builtin_directives = [
+    build_skip_directive_introspection(),
+    build_include_directive_introspection(),
+    build_deprecated_directive_introspection(),
+    build_specified_by_directive_introspection(),
+  ]
+
+  // Custom directives from schema
+  let custom_directives =
+    schema_def.directives
+    |> dict.to_list
+    |> list.map(fn(kv) {
+      let #(_name, directive_def) = kv
+      build_directive_introspection(directive_def)
+    })
+
+  types.to_dynamic(list.append(builtin_directives, custom_directives))
+}
+
+/// Build introspection for a single directive
+fn build_directive_introspection(
+  directive: schema.DirectiveDefinition,
+) -> Dynamic {
+  let args =
+    directive.arguments
+    |> dict.to_list
+    |> list.map(fn(kv) {
+      let #(arg_name, arg_def) = kv
+      types.to_dynamic(
+        dict.from_list([
+          #("name", types.to_dynamic(arg_name)),
+          #(
+            "description",
+            types.to_dynamic(option.unwrap(arg_def.description, "")),
+          ),
+          #("type", build_field_type_introspection(arg_def.arg_type)),
+          #("defaultValue", types.to_dynamic(Nil)),
+        ]),
+      )
+    })
+
+  let locations =
+    directive.locations
+    |> list.map(fn(loc) {
+      types.to_dynamic(schema.directive_location_to_string(loc))
+    })
+
+  types.to_dynamic(
+    dict.from_list([
+      #("name", types.to_dynamic(directive.name)),
+      #(
+        "description",
+        types.to_dynamic(option.unwrap(directive.description, "")),
+      ),
+      #("locations", types.to_dynamic(locations)),
+      #("args", types.to_dynamic(args)),
+      #("isRepeatable", types.to_dynamic(directive.is_repeatable)),
+    ]),
+  )
+}
+
+/// @skip directive - conditionally skip a field
+fn build_skip_directive_introspection() -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("name", types.to_dynamic("skip")),
+      #(
+        "description",
+        types.to_dynamic(
+          "Directs the executor to skip this field or fragment when the `if` argument is true.",
+        ),
+      ),
+      #(
+        "locations",
+        types.to_dynamic([
+          types.to_dynamic("FIELD"),
+          types.to_dynamic("FRAGMENT_SPREAD"),
+          types.to_dynamic("INLINE_FRAGMENT"),
+        ]),
+      ),
+      #(
+        "args",
+        types.to_dynamic([
+          types.to_dynamic(
+            dict.from_list([
+              #("name", types.to_dynamic("if")),
+              #("description", types.to_dynamic("Skipped when true.")),
+              #(
+                "type",
+                build_field_type_introspection(
+                  schema.NonNull(schema.Named("Boolean")),
+                ),
+              ),
+              #("defaultValue", types.to_dynamic(Nil)),
+            ]),
+          ),
+        ]),
+      ),
+      #("isRepeatable", types.to_dynamic(False)),
+    ]),
+  )
+}
+
+/// @include directive - conditionally include a field
+fn build_include_directive_introspection() -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("name", types.to_dynamic("include")),
+      #(
+        "description",
+        types.to_dynamic(
+          "Directs the executor to include this field or fragment only when the `if` argument is true.",
+        ),
+      ),
+      #(
+        "locations",
+        types.to_dynamic([
+          types.to_dynamic("FIELD"),
+          types.to_dynamic("FRAGMENT_SPREAD"),
+          types.to_dynamic("INLINE_FRAGMENT"),
+        ]),
+      ),
+      #(
+        "args",
+        types.to_dynamic([
+          types.to_dynamic(
+            dict.from_list([
+              #("name", types.to_dynamic("if")),
+              #("description", types.to_dynamic("Included when true.")),
+              #(
+                "type",
+                build_field_type_introspection(
+                  schema.NonNull(schema.Named("Boolean")),
+                ),
+              ),
+              #("defaultValue", types.to_dynamic(Nil)),
+            ]),
+          ),
+        ]),
+      ),
+      #("isRepeatable", types.to_dynamic(False)),
+    ]),
+  )
+}
+
+/// @deprecated directive - marks a field or enum value as deprecated
+fn build_deprecated_directive_introspection() -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("name", types.to_dynamic("deprecated")),
+      #(
+        "description",
+        types.to_dynamic(
+          "Marks an element of a GraphQL schema as no longer supported.",
+        ),
+      ),
+      #(
+        "locations",
+        types.to_dynamic([
+          types.to_dynamic("FIELD_DEFINITION"),
+          types.to_dynamic("ARGUMENT_DEFINITION"),
+          types.to_dynamic("INPUT_FIELD_DEFINITION"),
+          types.to_dynamic("ENUM_VALUE"),
+        ]),
+      ),
+      #(
+        "args",
+        types.to_dynamic([
+          types.to_dynamic(
+            dict.from_list([
+              #("name", types.to_dynamic("reason")),
+              #(
+                "description",
+                types.to_dynamic(
+                  "Explains why this element was deprecated, usually also including a suggestion for how to access supported similar data. Formatted using the Markdown syntax, as specified by [CommonMark](https://commonmark.org/).",
+                ),
+              ),
+              #("type", build_field_type_introspection(schema.Named("String"))),
+              #("defaultValue", types.to_dynamic("\"No longer supported\"")),
+            ]),
+          ),
+        ]),
+      ),
+      #("isRepeatable", types.to_dynamic(False)),
+    ]),
+  )
+}
+
+/// @specifiedBy directive - provides a URL for a custom scalar specification
+fn build_specified_by_directive_introspection() -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #("name", types.to_dynamic("specifiedBy")),
+      #(
+        "description",
+        types.to_dynamic(
+          "Exposes a URL that specifies the behavior of this scalar.",
+        ),
+      ),
+      #("locations", types.to_dynamic([types.to_dynamic("SCALAR")])),
+      #(
+        "args",
+        types.to_dynamic([
+          types.to_dynamic(
+            dict.from_list([
+              #("name", types.to_dynamic("url")),
+              #(
+                "description",
+                types.to_dynamic(
+                  "The URL that specifies the behavior of this scalar.",
+                ),
+              ),
+              #(
+                "type",
+                build_field_type_introspection(
+                  schema.NonNull(schema.Named("String")),
+                ),
+              ),
+              #("defaultValue", types.to_dynamic(Nil)),
+            ]),
+          ),
+        ]),
+      ),
+      #("isRepeatable", types.to_dynamic(False)),
     ]),
   )
 }
@@ -1658,7 +1889,17 @@ fn make_field(name: String, value: Dynamic) -> Dynamic {
 fn merge_results(results: List(Dynamic)) -> Dynamic {
   case results {
     [] -> types.to_dynamic(dict.new())
-    _ -> types.to_dynamic(results)
+    _ -> {
+      // Each result is a dict with a single field - merge them all
+      let merged =
+        list.fold(results, dict.new(), fn(acc, result) {
+          case decode.run(result, decode.dict(decode.string, decode.dynamic)) {
+            Ok(d) -> dict.merge(acc, d)
+            Error(_) -> acc
+          }
+        })
+      types.to_dynamic(merged)
+    }
   }
 }
 
