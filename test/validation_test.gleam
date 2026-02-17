@@ -460,3 +460,232 @@ pub fn multiple_error_formatting_test() {
     False -> panic as "Multiple error formatting incorrect"
   }
 }
+
+// ============================================================================
+// Invalid Query Tests - Duplicate Argument
+// ============================================================================
+
+pub fn invalid_duplicate_argument_test() {
+  let test_schema = build_test_schema()
+
+  // Duplicate id argument
+  let query_str = "{ user(id: \"1\", id: \"2\") { name } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> panic as "Validation should fail for duplicate argument"
+        Error(errors) -> {
+          case
+            list.find(errors, fn(e) {
+              case e {
+                validation.DuplicateArgument("user", "id") -> True
+                _ -> False
+              }
+            })
+          {
+            Ok(_) -> Nil
+            Error(_) -> panic as "Should have DuplicateArgument error"
+          }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Invalid Query Tests - Duplicate Variable
+// ============================================================================
+
+pub fn invalid_duplicate_variable_test() {
+  let test_schema = build_test_schema()
+
+  // Duplicate variable definition
+  let query_str = "query Test($id: ID!, $id: ID!) { user(id: $id) { name } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> panic as "Validation should fail for duplicate variable"
+        Error(errors) -> {
+          case
+            list.find(errors, fn(e) {
+              case e {
+                validation.DuplicateVariable("id") -> True
+                _ -> False
+              }
+            })
+          {
+            Ok(_) -> Nil
+            Error(_) -> panic as "Should have DuplicateVariable error"
+          }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Invalid Query Tests - Unused Fragment
+// ============================================================================
+
+pub fn invalid_unused_fragment_test() {
+  let test_schema = build_test_schema()
+
+  // Fragment defined but not used
+  let query_str =
+    "
+    { users { id name } }
+    fragment UnusedFields on User { email age }
+  "
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> panic as "Validation should fail for unused fragment"
+        Error(errors) -> {
+          case
+            list.find(errors, fn(e) {
+              case e {
+                validation.UnusedFragment("UnusedFields") -> True
+                _ -> False
+              }
+            })
+          {
+            Ok(_) -> Nil
+            Error(_) -> panic as "Should have UnusedFragment error"
+          }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Valid Query Tests - Skip Directive
+// ============================================================================
+
+pub fn valid_skip_directive_test() {
+  let test_schema = build_test_schema()
+
+  let query_str = "{ users { id name @skip(if: true) } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> Nil
+        Error(errors) -> {
+          let msg = validation.format_errors(errors)
+          panic as { "Validation failed unexpectedly: " <> msg }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Valid Query Tests - Include Directive
+// ============================================================================
+
+pub fn valid_include_directive_test() {
+  let test_schema = build_test_schema()
+
+  let query_str = "{ users { id @include(if: true) name } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> Nil
+        Error(errors) -> {
+          let msg = validation.format_errors(errors)
+          panic as { "Validation failed unexpectedly: " <> msg }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Invalid Query Tests - Unknown Directive
+// ============================================================================
+
+pub fn invalid_unknown_directive_test() {
+  let test_schema = build_test_schema()
+
+  // Unknown directive @custom
+  let query_str = "{ users { id @custom name } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> panic as "Validation should fail for unknown directive"
+        Error(errors) -> {
+          case
+            list.find(errors, fn(e) {
+              case e {
+                validation.UnknownDirective("custom") -> True
+                _ -> False
+              }
+            })
+          {
+            Ok(_) -> Nil
+            Error(_) -> panic as "Should have UnknownDirective error"
+          }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Valid Query Tests - Inline Fragment (no directive - parser limitation)
+// ============================================================================
+
+pub fn valid_inline_fragment_test() {
+  let test_schema = build_test_schema()
+
+  let query_str = "{ users { ... on User { id name } } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> Nil
+        Error(errors) -> {
+          let msg = validation.format_errors(errors)
+          panic as { "Validation failed unexpectedly: " <> msg }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
+
+// ============================================================================
+// Valid Query Tests - Multiple Directives on Field
+// ============================================================================
+
+pub fn valid_multiple_directives_test() {
+  let test_schema = build_test_schema()
+
+  // Multiple directives on a field
+  let query_str = "{ users { id @skip(if: false) @include(if: true) name } }"
+
+  case parser.parse(query_str) {
+    Ok(doc) -> {
+      case validation.validate(doc, test_schema) {
+        Ok(_) -> Nil
+        Error(errors) -> {
+          let msg = validation.format_errors(errors)
+          panic as { "Validation failed unexpectedly: " <> msg }
+        }
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}
