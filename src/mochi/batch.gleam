@@ -13,6 +13,12 @@ import mochi/executor.{type ExecutionResult}
 import mochi/parser
 import mochi/schema.{type ExecutionContext, type Schema}
 
+/// Execute a list of zero-argument functions in parallel using Erlang processes.
+/// Results are returned in the same order as the input functions.
+@external(erlang, "mochi_parallel_ffi", "parallel_map")
+@external(javascript, "../mochi_parallel_ffi.mjs", "parallel_map")
+fn do_parallel_map(fns: List(fn() -> a)) -> List(a)
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -250,34 +256,44 @@ fn execute_batch_internal(
   config: BatchConfig,
   ctx: ExecutionContext,
 ) -> BatchResult {
-  // Execute each request
-  let results =
-    list.fold(requests, #([], False), fn(acc, req) {
-      let #(results_acc, has_failure) = acc
-      case config.continue_on_error, has_failure {
-        // If not continuing on error and we have a failure, skip
-        False, True -> #(
-          [
-            executor.ExecutionResult(data: None, errors: [
-              executor.ValidationError(
-                "Batch execution halted due to error",
-                [],
-              ),
-            ]),
-            ..results_acc
-          ],
-          True,
-        )
-        // Otherwise execute the request
-        _, _ -> {
-          let result = execute_single_request(schema_def, req, ctx)
-          let new_has_failure = has_failure || has_errors(result)
-          #([result, ..results_acc], new_has_failure)
-        }
-      }
-    })
+  let final_results = case config.allow_parallel {
+    True ->
+      // Execute all requests in parallel using Erlang process spawning.
+      // Results are returned in the same order as requests.
+      requests
+      |> list.map(fn(req) {
+        fn() { execute_single_request(schema_def, req, ctx) }
+      })
+      |> do_parallel_map
 
-  let final_results = list.reverse(results.0)
+    False ->
+      // Sequential execution with optional early termination on error.
+      list.fold(requests, #([], False), fn(acc, req) {
+        let #(results_acc, has_failure) = acc
+        case config.continue_on_error, has_failure {
+          // If not continuing on error and we have a failure, skip remaining
+          False, True -> #(
+            [
+              executor.ExecutionResult(data: None, errors: [
+                executor.ValidationError(
+                  "Batch execution halted due to error",
+                  [],
+                ),
+              ]),
+              ..results_acc
+            ],
+            True,
+          )
+          // Otherwise execute the request
+          _, _ -> {
+            let result = execute_single_request(schema_def, req, ctx)
+            let new_has_failure = has_failure || has_errors(result)
+            #([result, ..results_acc], new_has_failure)
+          }
+        }
+      })
+      |> fn(pair) { list.reverse(pair.0) }
+  }
 
   // Calculate statistics
   let failure_count =

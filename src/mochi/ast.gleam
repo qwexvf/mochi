@@ -1,4 +1,5 @@
 import gleam/option.{type Option}
+import mochi/lexer
 
 pub type Document {
   Document(definitions: List(Definition))
@@ -43,6 +44,8 @@ pub type Field {
     arguments: List(Argument),
     directives: List(Directive),
     selection_set: Option(SelectionSet),
+    /// Source location of this field in the query document
+    location: Option(lexer.Position),
   )
 }
 

@@ -18,6 +18,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import mochi/schema
+import mochi/types
 
 // ============================================================================
 // Types
@@ -242,6 +243,17 @@ pub fn filter(
 pub fn to_field_definition(
   sub: SubscriptionDefinition(event),
 ) -> schema.FieldDefinition {
+  let topic_fn =
+    Some(fn(args: Dict(String, Dynamic), ctx: schema.ExecutionContext) {
+      let info =
+        schema.ResolverInfo(
+          parent: None,
+          arguments: args,
+          context: ctx,
+          info: types.to_dynamic(Nil),
+        )
+      sub.topic_resolver(info)
+    })
   schema.FieldDefinition(
     name: sub.name,
     description: sub.description,
@@ -250,6 +262,7 @@ pub fn to_field_definition(
     resolver: None,
     is_deprecated: False,
     deprecation_reason: None,
+    topic_fn: topic_fn,
   )
 }
 

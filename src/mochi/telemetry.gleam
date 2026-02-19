@@ -7,6 +7,7 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
+import mochi/schema
 import mochi/types
 
 // ============================================================================
@@ -583,4 +584,76 @@ pub fn format_metrics_summary(summary: MetricsSummary) -> String {
   }
 
   string.join(list.append(lines, slowest_lines), "\n")
+}
+
+// ============================================================================
+// Schema Bridge
+// ============================================================================
+
+/// Convert a TelemetryConfig into a schema.TelemetryFn callback.
+///
+/// This bridges the full telemetry system into the executor's event callback.
+/// Use this with `schema.with_telemetry_fn/2` to enable instrumentation:
+///
+/// ```gleam
+/// let config = telemetry.with_handler(fn(event) { io.debug(event) })
+/// let ctx = schema.execution_context(user_data)
+///   |> schema.with_telemetry_fn(telemetry.to_schema_fn(config))
+/// ```
+pub fn to_schema_fn(config: TelemetryConfig) -> schema.TelemetryFn {
+  fn(event: schema.SchemaEvent) -> Nil {
+    case config.enabled {
+      False -> Nil
+      True ->
+        case event {
+          schema.SchemaFieldStart(field_name, parent_type, path) -> {
+            case config.track_fields {
+              False -> Nil
+              True ->
+                config.handler(FieldResolveStart(
+                  get_timestamp_ns(),
+                  field_name,
+                  parent_type,
+                  path,
+                ))
+            }
+          }
+          schema.SchemaFieldEnd(
+            field_name,
+            parent_type,
+            path,
+            success,
+            duration_ns,
+          ) -> {
+            case config.track_fields {
+              False -> Nil
+              True ->
+                config.handler(FieldResolveEnd(
+                  get_timestamp_ns(),
+                  field_name,
+                  parent_type,
+                  path,
+                  success,
+                  duration_ns,
+                ))
+            }
+          }
+          schema.SchemaOperationStart(operation_name) -> {
+            config.handler(OperationStart(
+              get_timestamp_ns(),
+              operation_name,
+              Query,
+            ))
+          }
+          schema.SchemaOperationEnd(operation_name, success, error_count) -> {
+            config.handler(OperationEnd(
+              get_timestamp_ns(),
+              operation_name,
+              success,
+              error_count,
+            ))
+          }
+        }
+    }
+  }
 }

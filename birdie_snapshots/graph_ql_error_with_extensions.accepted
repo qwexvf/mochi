@@ -1,6 +1,8 @@
 ---
 version: 1.5.4
 title: GraphQL error with extensions
+file: ./test/mochi_snapshot_test.gleam
+test_name: error_with_extensions_test
 ---
 {
   "extensions": {

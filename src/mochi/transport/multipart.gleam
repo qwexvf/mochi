@@ -13,6 +13,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import mochi/types
 import mochi/upload.{type UploadConfig, type UploadedFile}
 import simplifile
 
@@ -497,24 +498,49 @@ fn apply_file_to_paths(
   file: UploadedFile,
   prefix: String,
 ) -> Result(Dict(String, Dynamic), MultipartError) {
-  // For now, handle simple single-level variable paths
-  // Full implementation would handle nested paths like "variables.input.file"
   list.fold(paths, Ok(variables), fn(acc, path) {
     case acc {
       Error(e) -> Error(e)
       Ok(vars) -> {
         let stripped =
           string.drop_start(path, string.length(prefix <> "variables."))
-        // Simple case: direct variable
-        case string.contains(stripped, ".") {
-          False -> Ok(dict.insert(vars, stripped, upload.to_dynamic(file)))
-          True ->
-            // Nested path - simplified: just use the first segment
-            Ok(vars)
+        let segments = string.split(stripped, ".")
+        case insert_at_path(vars, segments, upload.to_dynamic(file)) {
+          Ok(updated) -> Ok(updated)
+          Error(_) -> Error(InvalidMapJson("Invalid variable path: " <> path))
         }
       }
     }
   })
+}
+
+/// Recursively insert a value at a nested path within a Dict(String, Dynamic)
+fn insert_at_path(
+  vars: Dict(String, Dynamic),
+  path: List(String),
+  value: Dynamic,
+) -> Result(Dict(String, Dynamic), Nil) {
+  case path {
+    [] -> Error(Nil)
+    [key] -> Ok(dict.insert(vars, key, value))
+    [key, ..rest] -> {
+      let inner = case dict.get(vars, key) {
+        Ok(existing) ->
+          case
+            decode.run(existing, decode.dict(decode.string, decode.dynamic))
+          {
+            Ok(d) -> d
+            Error(_) -> dict.new()
+          }
+        Error(_) -> dict.new()
+      }
+      case insert_at_path(inner, rest, value) {
+        Ok(updated_inner) ->
+          Ok(dict.insert(vars, key, types.to_dynamic(updated_inner)))
+        Error(e) -> Error(e)
+      }
+    }
+  }
 }
 
 // ============================================================================

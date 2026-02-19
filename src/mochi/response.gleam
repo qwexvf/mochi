@@ -10,6 +10,7 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
+import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import mochi/error.{type GraphQLError}
@@ -158,21 +159,36 @@ pub fn to_json_pretty(response: GraphQLResponse) -> String {
 // ============================================================================
 
 /// Convert an ExecutionError to a GraphQLError
+/// Add source location to a GraphQLError if one is present
+fn maybe_with_location(
+  err: error.GraphQLError,
+  location: option.Option(#(Int, Int)),
+) -> error.GraphQLError {
+  case location {
+    option.None -> err
+    option.Some(#(line, col)) ->
+      error.with_locations(err, [error.Location(line, col)])
+  }
+}
+
 pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
   case err {
     executor.ValidationError(message, path) ->
       error.error_at(message, path)
       |> error.with_category(error.ValidationErrorCategory)
-    executor.ResolverError(message, path) ->
+    executor.ResolverError(message, path, location) ->
       error.error_at(message, path)
       |> error.with_category(error.ResolverErrorCategory)
-    executor.TypeError(message, path) ->
+      |> maybe_with_location(location)
+    executor.TypeError(message, path, location) ->
       error.error_at(message, path)
       |> error.with_category(error.TypeErrorCategory)
-    executor.NullValueError(message, path) ->
+      |> maybe_with_location(location)
+    executor.NullValueError(message, path, location) ->
       error.error_at(message, path)
       |> error.with_code("NULL_VALUE_ERROR")
       |> error.with_category(error.ResolverErrorCategory)
+      |> maybe_with_location(location)
   }
 }
 
@@ -230,7 +246,7 @@ pub fn format(response: GraphQLResponse) -> String {
       let count = list.length(errors)
       case count {
         1 -> "errors: [1 error]"
-        n -> "errors: [" <> int_to_string(n) <> " errors]"
+        n -> "errors: [" <> int.to_string(n) <> " errors]"
       }
     }
     None -> "errors: none"
@@ -248,25 +264,4 @@ pub fn format(response: GraphQLResponse) -> String {
   <> ", "
   <> ext_str
   <> " }"
-}
-
-fn int_to_string(n: Int) -> String {
-  case n {
-    0 -> "0"
-    1 -> "1"
-    2 -> "2"
-    3 -> "3"
-    4 -> "4"
-    5 -> "5"
-    6 -> "6"
-    7 -> "7"
-    8 -> "8"
-    9 -> "9"
-    _ -> {
-      case n < 0 {
-        True -> "-" <> int_to_string(-n)
-        False -> int_to_string(n / 10) <> int_to_string(n % 10)
-      }
-    }
-  }
 }

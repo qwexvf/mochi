@@ -1,6 +1,8 @@
 ---
 version: 1.5.4
 title: GraphQL error with path and location
+file: ./test/mochi_snapshot_test.gleam
+test_name: error_with_path_and_location_test
 ---
 {
   "extensions": {

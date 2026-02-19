@@ -1,6 +1,8 @@
 ---
 version: 1.5.4
 title: GraphQL partial response with errors
+file: ./test/mochi_snapshot_test.gleam
+test_name: response_with_errors_test
 ---
 {
   "data": {

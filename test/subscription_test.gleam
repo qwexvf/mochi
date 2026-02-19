@@ -434,9 +434,9 @@ pub fn subscription_executor_basic_test() {
         True -> Nil
         False -> panic as "Should have 1 active subscription"
       }
-      case topic == "onUserCreated" {
+      case topic == "user:created" {
         True -> Nil
-        False -> panic as "Topic should be 'onUserCreated'"
+        False -> panic as { "Topic should be 'user:created', got: " <> topic }
       }
     }
     subscription_executor.SubscriptionError(msg) ->

@@ -5,6 +5,7 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/result
+import gleam/string
 import mochi/types
 
 // ============================================================================
@@ -49,7 +50,15 @@ pub fn request_info(
 
 /// Get a header value from request info (case-insensitive)
 pub fn get_header(info: RequestInfo, name: String) -> Result(String, Nil) {
-  dict.get(info.headers, name)
+  let lower_name = string.lowercase(name)
+  dict.to_list(info.headers)
+  |> list.find_map(fn(pair) {
+    let #(k, v) = pair
+    case string.lowercase(k) == lower_name {
+      True -> Ok(v)
+      False -> Error(Nil)
+    }
+  })
 }
 
 /// Get the Authorization header value

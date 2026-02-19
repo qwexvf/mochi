@@ -39,11 +39,40 @@ import mochi/dataloader.{type DataLoader}
 // Forward declarations for types defined in other modules
 // These are opaque references to avoid circular dependencies
 
-/// Opaque type for middleware pipeline (defined in mochi/middleware.gleam)
-pub type MiddlewarePipeline
-
 /// Opaque type for telemetry context (defined in mochi/telemetry.gleam)
 pub type TelemetryContext
+
+/// Function type for middleware execution - avoids circular dependency with middleware.gleam
+pub type MiddlewareFn =
+  fn(String, FieldDefinition, ResolverInfo, Resolver) -> Result(Dynamic, String)
+
+/// Events emitted during GraphQL execution for telemetry/instrumentation.
+/// These are emitted by the executor and passed to the `telemetry_fn` if one is configured.
+pub type SchemaEvent {
+  /// A field resolver is about to be called.
+  SchemaFieldStart(field_name: String, parent_type: String, path: List(String))
+  /// A field resolver has completed.
+  SchemaFieldEnd(
+    field_name: String,
+    parent_type: String,
+    path: List(String),
+    success: Bool,
+    duration_ns: Int,
+  )
+  /// A GraphQL operation is about to be executed.
+  SchemaOperationStart(operation_name: Option(String))
+  /// A GraphQL operation has completed.
+  SchemaOperationEnd(
+    operation_name: Option(String),
+    success: Bool,
+    error_count: Int,
+  )
+}
+
+/// Callback for receiving schema execution events.
+/// Wire this up to a telemetry handler (e.g. via `telemetry.to_schema_fn/1`).
+pub type TelemetryFn =
+  fn(SchemaEvent) -> Nil
 
 // Core schema types
 pub type Schema {
@@ -125,6 +154,11 @@ pub type FieldDefinition {
     resolver: Option(Resolver),
     is_deprecated: Bool,
     deprecation_reason: Option(String),
+    /// Optional topic resolver for subscription fields.
+    /// Maps resolved arguments + context to a pub/sub topic string.
+    topic_fn: Option(
+      fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, String),
+    ),
   )
 }
 
@@ -221,10 +255,13 @@ pub type ExecutionContext {
     user_context: Dynamic,
     /// DataLoader instances for batching and caching
     data_loaders: Dict(String, DataLoader(Dynamic, Dynamic)),
-    /// Optional middleware pipeline for field resolution
-    middleware_pipeline: Option(MiddlewarePipeline),
-    /// Optional telemetry context for instrumentation
+    /// Optional middleware function for field resolution
+    middleware_fn: Option(MiddlewareFn),
+    /// Optional telemetry context for instrumentation (opaque, legacy)
     telemetry: Option(TelemetryContext),
+    /// Optional telemetry event callback — receives SchemaEvents during execution.
+    /// Use `telemetry.to_schema_fn/1` to bridge to a full TelemetryConfig.
+    telemetry_fn: Option(TelemetryFn),
   )
 }
 
@@ -245,25 +282,27 @@ pub fn execution_context(user_context: Dynamic) -> ExecutionContext {
   ExecutionContext(
     user_context: user_context,
     data_loaders: dict.new(),
-    middleware_pipeline: None,
+    middleware_fn: None,
     telemetry: None,
+    telemetry_fn: None,
   )
 }
 
-/// Create an execution context with middleware
+/// Create an execution context with a middleware function
 pub fn execution_context_with_middleware(
   user_context: Dynamic,
-  middleware: MiddlewarePipeline,
+  middleware: MiddlewareFn,
 ) -> ExecutionContext {
   ExecutionContext(
     user_context: user_context,
     data_loaders: dict.new(),
-    middleware_pipeline: Some(middleware),
+    middleware_fn: Some(middleware),
     telemetry: None,
+    telemetry_fn: None,
   )
 }
 
-/// Create an execution context with telemetry
+/// Create an execution context with telemetry (legacy opaque context)
 pub fn execution_context_with_telemetry(
   user_context: Dynamic,
   telemetry: TelemetryContext,
@@ -271,31 +310,33 @@ pub fn execution_context_with_telemetry(
   ExecutionContext(
     user_context: user_context,
     data_loaders: dict.new(),
-    middleware_pipeline: None,
+    middleware_fn: None,
     telemetry: Some(telemetry),
+    telemetry_fn: None,
   )
 }
 
 /// Create a full execution context with all options
 pub fn full_execution_context(
   user_context: Dynamic,
-  middleware: Option(MiddlewarePipeline),
+  middleware: Option(MiddlewareFn),
   telemetry: Option(TelemetryContext),
 ) -> ExecutionContext {
   ExecutionContext(
     user_context: user_context,
     data_loaders: dict.new(),
-    middleware_pipeline: middleware,
+    middleware_fn: middleware,
     telemetry: telemetry,
+    telemetry_fn: None,
   )
 }
 
-/// Set middleware pipeline on an execution context
+/// Set middleware function on an execution context
 pub fn with_middleware(
   context: ExecutionContext,
-  middleware: MiddlewarePipeline,
+  middleware: MiddlewareFn,
 ) -> ExecutionContext {
-  ExecutionContext(..context, middleware_pipeline: Some(middleware))
+  ExecutionContext(..context, middleware_fn: Some(middleware))
 }
 
 /// Set telemetry on an execution context
@@ -318,9 +359,9 @@ pub fn add_data_loader(
   )
 }
 
-/// Get the middleware pipeline from context
-pub fn get_middleware(context: ExecutionContext) -> Option(MiddlewarePipeline) {
-  context.middleware_pipeline
+/// Get the middleware function from context
+pub fn get_middleware(context: ExecutionContext) -> Option(MiddlewareFn) {
+  context.middleware_fn
 }
 
 /// Get the telemetry context
@@ -334,6 +375,21 @@ pub fn update_telemetry(
   telemetry: TelemetryContext,
 ) -> ExecutionContext {
   ExecutionContext(..context, telemetry: Some(telemetry))
+}
+
+/// Set a telemetry callback function on the execution context.
+/// This function is called for each SchemaEvent emitted during execution.
+/// Use `telemetry.to_schema_fn/1` to bridge a TelemetryConfig to this callback.
+pub fn with_telemetry_fn(
+  context: ExecutionContext,
+  telemetry_fn: TelemetryFn,
+) -> ExecutionContext {
+  ExecutionContext(..context, telemetry_fn: Some(telemetry_fn))
+}
+
+/// Get the telemetry callback function from the execution context
+pub fn get_telemetry_fn(context: ExecutionContext) -> Option(TelemetryFn) {
+  context.telemetry_fn
 }
 
 /// Get a DataLoader from the execution context
@@ -525,6 +581,7 @@ pub fn field_def(name: String, field_type: FieldType) -> FieldDefinition {
     resolver: None,
     is_deprecated: False,
     deprecation_reason: None,
+    topic_fn: None,
   )
 }
 
@@ -606,6 +663,7 @@ pub fn auto_field(
       resolver: Some(auto_resolver(name)),
       is_deprecated: False,
       deprecation_reason: None,
+      topic_fn: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -709,6 +767,7 @@ pub fn resolver_field(
       resolver: Some(resolve_fn),
       is_deprecated: False,
       deprecation_reason: None,
+      topic_fn: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -755,6 +814,7 @@ pub fn query_with_args(
       resolver: Some(resolve_fn),
       is_deprecated: False,
       deprecation_reason: None,
+      topic_fn: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }

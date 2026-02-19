@@ -350,9 +350,19 @@ pub fn subscription_to_field_def(
     Error("Subscriptions must be executed through the subscription executor")
   }
 
+  // Wrap the typed topic_resolver into the schema.FieldDefinition.topic_fn shape
+  let topic_fn =
+    Some(fn(raw_args: Dict(String, Dynamic), ctx: ExecutionContext) {
+      case s.args_decoder(raw_args) {
+        Ok(decoded_args) -> s.topic_resolver(decoded_args, ctx)
+        Error(e) -> Error("Failed to decode subscription args: " <> e)
+      }
+    })
+
   let base =
     schema.field_def(s.name, s.return_type)
     |> schema.resolver(resolver)
+    |> fn(fd) { schema.FieldDefinition(..fd, topic_fn: topic_fn) }
 
   let with_args = add_args_to_field(base, s.arg_definitions)
 
@@ -555,7 +565,13 @@ pub fn build(builder: SchemaBuilder) -> Schema {
       schema.add_type(s, schema.UnionTypeDef(u))
     })
 
-  list.fold(builder.scalars, with_unions, fn(s, scalar) {
-    schema.add_type(s, schema.ScalarTypeDef(scalar))
+  let with_scalars =
+    list.fold(builder.scalars, with_unions, fn(s, scalar) {
+      schema.add_type(s, schema.ScalarTypeDef(scalar))
+    })
+
+  // Always include built-in directives (@skip, @include, @deprecated)
+  list.fold(schema.builtin_directives(), with_scalars, fn(s, directive) {
+    schema.add_directive(s, directive)
   })
 }

@@ -76,13 +76,15 @@ fn parse_fragment_definition(
   use #(_, parser) <- result.try(expect_token(parser, lexer.On, "'on' keyword"))
   // Parse type condition
   use #(type_condition, parser) <- result.try(parse_name_from_parser(parser))
+  // Parse optional directives
+  use #(directives, parser) <- result.try(parse_directives(parser))
   // Parse selection set
   use #(selection_set, parser) <- result.try(parse_selection_set(parser))
   Ok(#(
     ast.Fragment(
       name: name,
       type_condition: type_condition,
-      directives: [],
+      directives: directives,
       selection_set: selection_set,
     ),
     parser,
@@ -105,13 +107,14 @@ fn parse_operation_definition(
       use #(variable_defs, parser) <- result.try(parse_variable_definitions(
         parser,
       ))
+      use #(directives, parser) <- result.try(parse_directives(parser))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
       Ok(#(
         ast.Operation(
           operation_type: op_type,
           name: name,
           variable_definitions: variable_defs,
-          directives: [],
+          directives: directives,
           selection_set: selection_set,
         ),
         parser,
@@ -207,43 +210,50 @@ fn parse_fragment_spread_or_inline(
   ))
 
   case peek_token(parser) {
-    // Inline fragment with type condition: ... on Type { ... }
+    // Inline fragment with type condition: ... on Type @dir { ... }
     Ok(lexer.TokenWithPosition(lexer.On, _)) -> {
       use #(_, parser) <- result.try(
         consume_token(parser)
         |> result.map_error(fn(_) { UnexpectedEOF("'on' keyword") }),
       )
       use #(type_name, parser) <- result.try(parse_name_from_parser(parser))
+      use #(directives, parser) <- result.try(parse_directives(parser))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
       Ok(#(
         ast.InlineFragment(ast.InlineFragmentValue(
           type_condition: Some(type_name),
-          directives: [],
+          directives: directives,
           selection_set: selection_set,
         )),
         parser,
       ))
     }
-    // Inline fragment without type condition: ... { ... }
-    Ok(lexer.TokenWithPosition(lexer.LeftBrace, _)) -> {
+    // Inline fragment without type condition: ... @dir { ... }
+    Ok(lexer.TokenWithPosition(lexer.LeftBrace, _))
+    | Ok(lexer.TokenWithPosition(lexer.At, _)) -> {
+      use #(directives, parser) <- result.try(parse_directives(parser))
       use #(selection_set, parser) <- result.try(parse_selection_set(parser))
       Ok(#(
         ast.InlineFragment(ast.InlineFragmentValue(
           type_condition: None,
-          directives: [],
+          directives: directives,
           selection_set: selection_set,
         )),
         parser,
       ))
     }
-    // Fragment spread: ...FragmentName
+    // Fragment spread: ...FragmentName @dir
     Ok(lexer.TokenWithPosition(lexer.Name(name), _)) -> {
       use #(_, parser) <- result.try(
         consume_token(parser)
         |> result.map_error(fn(_) { UnexpectedEOF("fragment name") }),
       )
+      use #(directives, parser) <- result.try(parse_directives(parser))
       Ok(#(
-        ast.FragmentSpread(ast.FragmentSpreadValue(name: name, directives: [])),
+        ast.FragmentSpread(ast.FragmentSpreadValue(
+          name: name,
+          directives: directives,
+        )),
         parser,
       ))
     }
@@ -258,7 +268,9 @@ fn parse_fragment_spread_or_inline(
 }
 
 fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
-  use #(first_name, parser) <- result.try(parse_name_from_parser(parser))
+  use #(first_name, first_pos, parser) <- result.try(parse_name_with_position(
+    parser,
+  ))
 
   case peek_token(parser) {
     Ok(lexer.TokenWithPosition(lexer.Colon, _)) -> {
@@ -279,6 +291,7 @@ fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
           arguments: arguments,
           directives: directives,
           selection_set: selection_set,
+          location: Some(first_pos),
         ),
         parser,
       ))
@@ -296,6 +309,7 @@ fn parse_field(parser: Parser) -> Result(#(Field, Parser), ParseError) {
           arguments: arguments,
           directives: directives,
           selection_set: selection_set,
+          location: Some(first_pos),
         ),
         parser,
       ))
@@ -363,6 +377,19 @@ fn parse_name_from_parser(
   case consume_token(parser) {
     Ok(#(lexer.TokenWithPosition(lexer.Name(name), _), parser)) ->
       Ok(#(name, parser))
+    Ok(#(lexer.TokenWithPosition(token, position), _)) ->
+      Error(UnexpectedToken("name", token, position))
+    Error(_) -> Error(UnexpectedEOF("name"))
+  }
+}
+
+/// Like parse_name_from_parser but also returns the token's source position.
+fn parse_name_with_position(
+  parser: Parser,
+) -> Result(#(String, lexer.Position, Parser), ParseError) {
+  case consume_token(parser) {
+    Ok(#(lexer.TokenWithPosition(lexer.Name(name), position), parser)) ->
+      Ok(#(name, position, parser))
     Ok(#(lexer.TokenWithPosition(token, position), _)) ->
       Error(UnexpectedToken("name", token, position))
     Error(_) -> Error(UnexpectedEOF("name"))
@@ -482,13 +509,15 @@ fn parse_variable_definition(
   use #(default_value, parser) <- result.try(parse_optional_default_value(
     parser,
   ))
+  // Parse optional directives on variable definition
+  use #(directives, parser) <- result.try(parse_directives(parser))
 
   Ok(#(
     ast.VariableDefinition(
       variable: name,
       type_: var_type,
       default_value: default_value,
-      directives: [],
+      directives: directives,
     ),
     parser,
   ))

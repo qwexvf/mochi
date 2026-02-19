@@ -6,8 +6,10 @@ import gleam/bit_array
 import gleam/crypto
 import gleam/dict.{type Dict}
 import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 // ============================================================================
@@ -179,8 +181,13 @@ fn collapse_spaces(s: String) -> String {
 // Internal Helpers
 // ============================================================================
 
-fn extract_apq_fields(_dyn: dynamic.Dynamic) -> Result(#(Int, String), Nil) {
-  // This would need proper dynamic decoding
-  // For now, return error - actual implementation would decode the object
-  Error(Nil)
+fn extract_apq_fields(dyn: dynamic.Dynamic) -> Result(#(Int, String), Nil) {
+  let pair_decoder =
+    decode.field("version", decode.int, fn(version) {
+      decode.field("sha256Hash", decode.string, fn(hash) {
+        decode.success(#(version, hash))
+      })
+    })
+  decode.run(dyn, pair_decoder)
+  |> result.map_error(fn(_) { Nil })
 }

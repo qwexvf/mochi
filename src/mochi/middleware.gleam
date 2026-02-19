@@ -6,7 +6,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import mochi/schema.{type FieldDefinition, type ResolverInfo}
+import mochi/schema.{type FieldDefinition, type MiddlewareFn, type ResolverInfo}
 import mochi/types
 
 // ============================================================================
@@ -197,6 +197,26 @@ fn middleware_applies(
 // ============================================================================
 // Middleware Execution
 // ============================================================================
+
+/// Convert a MiddlewarePipeline to a schema.MiddlewareFn
+///
+/// This is used to wire a middleware pipeline into the execution context
+/// without creating a circular dependency between schema and middleware.
+///
+/// ## Example
+///
+/// ```gleam
+/// let pipeline = middleware.new_pipeline()
+///   |> middleware.add_middleware(middleware.logging_middleware(io.println))
+///
+/// let ctx = schema.execution_context(user_ctx)
+///   |> schema.with_middleware(middleware.to_executor_fn(pipeline))
+/// ```
+pub fn to_executor_fn(pipeline: MiddlewarePipeline) -> schema.MiddlewareFn {
+  fn(parent_type, field_def, info, resolver) {
+    execute_with_middleware(pipeline, parent_type, field_def, info, resolver)
+  }
+}
 
 /// Execute a resolver with the middleware pipeline
 pub fn execute_with_middleware(

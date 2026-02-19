@@ -24,6 +24,7 @@ import mochi/executor.{type ExecutionResult}
 import mochi/json
 import mochi/schema.{type Schema}
 import mochi/subscription.{type PubSub, type SubscriptionId}
+import mochi/subscription_executor
 import mochi/types
 
 // ============================================================================
@@ -103,6 +104,8 @@ pub type ConnectionState {
     acknowledged: Bool,
     /// Connection parameters from ConnectionInit
     connection_params: Option(Dict(String, Dynamic)),
+    /// Optional event handler: called with (subscription_id, result) on each event
+    on_event: Option(fn(String, ExecutionResult) -> Nil),
   )
 }
 
@@ -135,6 +138,7 @@ pub fn new_connection(
     active_subscriptions: dict.new(),
     acknowledged: False,
     connection_params: None,
+    on_event: None,
   )
 }
 
@@ -152,7 +156,18 @@ pub fn new_connection_with_params(
     active_subscriptions: dict.new(),
     acknowledged: False,
     connection_params: Some(params),
+    on_event: None,
   )
+}
+
+/// Register an event callback to receive subscription results.
+/// The callback receives the subscription operation ID and the execution result.
+/// Use this to push results back to the WebSocket client.
+pub fn with_on_event(
+  state: ConnectionState,
+  on_event: fn(String, ExecutionResult) -> Nil,
+) -> ConnectionState {
+  ConnectionState(..state, on_event: Some(on_event))
 }
 
 // ============================================================================
@@ -194,25 +209,56 @@ fn handle_connection_init(
 fn handle_subscribe(
   state: ConnectionState,
   id: String,
-  _payload: SubscriptionPayload,
+  payload: SubscriptionPayload,
 ) -> HandleResult {
   use <- require_acknowledged(state)
   use <- check_duplicate_subscription(state, id)
 
-  // For now, we just acknowledge the subscription was received
-  // The actual subscription setup would integrate with subscription_executor
-  // This is a placeholder that shows the structure
-  let new_state =
-    ConnectionState(
-      ..state,
-      active_subscriptions: dict.insert(
-        state.active_subscriptions,
-        id,
-        "pending_" <> id,
-      ),
+  // Build the subscription context from connection state
+  let var_values = case payload.variables {
+    Some(vars) -> vars
+    None -> dict.new()
+  }
+  let sub_ctx =
+    subscription_executor.SubscriptionContext(
+      schema: state.schema,
+      pubsub: state.pubsub,
+      execution_context: state.execution_context,
+      variable_values: var_values,
     )
 
-  HandleOk(state: new_state, response: None)
+  // Build the event callback — calls on_event handler if registered,
+  // otherwise discards the result (no-op).
+  let op_id = id
+  let callback = fn(result: ExecutionResult) -> Nil {
+    case state.on_event {
+      Some(handler) -> handler(op_id, result)
+      None -> Nil
+    }
+  }
+
+  // Subscribe via the subscription executor
+  case subscription_executor.subscribe(sub_ctx, payload.query, callback) {
+    subscription_executor.SubscriptionResult(
+      subscription_id,
+      _topic,
+      new_pubsub,
+    ) -> {
+      let new_state =
+        ConnectionState(
+          ..state,
+          pubsub: new_pubsub,
+          active_subscriptions: dict.insert(
+            state.active_subscriptions,
+            id,
+            subscription_id,
+          ),
+        )
+      HandleOk(state: new_state, response: None)
+    }
+    subscription_executor.SubscriptionError(message) ->
+      HandleClose("Subscription setup failed: " <> message)
+  }
 }
 
 /// Handle Complete message (client unsubscribing)
@@ -417,9 +463,9 @@ fn encode_execution_errors(errors: List(executor.ExecutionError)) -> Dynamic {
     list.map(errors, fn(err) {
       let #(msg, path) = case err {
         executor.ValidationError(m, p) -> #(m, p)
-        executor.ResolverError(m, p) -> #(m, p)
-        executor.TypeError(m, p) -> #(m, p)
-        executor.NullValueError(m, p) -> #(m, p)
+        executor.ResolverError(message: m, path: p, ..) -> #(m, p)
+        executor.TypeError(message: m, path: p, ..) -> #(m, p)
+        executor.NullValueError(message: m, path: p, ..) -> #(m, p)
       }
       types.to_dynamic(
         dict.from_list([

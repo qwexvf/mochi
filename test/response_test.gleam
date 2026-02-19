@@ -96,7 +96,7 @@ pub fn from_execution_result_with_errors_test() {
     types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
   let errors = [
     executor.ValidationError("Field not found", ["user", "email"]),
-    executor.ResolverError("Database error", ["query", "users"]),
+    executor.ResolverError("Database error", ["query", "users"], location: None),
   ]
   let exec_result = executor.ExecutionResult(data: Some(data), errors: errors)
 
@@ -114,7 +114,7 @@ pub fn from_execution_result_with_errors_test() {
 }
 
 pub fn from_execution_result_failure_test() {
-  let errors = [executor.TypeError("Type mismatch", ["field"])]
+  let errors = [executor.TypeError("Type mismatch", ["field"], location: None)]
   let exec_result = executor.ExecutionResult(data: None, errors: errors)
 
   let resp = response.from_execution_result(exec_result)
@@ -433,7 +433,8 @@ pub fn convert_validation_error_test() {
 }
 
 pub fn convert_resolver_error_test() {
-  let exec_err = executor.ResolverError("Database error", ["query", "users"])
+  let exec_err =
+    executor.ResolverError("Database error", ["query", "users"], location: None)
   let gql_err = response.execution_error_to_graphql_error(exec_err)
 
   case gql_err.message == "Database error" {
@@ -443,7 +444,7 @@ pub fn convert_resolver_error_test() {
 }
 
 pub fn convert_type_error_test() {
-  let exec_err = executor.TypeError("Type mismatch", ["field"])
+  let exec_err = executor.TypeError("Type mismatch", ["field"], location: None)
   let gql_err = response.execution_error_to_graphql_error(exec_err)
 
   case gql_err.message == "Type mismatch" {

@@ -113,7 +113,7 @@ pub fn non_null_field_returns_null_test() {
 
   // Should have an error about null on non-null field
   case result.errors {
-    [executor.NullValueError(_, _), ..] -> Nil
+    [executor.NullValueError(_, _, _), ..] -> Nil
     [] -> panic as "Should have error for non-null field returning null"
     _ -> Nil
     // Other error types also acceptable
@@ -276,7 +276,7 @@ pub fn errors_collected_during_null_propagation_test() {
 
   // Should have at least one NullValueError
   case result.errors {
-    [executor.NullValueError(_message, path), ..] -> {
+    [executor.NullValueError(message: _message, path: path, ..), ..] -> {
       // Path should include the field name
       case path != [] {
         True -> Nil

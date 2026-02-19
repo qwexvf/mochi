@@ -15,8 +15,31 @@ import mochi/types
 // Test Helpers
 // ============================================================================
 
+/// Build a minimal subscription schema with `subscription { onMessage { id } }`
 fn create_test_schema() -> schema.Schema {
+  // Message type with id field
+  let message_type =
+    schema.object("Message")
+    |> schema.string_field("id")
+
+  // Resolver that returns a dummy message
+  let on_message_resolver = fn(_info: schema.ResolverInfo) {
+    Ok(types.to_dynamic(dict.from_list([#("id", types.to_dynamic("msg-1"))])))
+  }
+
+  // Subscription root type with onMessage field
+  let on_message_field =
+    schema.field_def("onMessage", schema.Named("Message"))
+    |> schema.resolver(on_message_resolver)
+    |> schema.field_description("Message subscription")
+
+  let sub_type =
+    schema.object("Subscription")
+    |> schema.field(on_message_field)
+
   schema.schema()
+  |> schema.subscription(sub_type)
+  |> schema.add_type(schema.ObjectTypeDef(message_type))
 }
 
 fn create_test_state() -> websocket.ConnectionState {

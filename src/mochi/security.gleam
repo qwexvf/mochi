@@ -212,7 +212,11 @@ fn calculate_depth(
           ast.FragmentSpread(spread) -> {
             case dict.get(fragments, spread.name) {
               Ok(frag) ->
-                calculate_depth(frag.selection_set, fragments, current_depth)
+                calculate_depth(
+                  frag.selection_set,
+                  fragments,
+                  current_depth + 1,
+                )
               Error(_) -> current_depth
             }
           }

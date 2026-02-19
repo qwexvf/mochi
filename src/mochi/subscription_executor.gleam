@@ -128,7 +128,15 @@ fn execute_subscription(
   use field_def <- require_subscription_field(subscription_type, field.name)
 
   let args = coerce_arguments(field.arguments, context.variable_values)
-  let topic = field.name
+  // Use topic_fn if available (set by subscription_to_field_def), else fall back to field name
+  let topic = case field_def.topic_fn {
+    Some(topic_fn) ->
+      case topic_fn(args, context.execution_context) {
+        Ok(t) -> t
+        Error(_) -> field.name
+      }
+    None -> field.name
+  }
 
   let event_callback = fn(event_data: Dynamic) {
     let result =
@@ -391,7 +399,7 @@ fn execute_event_field(
                   )
                 Error(msg) ->
                   executor.ExecutionResult(data: None, errors: [
-                    executor.ResolverError(msg, [response_name]),
+                    executor.ResolverError(msg, [response_name], location: None),
                   ])
               }
             }
@@ -415,8 +423,14 @@ fn make_field(name: String, value: Dynamic) -> Dynamic {
 }
 
 fn merge_field_results(results: List(Dynamic)) -> Dynamic {
-  // Merge multiple field result dicts into one
-  types.to_dynamic(results)
+  // Merge multiple single-entry field dicts into one combined dict
+  list.fold(results, dict.new(), fn(acc, item) {
+    case decode.run(item, decode.dict(decode.string, decode.dynamic)) {
+      Ok(d) -> dict.merge(acc, d)
+      Error(_) -> acc
+    }
+  })
+  |> types.to_dynamic
 }
 
 fn extract_field_from_dynamic(data: Dynamic, field: String) -> Dynamic {

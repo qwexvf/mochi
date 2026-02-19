@@ -14,7 +14,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/set.{type Set}
 import gleam/string
 import mochi/ast.{type Document}
-import mochi/parser
+import mochi/parser.{type ParseError}
 import mochi/schema.{type FieldDefinition, type ObjectType, type Schema}
 
 // ============================================================================
@@ -22,6 +22,8 @@ import mochi/schema.{type FieldDefinition, type ObjectType, type Schema}
 // ============================================================================
 
 pub type ValidationError {
+  /// Query string failed to parse
+  ParseError(message: String)
   /// Field does not exist on the type
   UnknownField(field_name: String, type_name: String)
   /// Required argument is missing
@@ -123,7 +125,8 @@ pub fn validate_query(
 ) -> Result(Document, List(ValidationError)) {
   case parser.parse(query) {
     Ok(document) -> validate(document, schema)
-    Error(_parse_error) -> Error([])
+    Error(parse_error) ->
+      Error([ParseError(message: format_parse_error(parse_error))])
   }
 }
 
@@ -229,7 +232,7 @@ fn validate_operation(
       variable_definitions: var_defs,
       selection_set: selection_set,
       name: op_name,
-      ..,
+      directives: op_directives,
     ) -> {
       // Set the current type based on operation type
       let root_type = case op_type {
@@ -241,6 +244,20 @@ fn validate_operation(
 
       // Track defined variables
       let ctx = track_defined_variables(ctx, var_defs)
+
+      // Validate operation-level directives
+      let op_location = case op_type {
+        ast.Query -> "QUERY"
+        ast.Mutation -> "MUTATION"
+        ast.Subscription -> "SUBSCRIPTION"
+      }
+      let ctx = validate_directives(ctx, op_directives, op_location)
+
+      // Validate variable definition directives
+      let ctx =
+        list.fold(var_defs, ctx, fn(ctx, var_def) {
+          validate_directives(ctx, var_def.directives, "VARIABLE_DEFINITION")
+        })
 
       // Validate subscription has single root field
       let ctx = case op_type {
@@ -347,6 +364,7 @@ fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext
   ctx
   |> validate_field_arguments(field, field_def)
   |> track_argument_variables(field.arguments)
+  |> validate_directives(field.directives, "FIELD")
   |> validate_field_selection_set(field, field_def)
 }
 
@@ -540,14 +558,13 @@ fn validate_fragment_definitions(
 ) -> ValidationContext {
   list.fold(document.definitions, ctx, fn(ctx, def) {
     case def {
-      ast.FragmentDefinition(fragment) ->
-        validate_fragment_type_condition(ctx, fragment)
+      ast.FragmentDefinition(fragment) -> validate_fragment_def(ctx, fragment)
       _ -> ctx
     }
   })
 }
 
-fn validate_fragment_type_condition(
+fn validate_fragment_def(
   ctx: ValidationContext,
   fragment: ast.Fragment,
 ) -> ValidationContext {
@@ -560,16 +577,20 @@ fn validate_fragment_type_condition(
     || type_name == "Subscription"
     || dict.has_key(ctx.schema.types, type_name)
 
-  case type_exists {
+  let ctx = case type_exists {
     True -> ctx
     False -> add_error(ctx, InvalidTypeCondition(fragment.name, type_name))
   }
+
+  // Validate directives on the fragment definition
+  validate_directives(ctx, fragment.directives, "FRAGMENT_DEFINITION")
 }
 
 fn validate_fragment_spread(
   ctx: ValidationContext,
   spread: ast.FragmentSpreadValue,
 ) -> ValidationContext {
+  let ctx = validate_directives(ctx, spread.directives, "FRAGMENT_SPREAD")
   let fragment_result = dict.get(ctx.fragments, spread.name)
   let is_cycle = list.contains(ctx.fragment_spread_path, spread.name)
 
@@ -826,6 +847,7 @@ fn check_duplicates(
 /// Format a validation error as a human-readable string
 pub fn format_error(error: ValidationError) -> String {
   case error {
+    ParseError(message) -> "Parse error: " <> message
     UnknownField(field_name, type_name) ->
       "Cannot query field \""
       <> field_name
@@ -928,4 +950,14 @@ pub fn format_errors(errors: List(ValidationError)) -> String {
   errors
   |> list.map(format_error)
   |> string.join("\n")
+}
+
+fn format_parse_error(err: ParseError) -> String {
+  case err {
+    parser.LexError(_) -> "Lexer error"
+    parser.UnexpectedToken(expected, _got, _pos) ->
+      "Unexpected token, expected " <> expected
+    parser.UnexpectedEOF(expected) ->
+      "Unexpected end of input, expected " <> expected
+  }
 }

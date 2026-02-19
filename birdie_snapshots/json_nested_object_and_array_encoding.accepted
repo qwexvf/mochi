@@ -1,6 +1,8 @@
 ---
 version: 1.5.4
 title: JSON nested object and array encoding
+file: ./test/mochi_snapshot_test.gleam
+test_name: json_nested_encoding_test
 ---
 {
   "address": {
