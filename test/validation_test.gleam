@@ -689,3 +689,99 @@ pub fn valid_multiple_directives_test() {
     Error(_) -> panic as "Parse failed"
   }
 }
+
+// ============================================================================
+// validate_query (parse + validate) Tests
+// ============================================================================
+
+pub fn validate_query_valid_test() {
+  let test_schema = build_test_schema()
+  let result = validation.validate_query("{ users { id name } }", test_schema)
+  case result {
+    Ok(_) -> Nil
+    Error(errors) -> {
+      let msg = validation.format_errors(errors)
+      panic as { "Expected valid query, got errors: " <> msg }
+    }
+  }
+}
+
+pub fn validate_query_invalid_syntax_test() {
+  let test_schema = build_test_schema()
+  // Syntactically invalid — unclosed brace
+  let result = validation.validate_query("{ users { id ", test_schema)
+  case result {
+    Error(errors) ->
+      case errors != [] {
+        True -> Nil
+        False -> panic as "Expected non-empty error list for invalid syntax"
+      }
+    Ok(_) -> panic as "Expected error for syntactically invalid query"
+  }
+}
+
+pub fn validate_query_unknown_field_test() {
+  let test_schema = build_test_schema()
+  let result =
+    validation.validate_query("{ users { nonexistentField } }", test_schema)
+  case result {
+    Error(errors) ->
+      case errors != [] {
+        True -> Nil
+        False -> panic as "Expected errors for unknown field"
+      }
+    Ok(_) -> panic as "Expected error for unknown field"
+  }
+}
+
+pub fn validate_query_garbage_input_test() {
+  let test_schema = build_test_schema()
+  // Completely unparseable input
+  let result = validation.validate_query("!@#$%^&*()", test_schema)
+  case result {
+    Error(errors) ->
+      case errors != [] {
+        True -> Nil
+        False -> panic as "Expected non-empty error list for garbage input"
+      }
+    Ok(_) -> panic as "Expected error for unparseable query string"
+  }
+}
+
+// ============================================================================
+// Subscription Single Root Field Validation
+// ============================================================================
+
+pub fn invalid_subscription_multiple_root_fields_test() {
+  let sub_schema =
+    query.new()
+    |> query.add_subscription(query.subscription(
+      "onUser",
+      schema.Named("String"),
+      "onUser",
+      types.to_dynamic,
+    ))
+    |> query.add_subscription(query.subscription(
+      "onPost",
+      schema.Named("String"),
+      "onPost",
+      types.to_dynamic,
+    ))
+    |> query.build
+
+  case parser.parse("subscription { onUser onPost }") {
+    Ok(doc) -> {
+      case validation.validate(doc, sub_schema) {
+        Error(errors) ->
+          case errors != [] {
+            True -> Nil
+            False ->
+              panic as "Expected error for subscription with multiple root fields"
+          }
+        Ok(_) ->
+          panic as "Expected validation to fail for subscription with multiple root fields"
+      }
+    }
+    Error(_) -> panic as "Parse failed"
+  }
+}

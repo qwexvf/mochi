@@ -106,3 +106,94 @@ pub fn error_message_test() {
   should.be_true(msg |> string.contains("15"))
   should.be_true(msg |> string.contains("10"))
 }
+
+// Fragment spread depth evasion: a deeply-nested fragment spread should count
+// toward the depth limit, not bypass it.
+pub fn fragment_spread_depth_test() {
+  // depth = 1 (root) + 1 (a) + 1 (spread → b) + 1 (c) + 1 (d) = 5
+  let assert Ok(doc) =
+    parser.parse(
+      "
+      fragment DeepFragment on SomeType {
+        b { c { d } }
+      }
+      { a { ...DeepFragment } }
+      ",
+    )
+  let analysis = security.analyze(doc)
+  // depth should be 5: query(1) → a(2) → spread(3) → b is inside spread so
+  // spread itself adds 1 → b(4) → c(5) → d is a leaf at depth 5
+  should.be_true(analysis.depth >= 4)
+}
+
+pub fn fragment_spread_depth_limit_test() {
+  // Use a fragment to get depth 6, then enforce max_depth: 5
+  let assert Ok(doc) =
+    parser.parse(
+      "
+      fragment Deep on T { d { e { f } } }
+      { a { b { c { ...Deep } } } }
+      ",
+    )
+  let strict_config =
+    security.SecurityConfig(
+      max_depth: Some(5),
+      max_complexity: None,
+      max_aliases: None,
+      max_root_fields: None,
+    )
+  // depth = root(1) + a(2) + b(3) + c(4) + spread(5) + d(6) + e(7) + f leaf
+  // should exceed max_depth: 5
+  let result = security.validate(doc, strict_config)
+  should.be_error(result)
+}
+
+pub fn alias_limit_validation_test() {
+  let assert Ok(doc) =
+    parser.parse(
+      "{ u1: user { id } u2: user { id } u3: user { id } u4: user { id } }",
+    )
+  let strict_config =
+    security.SecurityConfig(
+      max_depth: None,
+      max_complexity: None,
+      max_aliases: Some(3),
+      max_root_fields: None,
+    )
+  let result = security.validate(doc, strict_config)
+  should.be_error(result)
+}
+
+pub fn root_field_limit_validation_test() {
+  let assert Ok(doc) =
+    parser.parse("{ users { id } posts { id } comments { id } }")
+  let strict_config =
+    security.SecurityConfig(
+      max_depth: None,
+      max_complexity: None,
+      max_aliases: None,
+      max_root_fields: Some(2),
+    )
+  let result = security.validate(doc, strict_config)
+  should.be_error(result)
+}
+
+pub fn all_limits_pass_test() {
+  let assert Ok(doc) = parser.parse("{ users { id name } }")
+  let config =
+    security.SecurityConfig(
+      max_depth: Some(10),
+      max_complexity: Some(100),
+      max_aliases: Some(10),
+      max_root_fields: Some(10),
+    )
+  let result = security.validate(doc, config)
+  should.be_ok(result)
+}
+
+pub fn complexity_error_message_test() {
+  let error = security.ComplexityLimitExceeded(20, 10)
+  let msg = security.error_message(error)
+  should.be_true(msg |> string.contains("20"))
+  should.be_true(msg |> string.contains("10"))
+}

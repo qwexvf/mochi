@@ -185,3 +185,124 @@ pub fn headers_builder_test() {
     Error(_) -> should.fail()
   }
 }
+
+// ============================================================================
+// require_bearer_token Tests
+// ============================================================================
+
+pub fn require_bearer_token_present_test() {
+  let builder = context.require_bearer_token()
+  let headers = dict.from_list([#("authorization", "Bearer secret123")])
+  let info = context.request_info(headers, "POST", "/graphql")
+  let result = builder(info, dict.new())
+  should.be_ok(result)
+}
+
+pub fn require_bearer_token_missing_test() {
+  let builder = context.require_bearer_token()
+  let info = context.request_info(dict.new(), "POST", "/graphql")
+  let result = builder(info, dict.new())
+  should.be_error(result)
+}
+
+pub fn require_bearer_token_wrong_scheme_test() {
+  let builder = context.require_bearer_token()
+  let headers = dict.from_list([#("authorization", "Basic dXNlcjpwYXNz")])
+  let info = context.request_info(headers, "POST", "/graphql")
+  let result = builder(info, dict.new())
+  should.be_error(result)
+}
+
+// ============================================================================
+// add_to_context_or Tests
+// ============================================================================
+
+pub fn add_to_context_or_success_test() {
+  // Extractor succeeds — uses the extracted value
+  let builder =
+    context.add_to_context_or(
+      "custom",
+      fn(info) {
+        case context.get_header(info, "x-custom") {
+          Ok(v) -> Ok(types.to_dynamic(v))
+          Error(_) -> Error("no header")
+        }
+      },
+      types.to_dynamic("default"),
+    )
+  let headers = dict.from_list([#("x-custom", "my-value")])
+  let info = context.request_info(headers, "GET", "/")
+  let result = builder(info, dict.new())
+  case result {
+    Ok(ctx) -> should.be_true(dict.has_key(ctx, "custom"))
+    Error(_) -> should.fail()
+  }
+}
+
+pub fn add_to_context_or_fallback_test() {
+  // Extractor fails — uses the default value, no error
+  let builder =
+    context.add_to_context_or(
+      "custom",
+      fn(_info) { Error("not found") },
+      types.to_dynamic("default"),
+    )
+  let info = context.request_info(dict.new(), "GET", "/")
+  let result = builder(info, dict.new())
+  // Should succeed with default, not error
+  should.be_ok(result)
+  case result {
+    Ok(ctx) -> should.be_true(dict.has_key(ctx, "custom"))
+    Error(_) -> should.fail()
+  }
+}
+
+// ============================================================================
+// request_metadata_builder Tests
+// ============================================================================
+
+pub fn request_metadata_builder_test() {
+  let builder = context.request_metadata_builder()
+  let info = context.request_info(dict.new(), "DELETE", "/api/users/1")
+  let result = builder(info, dict.new())
+  case result {
+    Ok(ctx) -> should.be_true(dict.has_key(ctx, "request"))
+    Error(_) -> should.fail()
+  }
+}
+
+// ============================================================================
+// Pipeline composition Tests
+// ============================================================================
+
+pub fn pipeline_with_multiple_builders_test() {
+  let pipeline =
+    context.new_pipeline()
+    |> context.add_builder(context.headers_builder())
+    |> context.add_builder(context.bearer_token_builder())
+    |> context.add_builder(context.request_metadata_builder())
+
+  let headers = dict.from_list([#("authorization", "Bearer tok")])
+  let info = context.request_info(headers, "GET", "/")
+  let result = context.build_context(pipeline, info, dict.new())
+  case result {
+    Ok(ctx) -> {
+      should.be_true(dict.has_key(ctx, "headers"))
+      should.be_true(dict.has_key(ctx, "token"))
+      should.be_true(dict.has_key(ctx, "request"))
+    }
+    Error(_) -> should.fail()
+  }
+}
+
+pub fn pipeline_require_bearer_blocks_without_token_test() {
+  let pipeline =
+    context.new_pipeline()
+    |> context.add_builder(context.require_bearer_token())
+    |> context.add_builder(context.headers_builder())
+
+  let info = context.request_info(dict.new(), "GET", "/")
+  let result = context.build_context(pipeline, info, dict.new())
+  // require_bearer_token should cause the pipeline to fail
+  should.be_error(result)
+}

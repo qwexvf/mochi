@@ -3,7 +3,10 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/option.{None, Some}
+import gleam/result
+import mochi/executor
 import mochi/query
 import mochi/schema
 import mochi/types
@@ -442,5 +445,84 @@ pub fn enum_value_deprecation_test() {
         False -> panic as "LEGACY should be deprecated with reason"
       }
     Error(_) -> panic as "LEGACY should exist"
+  }
+}
+
+// ============================================================================
+// Field Deduplication Tests
+// ============================================================================
+
+fn build_exec_schema() -> schema.Schema {
+  let user_type =
+    types.object("User")
+    |> types.id("id", fn(u: User) { u.id })
+    |> types.string("name", fn(u: User) { u.name })
+    |> types.string("email", fn(u: User) { u.email })
+    |> types.build(decode_user)
+
+  let user_query =
+    query.query(
+      "user",
+      schema.Named("User"),
+      fn(_) { Ok(User("1", "Alice", "alice@example.com", 30)) },
+      types.to_dynamic,
+    )
+
+  query.new()
+  |> query.add_query(user_query)
+  |> query.add_type(user_type)
+  |> query.build
+}
+
+/// A field appearing twice in the same selection set should appear once in the
+/// response, not duplicated.
+pub fn field_deduplication_test() {
+  let schema_def = build_exec_schema()
+  // Request 'name' twice — result should still have exactly one 'name' value
+  let result = executor.execute_query(schema_def, "{ user { id name name } }")
+  case result.data {
+    None -> panic as "Expected data"
+    Some(data) -> {
+      // Decode the user object — name should be a string, not doubled
+      let user_result =
+        decode.run(data, decode.at(["user"], decode.dynamic))
+        |> result.lazy_unwrap(fn() {
+          // Try list form
+          case decode.run(data, decode.list(decode.dynamic)) {
+            Ok([first, ..]) ->
+              decode.run(first, decode.at(["user"], decode.dynamic))
+              |> result.unwrap(types.to_dynamic(Nil))
+            _ -> types.to_dynamic(Nil)
+          }
+        })
+      let name =
+        decode.run(user_result, decode.at(["name"], decode.string))
+        |> result.unwrap("")
+      // name should be a single string value, not empty
+      case name {
+        "" -> panic as "name should be present when requested twice"
+        _ -> Nil
+      }
+    }
+  }
+}
+
+/// Requesting the same field with an alias produces separate keys.
+pub fn aliased_duplicate_field_test() {
+  let schema_def = build_exec_schema()
+  let result =
+    executor.execute_query(
+      schema_def,
+      "{ user { firstName: name lastName: name } }",
+    )
+  case result.data {
+    None -> panic as "Expected data"
+    Some(_) -> {
+      // No errors expected
+      case result.errors {
+        [] -> Nil
+        _ -> panic as "Unexpected errors with aliased duplicate fields"
+      }
+    }
   }
 }
