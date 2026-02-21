@@ -368,7 +368,7 @@ pub fn execution_result_to_json_success_test() {
 pub fn execution_result_to_json_with_errors_test() {
   let result =
     executor.ExecutionResult(data: None, errors: [
-      executor.ValidationError("Test error", ["field"]),
+      executor.ValidationError("Test error", ["field"], None),
     ])
   let json_str = graphql_handler.execution_result_to_json(result)
   // Should contain errors field
@@ -379,7 +379,7 @@ pub fn execution_result_to_json_with_errors_test() {
 pub fn execution_result_to_json_with_path_test() {
   let result =
     executor.ExecutionResult(data: None, errors: [
-      executor.ResolverError("Resolver failed", ["query", "user", "name"]),
+      executor.ResolverError("Resolver failed", ["query", "user", "name"], None),
     ])
   let json_str = graphql_handler.execution_result_to_json(result)
   should.be_true(string.contains(json_str, "path"))

@@ -1,6 +1,6 @@
 // mochi_wisp/complex_schema.gleam
 // Realistic GraphQL schema for benchmarking real-world scenarios
-// Includes: Users, Posts, Comments, Mutations, Subscriptions, Input Types
+// Using high-level types API
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
@@ -64,61 +64,6 @@ pub type Comment {
     post_id: String,
     parent_id: Option(String),
     created_at: String,
-  )
-}
-
-pub type PageInfo {
-  PageInfo(
-    has_next_page: Bool,
-    has_previous_page: Bool,
-    start_cursor: Option(String),
-    end_cursor: Option(String),
-  )
-}
-
-pub type PostConnection {
-  PostConnection(edges: List(PostEdge), page_info: PageInfo, total_count: Int)
-}
-
-pub type PostEdge {
-  PostEdge(node: Post, cursor: String)
-}
-
-// Input Types
-pub type CreateUserInput {
-  CreateUserInput(
-    username: String,
-    email: String,
-    display_name: String,
-    bio: Option(String),
-    role: Option(Role),
-  )
-}
-
-pub type UpdateUserInput {
-  UpdateUserInput(
-    display_name: Option(String),
-    bio: Option(String),
-    role: Option(Role),
-  )
-}
-
-pub type CreatePostInput {
-  CreatePostInput(
-    title: String,
-    content: String,
-    excerpt: Option(String),
-    tags: Option(List(String)),
-    status: Option(PostStatus),
-  )
-}
-
-pub type PostFilterInput {
-  PostFilterInput(
-    status: Option(PostStatus),
-    author_id: Option(String),
-    tags: Option(List(String)),
-    search: Option(String),
   )
 }
 
@@ -339,6 +284,16 @@ pub fn role_to_string(role: Role) -> String {
   }
 }
 
+pub fn string_to_role(s: String) -> Result(Role, String) {
+  case s {
+    "ADMIN" -> Ok(Admin)
+    "MODERATOR" -> Ok(Moderator)
+    "MEMBER" -> Ok(Member)
+    "GUEST" -> Ok(Guest)
+    _ -> Error("Unknown role: " <> s)
+  }
+}
+
 pub fn status_to_string(status: PostStatus) -> String {
   case status {
     Draft -> "DRAFT"
@@ -347,64 +302,194 @@ pub fn status_to_string(status: PostStatus) -> String {
   }
 }
 
-// ============================================================================
-// Dynamic Encoders
-// ============================================================================
-
-pub fn user_to_dynamic(user: User) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(user.id)),
-      #("username", types.to_dynamic(user.username)),
-      #("email", types.to_dynamic(user.email)),
-      #("displayName", types.to_dynamic(user.display_name)),
-      #("bio", option_to_dynamic(user.bio, types.to_dynamic)),
-      #("role", types.to_dynamic(role_to_string(user.role))),
-      #("createdAt", types.to_dynamic(user.created_at)),
-      #("updatedAt", types.to_dynamic(user.updated_at)),
-    ]),
-  )
-}
-
-pub fn post_to_dynamic(post: Post) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(post.id)),
-      #("title", types.to_dynamic(post.title)),
-      #("content", types.to_dynamic(post.content)),
-      #("excerpt", option_to_dynamic(post.excerpt, types.to_dynamic)),
-      #("authorId", types.to_dynamic(post.author_id)),
-      #("status", types.to_dynamic(status_to_string(post.status))),
-      #("tags", types.to_dynamic(post.tags)),
-      #("viewCount", types.to_dynamic(post.view_count)),
-      #("createdAt", types.to_dynamic(post.created_at)),
-      #("updatedAt", types.to_dynamic(post.updated_at)),
-    ]),
-  )
-}
-
-pub fn comment_to_dynamic(comment: Comment) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(comment.id)),
-      #("content", types.to_dynamic(comment.content)),
-      #("authorId", types.to_dynamic(comment.author_id)),
-      #("postId", types.to_dynamic(comment.post_id)),
-      #("parentId", option_to_dynamic(comment.parent_id, types.to_dynamic)),
-      #("createdAt", types.to_dynamic(comment.created_at)),
-    ]),
-  )
-}
-
-fn option_to_dynamic(opt: Option(a), encoder: fn(a) -> Dynamic) -> Dynamic {
-  case opt {
-    Some(v) -> encoder(v)
-    None -> types.to_dynamic(Nil)
+pub fn string_to_status(s: String) -> Result(PostStatus, String) {
+  case s {
+    "DRAFT" -> Ok(Draft)
+    "PUBLISHED" -> Ok(Published)
+    "ARCHIVED" -> Ok(Archived)
+    _ -> Error("Unknown status: " <> s)
   }
 }
 
 // ============================================================================
-// Type Definitions
+// Decoders
+// ============================================================================
+
+fn decode_user(dyn: Dynamic) -> Result(User, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use username <- decode.field("username", decode.string)
+    use email <- decode.field("email", decode.string)
+    use display_name <- decode.field("displayName", decode.string)
+    use bio <- decode.field("bio", decode.optional(decode.string))
+    use role_str <- decode.field("role", decode.string)
+    use created_at <- decode.field("createdAt", decode.string)
+    use updated_at <- decode.field("updatedAt", decode.string)
+    decode.success(#(
+      id,
+      username,
+      email,
+      display_name,
+      bio,
+      role_str,
+      created_at,
+      updated_at,
+    ))
+  }
+  case decode.run(dyn, decoder) {
+    Ok(#(id, username, email, display_name, bio, role_str, created_at, updated_at)) ->
+      case string_to_role(role_str) {
+        Ok(role) ->
+          Ok(User(
+            id: id,
+            username: username,
+            email: email,
+            display_name: display_name,
+            bio: bio,
+            role: role,
+            created_at: created_at,
+            updated_at: updated_at,
+          ))
+        Error(e) -> Error(e)
+      }
+    Error(_) -> Error("Failed to decode User")
+  }
+}
+
+fn decode_post(dyn: Dynamic) -> Result(Post, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use title <- decode.field("title", decode.string)
+    use content <- decode.field("content", decode.string)
+    use excerpt <- decode.field("excerpt", decode.optional(decode.string))
+    use author_id <- decode.field("authorId", decode.string)
+    use status_str <- decode.field("status", decode.string)
+    use tags <- decode.field("tags", decode.list(decode.string))
+    use view_count <- decode.field("viewCount", decode.int)
+    use created_at <- decode.field("createdAt", decode.string)
+    use updated_at <- decode.field("updatedAt", decode.string)
+    decode.success(#(
+      id,
+      title,
+      content,
+      excerpt,
+      author_id,
+      status_str,
+      tags,
+      view_count,
+      created_at,
+      updated_at,
+    ))
+  }
+  case decode.run(dyn, decoder) {
+    Ok(#(
+      id,
+      title,
+      content,
+      excerpt,
+      author_id,
+      status_str,
+      tags,
+      view_count,
+      created_at,
+      updated_at,
+    )) ->
+      case string_to_status(status_str) {
+        Ok(status) ->
+          Ok(Post(
+            id: id,
+            title: title,
+            content: content,
+            excerpt: excerpt,
+            author_id: author_id,
+            status: status,
+            tags: tags,
+            view_count: view_count,
+            created_at: created_at,
+            updated_at: updated_at,
+          ))
+        Error(e) -> Error(e)
+      }
+    Error(_) -> Error("Failed to decode Post")
+  }
+}
+
+fn decode_comment(dyn: Dynamic) -> Result(Comment, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use content <- decode.field("content", decode.string)
+    use author_id <- decode.field("authorId", decode.string)
+    use post_id <- decode.field("postId", decode.string)
+    use parent_id <- decode.field("parentId", decode.optional(decode.string))
+    use created_at <- decode.field("createdAt", decode.string)
+    decode.success(Comment(
+      id: id,
+      content: content,
+      author_id: author_id,
+      post_id: post_id,
+      parent_id: parent_id,
+      created_at: created_at,
+    ))
+  }
+  decode.run(dyn, decoder)
+  |> result_map_error("Failed to decode Comment")
+}
+
+fn result_map_error(
+  result: Result(a, b),
+  error_msg: String,
+) -> Result(a, String) {
+  case result {
+    Ok(v) -> Ok(v)
+    Error(_) -> Error(error_msg)
+  }
+}
+
+// ============================================================================
+// Encoders - Using types helpers for cleaner code
+// ============================================================================
+
+pub fn user_to_dynamic(user: User) -> Dynamic {
+  types.record([
+    types.field("id", user.id),
+    types.field("username", user.username),
+    types.field("email", user.email),
+    types.field("displayName", user.display_name),
+    #("bio", types.option(user.bio)),
+    types.field("role", role_to_string(user.role)),
+    types.field("createdAt", user.created_at),
+    types.field("updatedAt", user.updated_at),
+  ])
+}
+
+pub fn post_to_dynamic(post: Post) -> Dynamic {
+  types.record([
+    types.field("id", post.id),
+    types.field("title", post.title),
+    types.field("content", post.content),
+    #("excerpt", types.option(post.excerpt)),
+    types.field("authorId", post.author_id),
+    types.field("status", status_to_string(post.status)),
+    types.field("tags", post.tags),
+    types.field("viewCount", post.view_count),
+    types.field("createdAt", post.created_at),
+    types.field("updatedAt", post.updated_at),
+  ])
+}
+
+pub fn comment_to_dynamic(comment: Comment) -> Dynamic {
+  types.record([
+    types.field("id", comment.id),
+    types.field("content", comment.content),
+    types.field("authorId", comment.author_id),
+    types.field("postId", comment.post_id),
+    #("parentId", types.option(comment.parent_id)),
+    types.field("createdAt", comment.created_at),
+  ])
+}
+
+// ============================================================================
+// GraphQL Enum Types
 // ============================================================================
 
 pub fn role_enum() -> schema.EnumType {
@@ -426,339 +511,197 @@ pub fn post_status_enum() -> schema.EnumType {
   |> types.build_enum
 }
 
+// ============================================================================
+// GraphQL Object Types - Using High-Level types API
+// ============================================================================
+
 pub fn user_type() -> schema.ObjectType {
-  schema.object("User")
-  |> schema.description("A user account in the system")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.id_type()))
-    |> schema.resolver(field_resolver("id")),
-  )
-  |> schema.field(
-    schema.field_def("username", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("username")),
-  )
-  |> schema.field(
-    schema.field_def("email", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("email")),
-  )
-  |> schema.field(
-    schema.field_def("displayName", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("displayName")),
-  )
-  |> schema.field(
-    schema.field_def("bio", schema.string_type())
-    |> schema.resolver(field_resolver("bio")),
-  )
-  |> schema.field(
-    schema.field_def("role", schema.non_null(schema.Named("Role")))
-    |> schema.resolver(field_resolver("role")),
-  )
-  |> schema.field(
-    schema.field_def("createdAt", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("createdAt")),
-  )
-  |> schema.field(
-    schema.field_def("updatedAt", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("updatedAt")),
-  )
+  types.object("User")
+  |> types.description("A user account in the system")
+  |> types.id("id", fn(u: User) { u.id })
+  |> types.string("username", fn(u: User) { u.username })
+  |> types.string("email", fn(u: User) { u.email })
+  |> types.string("displayName", fn(u: User) { u.display_name })
+  |> types.optional_string("bio", fn(u: User) { u.bio })
+  |> types.string("role", fn(u: User) { role_to_string(u.role) })
+  |> types.string("createdAt", fn(u: User) { u.created_at })
+  |> types.string("updatedAt", fn(u: User) { u.updated_at })
+  |> types.build(decode_user)
+  // Add relationship fields
   |> schema.field(
     schema.field_def(
       "posts",
       schema.non_null(schema.List(schema.non_null(schema.Named("Post")))),
     )
-    |> schema.resolver(user_posts_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_user(p) {
+            Ok(user) -> {
+              let posts = find_posts_by_author(user.id)
+              Ok(types.to_dynamic(list.map(posts, post_to_dynamic)))
+            }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
   |> schema.field(
     schema.field_def(
       "comments",
       schema.non_null(schema.List(schema.non_null(schema.Named("Comment")))),
     )
-    |> schema.resolver(user_comments_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_user(p) {
+            Ok(user) -> {
+              let comments = find_comments_by_author(user.id)
+              Ok(types.to_dynamic(list.map(comments, comment_to_dynamic)))
+            }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
 }
 
 pub fn post_type() -> schema.ObjectType {
-  schema.object("Post")
-  |> schema.description("A blog post")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.id_type()))
-    |> schema.resolver(field_resolver("id")),
-  )
-  |> schema.field(
-    schema.field_def("title", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("title")),
-  )
-  |> schema.field(
-    schema.field_def("content", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("content")),
-  )
-  |> schema.field(
-    schema.field_def("excerpt", schema.string_type())
-    |> schema.resolver(field_resolver("excerpt")),
-  )
-  |> schema.field(
-    schema.field_def("status", schema.non_null(schema.Named("PostStatus")))
-    |> schema.resolver(field_resolver("status")),
-  )
-  |> schema.field(
-    schema.field_def(
-      "tags",
-      schema.non_null(schema.List(schema.non_null(schema.string_type()))),
-    )
-    |> schema.resolver(field_resolver("tags")),
-  )
-  |> schema.field(
-    schema.field_def("viewCount", schema.non_null(schema.int_type()))
-    |> schema.resolver(field_resolver("viewCount")),
-  )
-  |> schema.field(
-    schema.field_def("createdAt", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("createdAt")),
-  )
-  |> schema.field(
-    schema.field_def("updatedAt", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("updatedAt")),
-  )
+  types.object("Post")
+  |> types.description("A blog post")
+  |> types.id("id", fn(p: Post) { p.id })
+  |> types.string("title", fn(p: Post) { p.title })
+  |> types.string("content", fn(p: Post) { p.content })
+  |> types.optional_string("excerpt", fn(p: Post) { p.excerpt })
+  |> types.string("status", fn(p: Post) { status_to_string(p.status) })
+  |> types.list_string("tags", fn(p: Post) { p.tags })
+  |> types.int("viewCount", fn(p: Post) { p.view_count })
+  |> types.string("createdAt", fn(p: Post) { p.created_at })
+  |> types.string("updatedAt", fn(p: Post) { p.updated_at })
+  |> types.build(decode_post)
+  // Add relationship fields
   |> schema.field(
     schema.field_def("author", schema.non_null(schema.Named("User")))
-    |> schema.resolver(post_author_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_post(p) {
+            Ok(post) ->
+              case find_user_by_id(post.author_id) {
+                Some(user) -> Ok(user_to_dynamic(user))
+                None -> Error("Author not found: " <> post.author_id)
+              }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
   |> schema.field(
     schema.field_def(
       "comments",
       schema.non_null(schema.List(schema.non_null(schema.Named("Comment")))),
     )
-    |> schema.resolver(post_comments_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_post(p) {
+            Ok(post) -> {
+              let comments = find_comments_by_post(post.id)
+              Ok(types.to_dynamic(list.map(comments, comment_to_dynamic)))
+            }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
 }
 
 pub fn comment_type() -> schema.ObjectType {
-  schema.object("Comment")
-  |> schema.description("A comment on a post")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.id_type()))
-    |> schema.resolver(field_resolver("id")),
-  )
-  |> schema.field(
-    schema.field_def("content", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("content")),
-  )
-  |> schema.field(
-    schema.field_def("createdAt", schema.non_null(schema.string_type()))
-    |> schema.resolver(field_resolver("createdAt")),
-  )
+  types.object("Comment")
+  |> types.description("A comment on a post")
+  |> types.id("id", fn(c: Comment) { c.id })
+  |> types.string("content", fn(c: Comment) { c.content })
+  |> types.string("createdAt", fn(c: Comment) { c.created_at })
+  |> types.build(decode_comment)
+  // Add relationship fields
   |> schema.field(
     schema.field_def("author", schema.non_null(schema.Named("User")))
-    |> schema.resolver(comment_author_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_comment(p) {
+            Ok(comment) ->
+              case find_user_by_id(comment.author_id) {
+                Some(user) -> Ok(user_to_dynamic(user))
+                None -> Error("Author not found: " <> comment.author_id)
+              }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
   |> schema.field(
     schema.field_def("post", schema.non_null(schema.Named("Post")))
-    |> schema.resolver(comment_post_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_comment(p) {
+            Ok(comment) ->
+              case find_post_by_id(comment.post_id) {
+                Some(post) -> Ok(post_to_dynamic(post))
+                None -> Error("Post not found: " <> comment.post_id)
+              }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
   |> schema.field(
     schema.field_def("parent", schema.Named("Comment"))
-    |> schema.resolver(comment_parent_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_comment(p) {
+            Ok(comment) ->
+              case comment.parent_id {
+                Some(parent_id) ->
+                  case find_comment_by_id(parent_id) {
+                    Some(parent) -> Ok(comment_to_dynamic(parent))
+                    None -> Ok(types.to_dynamic(Nil))
+                  }
+                None -> Ok(types.to_dynamic(Nil))
+              }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
   |> schema.field(
     schema.field_def(
       "replies",
       schema.non_null(schema.List(schema.non_null(schema.Named("Comment")))),
     )
-    |> schema.resolver(comment_replies_resolver()),
+    |> schema.resolver(fn(info) {
+      case info.parent {
+        Some(p) ->
+          case decode_comment(p) {
+            Ok(comment) -> {
+              let replies = find_replies(comment.id)
+              Ok(types.to_dynamic(list.map(replies, comment_to_dynamic)))
+            }
+            Error(e) -> Error(e)
+          }
+        None -> Error("No parent")
+      }
+    }),
   )
-}
-
-// ============================================================================
-// Field Resolvers
-// ============================================================================
-
-@external(erlang, "mochi_wisp_ffi", "get_field_safe")
-@external(javascript, "../../mochi_wisp_ffi.mjs", "get_field_safe")
-fn get_field_ffi(data: Dynamic, field: String) -> option.Option(Dynamic)
-
-fn field_resolver(
-  field_name: String,
-) -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, field_name) {
-          Some(value) -> Ok(value)
-          None -> Error("Field not found: " <> field_name)
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn user_posts_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "id") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(user_id) -> {
-                let posts = find_posts_by_author(user_id)
-                Ok(types.to_dynamic(list.map(posts, post_to_dynamic)))
-              }
-              Error(_) -> Error("Invalid user id")
-            }
-          None -> Error("User id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn user_comments_resolver() -> fn(schema.ResolverInfo) ->
-  Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "id") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(user_id) -> {
-                let comments = find_comments_by_author(user_id)
-                Ok(types.to_dynamic(list.map(comments, comment_to_dynamic)))
-              }
-              Error(_) -> Error("Invalid user id")
-            }
-          None -> Error("User id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn post_author_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "authorId") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(author_id) ->
-                case find_user_by_id(author_id) {
-                  Some(user) -> Ok(user_to_dynamic(user))
-                  None -> Error("Author not found: " <> author_id)
-                }
-              Error(_) -> Error("Invalid author id")
-            }
-          None -> Error("Author id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn post_comments_resolver() -> fn(schema.ResolverInfo) ->
-  Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "id") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(post_id) -> {
-                let comments = find_comments_by_post(post_id)
-                Ok(types.to_dynamic(list.map(comments, comment_to_dynamic)))
-              }
-              Error(_) -> Error("Invalid post id")
-            }
-          None -> Error("Post id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn comment_author_resolver() -> fn(schema.ResolverInfo) ->
-  Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "authorId") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(author_id) ->
-                case find_user_by_id(author_id) {
-                  Some(user) -> Ok(user_to_dynamic(user))
-                  None -> Error("Author not found: " <> author_id)
-                }
-              Error(_) -> Error("Invalid author id")
-            }
-          None -> Error("Author id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn comment_post_resolver() -> fn(schema.ResolverInfo) -> Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "postId") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(post_id) ->
-                case find_post_by_id(post_id) {
-                  Some(post) -> Ok(post_to_dynamic(post))
-                  None -> Error("Post not found: " <> post_id)
-                }
-              Error(_) -> Error("Invalid post id")
-            }
-          None -> Error("Post id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn comment_parent_resolver() -> fn(schema.ResolverInfo) ->
-  Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "parentId") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.optional(decode.string)) {
-              Ok(Some(parent_id)) ->
-                case find_comment_by_id(parent_id) {
-                  Some(comment) -> Ok(comment_to_dynamic(comment))
-                  None -> Ok(types.to_dynamic(Nil))
-                }
-              Ok(None) -> Ok(types.to_dynamic(Nil))
-              Error(_) -> Ok(types.to_dynamic(Nil))
-            }
-          None -> Ok(types.to_dynamic(Nil))
-        }
-      None -> Error("No parent value")
-    }
-  }
-}
-
-fn comment_replies_resolver() -> fn(schema.ResolverInfo) ->
-  Result(Dynamic, String) {
-  fn(info: schema.ResolverInfo) {
-    case info.parent {
-      Some(parent) ->
-        case get_field_ffi(parent, "id") {
-          Some(id_dyn) ->
-            case decode.run(id_dyn, decode.string) {
-              Ok(comment_id) -> {
-                let replies = find_replies(comment_id)
-                Ok(types.to_dynamic(list.map(replies, comment_to_dynamic)))
-              }
-              Error(_) -> Error("Invalid comment id")
-            }
-          None -> Error("Comment id not found")
-        }
-      None -> Error("No parent value")
-    }
-  }
 }
 
 // ============================================================================

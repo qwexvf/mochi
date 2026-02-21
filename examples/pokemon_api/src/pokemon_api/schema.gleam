@@ -1,11 +1,11 @@
 // pokemon_api/schema.gleam
-// GraphQL schema for the Pokemon API - No FFI version
+// GraphQL schema for the Pokemon API - Using high-level types API
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
-import gleam/option.{type Option, None, Some}
+import gleam/option.{None, Some}
 import mochi/query
 import mochi/schema
 import mochi/types
@@ -13,7 +13,222 @@ import pokemon_api/data
 import pokemon_api/types as pokemon_types
 
 // ============================================================================
-// GraphQL Type Definitions
+// Decoders - Convert Dynamic (from encoders) back to typed values
+// ============================================================================
+
+fn decode_stats(dyn: Dynamic) -> Result(pokemon_types.Stats, String) {
+  let decoder = {
+    use hp <- decode.field("hp", decode.int)
+    use attack <- decode.field("attack", decode.int)
+    use defense <- decode.field("defense", decode.int)
+    use special_attack <- decode.field("special_attack", decode.int)
+    use special_defense <- decode.field("special_defense", decode.int)
+    use speed <- decode.field("speed", decode.int)
+    decode.success(pokemon_types.Stats(
+      hp: hp,
+      attack: attack,
+      defense: defense,
+      special_attack: special_attack,
+      special_defense: special_defense,
+      speed: speed,
+    ))
+  }
+  decode.run(dyn, decoder)
+  |> result_to_string_error("Failed to decode Stats")
+}
+
+fn decode_move(dyn: Dynamic) -> Result(pokemon_types.Move, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.int)
+    use name <- decode.field("name", decode.string)
+    use move_type_str <- decode.field("move_type", decode.string)
+    use power <- decode.field("power", decode.optional(decode.int))
+    use accuracy <- decode.field("accuracy", decode.optional(decode.int))
+    use pp <- decode.field("pp", decode.int)
+    use description <- decode.field("description", decode.string)
+    use category_str <- decode.field("category", decode.string)
+    decode.success(#(
+      id,
+      name,
+      move_type_str,
+      power,
+      accuracy,
+      pp,
+      description,
+      category_str,
+    ))
+  }
+  case decode.run(dyn, decoder) {
+    Ok(#(id, name, move_type_str, power, accuracy, pp, description, category_str)) -> {
+      case
+        pokemon_types.string_to_type(move_type_str),
+        pokemon_types.string_to_category(category_str)
+      {
+        Ok(move_type), Ok(category) ->
+          Ok(pokemon_types.Move(
+            id: id,
+            name: name,
+            move_type: move_type,
+            power: power,
+            accuracy: accuracy,
+            pp: pp,
+            description: description,
+            category: category,
+          ))
+        _, _ -> Error("Failed to decode Move enums")
+      }
+    }
+    Error(_) -> Error("Failed to decode Move")
+  }
+}
+
+fn decode_pokemon(dyn: Dynamic) -> Result(pokemon_types.Pokemon, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.int)
+    use name <- decode.field("name", decode.string)
+    use pokedex_number <- decode.field("pokedex_number", decode.int)
+    use pokemon_types_strs <- decode.field(
+      "pokemon_types",
+      decode.list(decode.string),
+    )
+    use stats <- decode.field("stats", decode.dynamic)
+    use moves <- decode.field("moves", decode.list(decode.int))
+    use sprite_url <- decode.field("sprite_url", decode.string)
+    use height <- decode.field("height", decode.float)
+    use weight <- decode.field("weight", decode.float)
+    decode.success(#(
+      id,
+      name,
+      pokedex_number,
+      pokemon_types_strs,
+      stats,
+      moves,
+      sprite_url,
+      height,
+      weight,
+    ))
+  }
+  case decode.run(dyn, decoder) {
+    Ok(#(
+      id,
+      name,
+      pokedex_number,
+      pokemon_types_strs,
+      stats_dyn,
+      moves,
+      sprite_url,
+      height,
+      weight,
+    )) -> {
+      let pokemon_types_result =
+        list.try_map(pokemon_types_strs, pokemon_types.string_to_type)
+      case pokemon_types_result, decode_stats(stats_dyn) {
+        Ok(ptypes), Ok(stats) ->
+          Ok(pokemon_types.Pokemon(
+            id: id,
+            name: name,
+            pokedex_number: pokedex_number,
+            pokemon_types: ptypes,
+            stats: stats,
+            moves: moves,
+            evolution_chain_id: None,
+            sprite_url: sprite_url,
+            height: height,
+            weight: weight,
+          ))
+        _, _ -> Error("Failed to decode Pokemon nested types")
+      }
+    }
+    Error(_) -> Error("Failed to decode Pokemon")
+  }
+}
+
+fn decode_trainer(dyn: Dynamic) -> Result(pokemon_types.Trainer, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.int)
+    use name <- decode.field("name", decode.string)
+    use team <- decode.field("team", decode.list(decode.int))
+    use badges <- decode.field("badges", decode.int)
+    use pokedex_caught <- decode.field("pokedex_caught", decode.int)
+    decode.success(pokemon_types.Trainer(
+      id: id,
+      name: name,
+      team: team,
+      badges: badges,
+      pokedex_caught: pokedex_caught,
+    ))
+  }
+  decode.run(dyn, decoder)
+  |> result_to_string_error("Failed to decode Trainer")
+}
+
+fn result_to_string_error(
+  result: Result(a, b),
+  error_msg: String,
+) -> Result(a, String) {
+  case result {
+    Ok(v) -> Ok(v)
+    Error(_) -> Error(error_msg)
+  }
+}
+
+// ============================================================================
+// Encoders - Convert typed values to Dynamic using types helpers
+// ============================================================================
+
+pub fn stats_to_dynamic(s: pokemon_types.Stats) -> Dynamic {
+  types.record([
+    types.field("hp", s.hp),
+    types.field("attack", s.attack),
+    types.field("defense", s.defense),
+    types.field("special_attack", s.special_attack),
+    types.field("special_defense", s.special_defense),
+    types.field("speed", s.speed),
+  ])
+}
+
+pub fn move_to_dynamic(m: pokemon_types.Move) -> Dynamic {
+  types.record([
+    types.field("id", m.id),
+    types.field("name", m.name),
+    types.field("move_type", pokemon_types.type_to_string(m.move_type)),
+    #("power", types.option(m.power)),
+    #("accuracy", types.option(m.accuracy)),
+    types.field("pp", m.pp),
+    types.field("description", m.description),
+    types.field("category", pokemon_types.category_to_string(m.category)),
+  ])
+}
+
+pub fn pokemon_to_dynamic(p: pokemon_types.Pokemon) -> Dynamic {
+  types.record([
+    types.field("id", p.id),
+    types.field("name", p.name),
+    types.field("pokedex_number", p.pokedex_number),
+    types.field(
+      "pokemon_types",
+      list.map(p.pokemon_types, pokemon_types.type_to_string),
+    ),
+    #("stats", stats_to_dynamic(p.stats)),
+    types.field("moves", p.moves),
+    types.field("sprite_url", p.sprite_url),
+    types.field("height", p.height),
+    types.field("weight", p.weight),
+  ])
+}
+
+pub fn trainer_to_dynamic(t: pokemon_types.Trainer) -> Dynamic {
+  types.record([
+    types.field("id", t.id),
+    types.field("name", t.name),
+    types.field("team", t.team),
+    types.field("badges", t.badges),
+    types.field("pokedex_caught", t.pokedex_caught),
+  ])
+}
+
+// ============================================================================
+// GraphQL Enum Type Definitions
 // ============================================================================
 
 fn pokemon_type_enum() -> schema.EnumType {
@@ -52,70 +267,56 @@ fn move_category_enum() -> schema.EnumType {
   |> types.build_enum
 }
 
+// ============================================================================
+// GraphQL Object Type Definitions - Using High-Level types API
+// ============================================================================
+
 fn stats_type() -> schema.ObjectType {
-  schema.object("Stats")
-  |> schema.description("Base stats of a Pokemon")
-  |> schema.field(
-    schema.field_def("hp", schema.non_null(schema.int_type()))
-    |> schema.field_description("Hit Points")
-    |> schema.resolver(fn(info) { get_field(info.parent, "hp") }),
+  types.object("Stats")
+  |> types.description("Base stats of a Pokemon")
+  |> types.int_with_desc("hp", "Hit Points", fn(s: pokemon_types.Stats) { s.hp })
+  |> types.int_with_desc("attack", "Physical attack power", fn(s: pokemon_types.Stats) {
+    s.attack
+  })
+  |> types.int_with_desc("defense", "Physical defense", fn(s: pokemon_types.Stats) {
+    s.defense
+  })
+  |> types.int_with_desc(
+    "specialAttack",
+    "Special attack power",
+    fn(s: pokemon_types.Stats) { s.special_attack },
   )
-  |> schema.field(
-    schema.field_def("attack", schema.non_null(schema.int_type()))
-    |> schema.field_description("Physical attack power")
-    |> schema.resolver(fn(info) { get_field(info.parent, "attack") }),
+  |> types.int_with_desc(
+    "specialDefense",
+    "Special defense",
+    fn(s: pokemon_types.Stats) { s.special_defense },
   )
-  |> schema.field(
-    schema.field_def("defense", schema.non_null(schema.int_type()))
-    |> schema.field_description("Physical defense")
-    |> schema.resolver(fn(info) { get_field(info.parent, "defense") }),
+  |> types.int_with_desc(
+    "speed",
+    "Speed determines turn order",
+    fn(s: pokemon_types.Stats) { s.speed },
   )
-  |> schema.field(
-    schema.field_def("specialAttack", schema.non_null(schema.int_type()))
-    |> schema.field_description("Special attack power")
-    |> schema.resolver(fn(info) { get_field(info.parent, "special_attack") }),
-  )
-  |> schema.field(
-    schema.field_def("specialDefense", schema.non_null(schema.int_type()))
-    |> schema.field_description("Special defense")
-    |> schema.resolver(fn(info) { get_field(info.parent, "special_defense") }),
-  )
-  |> schema.field(
-    schema.field_def("speed", schema.non_null(schema.int_type()))
-    |> schema.field_description("Speed determines turn order")
-    |> schema.resolver(fn(info) { get_field(info.parent, "speed") }),
-  )
+  |> types.build(decode_stats)
+  // Add computed total field
   |> schema.field(
     schema.field_def("total", schema.non_null(schema.int_type()))
     |> schema.field_description("Total of all base stats")
     |> schema.resolver(fn(info) {
       case info.parent {
-        Some(p) -> {
-          // Decode parent as dict, then sum up stats
-          case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-            Ok(d) -> {
-              let get_int = fn(key) {
-                case dict.get(d, key) {
-                  Ok(v) ->
-                    case decode.run(v, decode.int) {
-                      Ok(i) -> i
-                      Error(_) -> 0
-                    }
-                  Error(_) -> 0
-                }
-              }
+        Some(p) ->
+          case decode_stats(p) {
+            Ok(s) -> {
               let total =
-                get_int("hp")
-                + get_int("attack")
-                + get_int("defense")
-                + get_int("special_attack")
-                + get_int("special_defense")
-                + get_int("speed")
+                s.hp
+                + s.attack
+                + s.defense
+                + s.special_attack
+                + s.special_defense
+                + s.speed
               Ok(types.to_dynamic(total))
             }
-            Error(_) -> Error("Failed to calculate total")
+            Error(e) -> Error(e)
           }
-        }
         None -> Error("No parent")
       }
     }),
@@ -123,76 +324,50 @@ fn stats_type() -> schema.ObjectType {
 }
 
 fn move_type() -> schema.ObjectType {
-  schema.object("Move")
-  |> schema.description("A move that a Pokemon can learn")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.int_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "id") }),
-  )
-  |> schema.field(
-    schema.field_def("name", schema.non_null(schema.string_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "name") }),
-  )
-  |> schema.field(
-    schema.field_def("type", schema.non_null(schema.Named("PokemonType")))
-    |> schema.field_description("The elemental type of this move")
-    |> schema.resolver(fn(info) { get_field(info.parent, "move_type") }),
-  )
-  |> schema.field(
-    schema.field_def("power", schema.int_type())
-    |> schema.field_description("Base power (null for status moves)")
-    |> schema.resolver(fn(info) { get_optional_field(info.parent, "power") }),
-  )
-  |> schema.field(
-    schema.field_def("accuracy", schema.int_type())
-    |> schema.field_description("Accuracy percentage")
-    |> schema.resolver(fn(info) { get_optional_field(info.parent, "accuracy") }),
-  )
-  |> schema.field(
-    schema.field_def("pp", schema.non_null(schema.int_type()))
-    |> schema.field_description("Power Points")
-    |> schema.resolver(fn(info) { get_field(info.parent, "pp") }),
-  )
-  |> schema.field(
-    schema.field_def("description", schema.non_null(schema.string_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "description") }),
-  )
-  |> schema.field(
-    schema.field_def("category", schema.non_null(schema.Named("MoveCategory")))
-    |> schema.resolver(fn(info) { get_field(info.parent, "category") }),
-  )
+  types.object("Move")
+  |> types.description("A move that a Pokemon can learn")
+  |> types.int("id", fn(m: pokemon_types.Move) { m.id })
+  |> types.string("name", fn(m: pokemon_types.Move) { m.name })
+  |> types.string_with_desc("type", "The elemental type of this move", fn(m: pokemon_types.Move) {
+    pokemon_types.type_to_string(m.move_type)
+  })
+  |> types.optional_int("power", fn(m: pokemon_types.Move) { m.power })
+  |> types.optional_int("accuracy", fn(m: pokemon_types.Move) { m.accuracy })
+  |> types.int("pp", fn(m: pokemon_types.Move) { m.pp })
+  |> types.string("description", fn(m: pokemon_types.Move) { m.description })
+  |> types.string("category", fn(m: pokemon_types.Move) {
+    pokemon_types.category_to_string(m.category)
+  })
+  |> types.build(decode_move)
 }
 
 fn pokemon_object_type() -> schema.ObjectType {
-  schema.object("Pokemon")
-  |> schema.description("A Pokemon creature")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.int_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "id") }),
+  types.object("Pokemon")
+  |> types.description("A Pokemon creature")
+  |> types.int("id", fn(p: pokemon_types.Pokemon) { p.id })
+  |> types.string_with_desc("name", "The name of this Pokemon", fn(p: pokemon_types.Pokemon) {
+    p.name
+  })
+  |> types.int_with_desc(
+    "pokedexNumber",
+    "National Pokedex number",
+    fn(p: pokemon_types.Pokemon) { p.pokedex_number },
   )
-  |> schema.field(
-    schema.field_def("name", schema.non_null(schema.string_type()))
-    |> schema.field_description("The name of this Pokemon")
-    |> schema.resolver(fn(info) { get_field(info.parent, "name") }),
+  |> types.list_string("types", fn(p: pokemon_types.Pokemon) {
+    list.map(p.pokemon_types, pokemon_types.type_to_string)
+  })
+  |> types.object_field("stats", "Stats", fn(p: pokemon_types.Pokemon) {
+    stats_to_dynamic(p.stats)
+  })
+  |> types.string_with_desc(
+    "spriteUrl",
+    "URL to the Pokemon's sprite image",
+    fn(p: pokemon_types.Pokemon) { p.sprite_url },
   )
-  |> schema.field(
-    schema.field_def("pokedexNumber", schema.non_null(schema.int_type()))
-    |> schema.field_description("National Pokedex number")
-    |> schema.resolver(fn(info) { get_field(info.parent, "pokedex_number") }),
-  )
-  |> schema.field(
-    schema.field_def(
-      "types",
-      schema.non_null(schema.List(schema.non_null(schema.Named("PokemonType")))),
-    )
-    |> schema.field_description("The elemental type(s) of this Pokemon")
-    |> schema.resolver(fn(info) { get_field(info.parent, "pokemon_types") }),
-  )
-  |> schema.field(
-    schema.field_def("stats", schema.non_null(schema.Named("Stats")))
-    |> schema.field_description("Base stats")
-    |> schema.resolver(fn(info) { get_field(info.parent, "stats") }),
-  )
+  |> types.float("height", fn(p: pokemon_types.Pokemon) { p.height })
+  |> types.float("weight", fn(p: pokemon_types.Pokemon) { p.weight })
+  |> types.build(decode_pokemon)
+  // Add moves field with data loading
   |> schema.field(
     schema.field_def(
       "moves",
@@ -201,87 +376,50 @@ fn pokemon_object_type() -> schema.ObjectType {
     |> schema.field_description("Moves this Pokemon can learn")
     |> schema.resolver(fn(info) {
       case info.parent {
-        Some(p) -> {
-          case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-            Ok(d) -> {
-              case dict.get(d, "moves") {
-                Ok(moves_dyn) -> {
-                  case decode.run(moves_dyn, decode.list(decode.int)) {
-                    Ok(move_ids) -> {
-                      let moves =
-                        list.filter_map(move_ids, fn(id) {
-                          case data.find_move(id) {
-                            Ok(m) -> Ok(move_to_dynamic(m))
-                            Error(_) -> Error(Nil)
-                          }
-                        })
-                      Ok(types.to_dynamic(moves))
-                    }
-                    Error(_) -> Ok(types.to_dynamic([]))
+        Some(p) ->
+          case decode_pokemon(p) {
+            Ok(pokemon) -> {
+              let moves =
+                list.filter_map(pokemon.moves, fn(id) {
+                  case data.find_move(id) {
+                    Ok(m) -> Ok(move_to_dynamic(m))
+                    Error(_) -> Error(Nil)
                   }
-                }
-                Error(_) -> Ok(types.to_dynamic([]))
-              }
+                })
+              Ok(types.to_dynamic(moves))
             }
-            Error(_) -> Ok(types.to_dynamic([]))
+            Error(e) -> Error(e)
           }
-        }
         None -> Error("No parent")
       }
     }),
   )
-  |> schema.field(
-    schema.field_def("spriteUrl", schema.non_null(schema.string_type()))
-    |> schema.field_description("URL to the Pokemon's sprite image")
-    |> schema.resolver(fn(info) { get_field(info.parent, "sprite_url") }),
-  )
-  |> schema.field(
-    schema.field_def("height", schema.non_null(schema.float_type()))
-    |> schema.field_description("Height in meters")
-    |> schema.resolver(fn(info) { get_field(info.parent, "height") }),
-  )
-  |> schema.field(
-    schema.field_def("weight", schema.non_null(schema.float_type()))
-    |> schema.field_description("Weight in kilograms")
-    |> schema.resolver(fn(info) { get_field(info.parent, "weight") }),
-  )
+  // Add evolvesTo field with data loading
   |> schema.field(
     schema.field_def("evolvesTo", schema.Named("Pokemon"))
     |> schema.field_description("The Pokemon this one evolves into")
     |> schema.resolver(fn(info) {
       case info.parent {
-        Some(p) -> {
-          case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-            Ok(d) -> {
-              case dict.get(d, "id") {
-                Ok(id_dyn) -> {
-                  case decode.run(id_dyn, decode.int) {
-                    Ok(id) -> {
-                      // Simple evolution chain lookup
-                      let evolution = case id {
-                        1 -> data.find_pokemon(2)
-                        2 -> data.find_pokemon(3)
-                        4 -> data.find_pokemon(5)
-                        5 -> data.find_pokemon(6)
-                        7 -> data.find_pokemon(8)
-                        8 -> data.find_pokemon(9)
-                        25 -> data.find_pokemon(26)
-                        _ -> Error("No evolution")
-                      }
-                      case evolution {
-                        Ok(pkmn) -> Ok(pokemon_to_dynamic(pkmn))
-                        Error(_) -> Ok(types.to_dynamic(Nil))
-                      }
-                    }
-                    Error(_) -> Ok(types.to_dynamic(Nil))
-                  }
-                }
+        Some(p) ->
+          case decode_pokemon(p) {
+            Ok(pokemon) -> {
+              let evolution = case pokemon.id {
+                1 -> data.find_pokemon(2)
+                2 -> data.find_pokemon(3)
+                4 -> data.find_pokemon(5)
+                5 -> data.find_pokemon(6)
+                7 -> data.find_pokemon(8)
+                8 -> data.find_pokemon(9)
+                25 -> data.find_pokemon(26)
+                _ -> Error("No evolution")
+              }
+              case evolution {
+                Ok(pkmn) -> Ok(pokemon_to_dynamic(pkmn))
                 Error(_) -> Ok(types.to_dynamic(Nil))
               }
             }
-            Error(_) -> Ok(types.to_dynamic(Nil))
+            Error(e) -> Error(e)
           }
-        }
         None -> Error("No parent")
       }
     }),
@@ -289,16 +427,20 @@ fn pokemon_object_type() -> schema.ObjectType {
 }
 
 fn trainer_type() -> schema.ObjectType {
-  schema.object("Trainer")
-  |> schema.description("A Pokemon trainer")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.int_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "id") }),
+  types.object("Trainer")
+  |> types.description("A Pokemon trainer")
+  |> types.int("id", fn(t: pokemon_types.Trainer) { t.id })
+  |> types.string("name", fn(t: pokemon_types.Trainer) { t.name })
+  |> types.int_with_desc("badges", "Number of gym badges earned", fn(t: pokemon_types.Trainer) {
+    t.badges
+  })
+  |> types.int_with_desc(
+    "pokedexCaught",
+    "Number of Pokemon caught",
+    fn(t: pokemon_types.Trainer) { t.pokedex_caught },
   )
-  |> schema.field(
-    schema.field_def("name", schema.non_null(schema.string_type()))
-    |> schema.resolver(fn(info) { get_field(info.parent, "name") }),
-  )
+  |> types.build(decode_trainer)
+  // Add team field with data loading
   |> schema.field(
     schema.field_def(
       "team",
@@ -307,44 +449,23 @@ fn trainer_type() -> schema.ObjectType {
     |> schema.field_description("The trainer's Pokemon team")
     |> schema.resolver(fn(info) {
       case info.parent {
-        Some(p) -> {
-          case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-            Ok(d) -> {
-              case dict.get(d, "team") {
-                Ok(team_dyn) -> {
-                  case decode.run(team_dyn, decode.list(decode.int)) {
-                    Ok(pokemon_ids) -> {
-                      let pokemon =
-                        list.filter_map(pokemon_ids, fn(id) {
-                          case data.find_pokemon(id) {
-                            Ok(pkmn) -> Ok(pokemon_to_dynamic(pkmn))
-                            Error(_) -> Error(Nil)
-                          }
-                        })
-                      Ok(types.to_dynamic(pokemon))
-                    }
-                    Error(_) -> Ok(types.to_dynamic([]))
+        Some(p) ->
+          case decode_trainer(p) {
+            Ok(trainer) -> {
+              let pokemon =
+                list.filter_map(trainer.team, fn(id) {
+                  case data.find_pokemon(id) {
+                    Ok(pkmn) -> Ok(pokemon_to_dynamic(pkmn))
+                    Error(_) -> Error(Nil)
                   }
-                }
-                Error(_) -> Ok(types.to_dynamic([]))
-              }
+                })
+              Ok(types.to_dynamic(pokemon))
             }
-            Error(_) -> Ok(types.to_dynamic([]))
+            Error(e) -> Error(e)
           }
-        }
         None -> Error("No parent")
       }
     }),
-  )
-  |> schema.field(
-    schema.field_def("badges", schema.non_null(schema.int_type()))
-    |> schema.field_description("Number of gym badges earned")
-    |> schema.resolver(fn(info) { get_field(info.parent, "badges") }),
-  )
-  |> schema.field(
-    schema.field_def("pokedexCaught", schema.non_null(schema.int_type()))
-    |> schema.field_description("Number of Pokemon caught")
-    |> schema.resolver(fn(info) { get_field(info.parent, "pokedex_caught") }),
   )
 }
 
@@ -542,123 +663,5 @@ fn decode_type_args(args: Dict(String, Dynamic)) -> Result(TypeArgs, String) {
         Error(_) -> Error("Invalid type argument")
       }
     Error(_) -> Error("Missing required argument: type")
-  }
-}
-
-// ============================================================================
-// Encoders
-// ============================================================================
-
-pub fn pokemon_to_dynamic(p: pokemon_types.Pokemon) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(p.id)),
-      #("name", types.to_dynamic(p.name)),
-      #("pokedex_number", types.to_dynamic(p.pokedex_number)),
-      #(
-        "pokemon_types",
-        types.to_dynamic(list.map(p.pokemon_types, pokemon_types.type_to_string)),
-      ),
-      #("stats", stats_to_dynamic(p.stats)),
-      #("moves", types.to_dynamic(p.moves)),
-      #("sprite_url", types.to_dynamic(p.sprite_url)),
-      #("height", types.to_dynamic(p.height)),
-      #("weight", types.to_dynamic(p.weight)),
-    ]),
-  )
-}
-
-fn stats_to_dynamic(s: pokemon_types.Stats) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("hp", types.to_dynamic(s.hp)),
-      #("attack", types.to_dynamic(s.attack)),
-      #("defense", types.to_dynamic(s.defense)),
-      #("special_attack", types.to_dynamic(s.special_attack)),
-      #("special_defense", types.to_dynamic(s.special_defense)),
-      #("speed", types.to_dynamic(s.speed)),
-    ]),
-  )
-}
-
-pub fn move_to_dynamic(m: pokemon_types.Move) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(m.id)),
-      #("name", types.to_dynamic(m.name)),
-      #(
-        "move_type",
-        types.to_dynamic(pokemon_types.type_to_string(m.move_type)),
-      ),
-      #("power", option_to_dynamic(m.power)),
-      #("accuracy", option_to_dynamic(m.accuracy)),
-      #("pp", types.to_dynamic(m.pp)),
-      #("description", types.to_dynamic(m.description)),
-      #(
-        "category",
-        types.to_dynamic(pokemon_types.category_to_string(m.category)),
-      ),
-    ]),
-  )
-}
-
-pub fn trainer_to_dynamic(t: pokemon_types.Trainer) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(t.id)),
-      #("name", types.to_dynamic(t.name)),
-      #("team", types.to_dynamic(t.team)),
-      #("badges", types.to_dynamic(t.badges)),
-      #("pokedex_caught", types.to_dynamic(t.pokedex_caught)),
-    ]),
-  )
-}
-
-fn option_to_dynamic(opt: Option(Int)) -> Dynamic {
-  case opt {
-    Some(v) -> types.to_dynamic(v)
-    None -> types.to_dynamic(Nil)
-  }
-}
-
-// ============================================================================
-// Field Extraction Helpers (No FFI - uses Gleam decoders)
-// ============================================================================
-
-fn get_field(parent: Option(Dynamic), field: String) -> Result(Dynamic, String) {
-  case parent {
-    Some(p) -> {
-      // Decode as a dict, then look up the field
-      case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-        Ok(d) -> {
-          case dict.get(d, field) {
-            Ok(value) -> Ok(value)
-            Error(_) -> Error("Field not found: " <> field)
-          }
-        }
-        Error(_) -> Error("Failed to decode as dict: " <> field)
-      }
-    }
-    None -> Error("No parent value")
-  }
-}
-
-fn get_optional_field(
-  parent: Option(Dynamic),
-  field: String,
-) -> Result(Dynamic, String) {
-  case parent {
-    Some(p) -> {
-      case decode.run(p, decode.dict(decode.string, decode.dynamic)) {
-        Ok(d) -> {
-          case dict.get(d, field) {
-            Ok(value) -> Ok(value)
-            Error(_) -> Ok(types.to_dynamic(Nil))
-          }
-        }
-        Error(_) -> Ok(types.to_dynamic(Nil))
-      }
-    }
-    None -> Error("No parent value")
   }
 }

@@ -412,8 +412,8 @@ fn run_json_benchmarks() -> Nil {
   // Test with errors
   let error_result =
     executor.ExecutionResult(data: None, errors: [
-      executor.ValidationError("Test error", ["field", "subfield"]),
-      executor.ResolverError("Another error", ["other"]),
+      executor.ValidationError("Test error", ["field", "subfield"], None),
+      executor.ResolverError("Another error", ["other"], None),
     ])
 
   let _ =

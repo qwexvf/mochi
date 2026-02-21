@@ -431,6 +431,7 @@ fn parse_field(cursor: Cursor) -> Result(#(Field, Cursor), ParseError) {
       arguments: arguments,
       directives: directives,
       selection_set: selection_set,
+      location: None,
     ),
     cursor,
   ))

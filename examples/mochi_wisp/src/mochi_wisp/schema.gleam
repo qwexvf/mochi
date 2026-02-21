@@ -1,11 +1,11 @@
 // mochi_wisp/schema.gleam
 // Example GraphQL schema for the Wisp integration demo
+// Using high-level types API
 
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
-import gleam/option
 import mochi/query
 import mochi/schema
 import mochi/types
@@ -22,6 +22,10 @@ pub type Role {
   Admin
   Member
   Guest
+}
+
+pub type Message {
+  Message(id: String, content: String, channel: String, timestamp: Int)
 }
 
 // ============================================================================
@@ -50,7 +54,7 @@ fn result_from_option(opt: Result(a, Nil), error: String) -> Result(a, String) {
 }
 
 // ============================================================================
-// Helpers
+// Enum Helpers
 // ============================================================================
 
 pub fn role_to_string(role: Role) -> String {
@@ -71,7 +75,90 @@ pub fn string_to_role(s: String) -> Result(Role, String) {
 }
 
 // ============================================================================
-// Type Builders
+// Decoders
+// ============================================================================
+
+fn decode_user(dyn: Dynamic) -> Result(User, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use name <- decode.field("name", decode.string)
+    use email <- decode.field("email", decode.string)
+    use role_str <- decode.field("role", decode.string)
+    decode.success(#(id, name, email, role_str))
+  }
+  case decode.run(dyn, decoder) {
+    Ok(#(id, name, email, role_str)) ->
+      case string_to_role(role_str) {
+        Ok(role) -> Ok(User(id: id, name: name, email: email, role: role))
+        Error(e) -> Error(e)
+      }
+    Error(_) -> Error("Failed to decode User")
+  }
+}
+
+fn decode_message(dyn: Dynamic) -> Result(Message, String) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use content <- decode.field("content", decode.string)
+    use channel <- decode.field("channel", decode.string)
+    use timestamp <- decode.field("timestamp", decode.int)
+    decode.success(Message(
+      id: id,
+      content: content,
+      channel: channel,
+      timestamp: timestamp,
+    ))
+  }
+  decode.run(dyn, decoder)
+  |> result_map_error("Failed to decode Message")
+}
+
+fn result_map_error(
+  result: Result(a, b),
+  error_msg: String,
+) -> Result(a, String) {
+  case result {
+    Ok(v) -> Ok(v)
+    Error(_) -> Error(error_msg)
+  }
+}
+
+// ============================================================================
+// Encoders - Using types helpers for cleaner code
+// ============================================================================
+
+pub fn user_to_dynamic(user: User) -> Dynamic {
+  types.record([
+    types.field("id", user.id),
+    types.field("name", user.name),
+    types.field("email", user.email),
+    types.field("role", role_to_string(user.role)),
+  ])
+}
+
+pub fn users_encoder(users: List(User)) -> Dynamic {
+  types.to_dynamic(list.map(users, user_to_dynamic))
+}
+
+pub fn user_encoder(user: User) -> Dynamic {
+  user_to_dynamic(user)
+}
+
+pub fn message_to_dynamic(msg: Message) -> Dynamic {
+  types.record([
+    types.field("id", msg.id),
+    types.field("content", msg.content),
+    types.field("channel", msg.channel),
+    types.field("timestamp", msg.timestamp),
+  ])
+}
+
+pub fn message_encoder(msg: Message) -> Dynamic {
+  message_to_dynamic(msg)
+}
+
+// ============================================================================
+// GraphQL Type Definitions - Using High-Level types API
 // ============================================================================
 
 pub fn role_enum() -> schema.EnumType {
@@ -83,87 +170,24 @@ pub fn role_enum() -> schema.EnumType {
   |> types.build_enum
 }
 
-// Build User type with field resolvers that extract from dict
 pub fn user_type() -> schema.ObjectType {
-  schema.object("User")
-  |> schema.description("A user in the system")
-  |> schema.field(id_field())
-  |> schema.field(name_field())
-  |> schema.field(email_field())
-  |> schema.field(role_field())
+  types.object("User")
+  |> types.description("A user in the system")
+  |> types.id("id", fn(u: User) { u.id })
+  |> types.string("name", fn(u: User) { u.name })
+  |> types.string("email", fn(u: User) { u.email })
+  |> types.string("role", fn(u: User) { role_to_string(u.role) })
+  |> types.build(decode_user)
 }
 
-fn id_field() -> schema.FieldDefinition {
-  schema.field_def("id", schema.non_null(schema.id_type()))
-  |> schema.resolver(fn(info: schema.ResolverInfo) {
-    extract_field(info.parent, "id")
-  })
-}
-
-fn name_field() -> schema.FieldDefinition {
-  schema.field_def("name", schema.non_null(schema.string_type()))
-  |> schema.resolver(fn(info: schema.ResolverInfo) {
-    extract_field(info.parent, "name")
-  })
-}
-
-fn email_field() -> schema.FieldDefinition {
-  schema.field_def("email", schema.non_null(schema.string_type()))
-  |> schema.resolver(fn(info: schema.ResolverInfo) {
-    extract_field(info.parent, "email")
-  })
-}
-
-fn role_field() -> schema.FieldDefinition {
-  schema.field_def("role", schema.non_null(schema.Named("Role")))
-  |> schema.resolver(fn(info: schema.ResolverInfo) {
-    extract_field(info.parent, "role")
-  })
-}
-
-/// Extract a field from Dynamic parent value
-/// Uses FFI because we need to access dynamic map fields
-fn extract_field(
-  parent: option.Option(Dynamic),
-  field: String,
-) -> Result(Dynamic, String) {
-  case parent {
-    option.Some(p) -> {
-      case get_field_ffi(p, field) {
-        option.Some(value) -> Ok(value)
-        option.None -> Error("Field not found: " <> field)
-      }
-    }
-    option.None -> Error("No parent value")
-  }
-}
-
-/// FFI for getting a field from a dynamic map
-@external(erlang, "mochi_wisp_ffi", "get_field_safe")
-@external(javascript, "../../mochi_wisp_ffi.mjs", "get_field_safe")
-fn get_field_ffi(data: Dynamic, field: String) -> option.Option(Dynamic)
-
-// ============================================================================
-// Encoders - Convert Gleam types to Dynamic for GraphQL response
-// ============================================================================
-
-pub fn user_to_dynamic(user: User) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(user.id)),
-      #("name", types.to_dynamic(user.name)),
-      #("email", types.to_dynamic(user.email)),
-      #("role", types.to_dynamic(role_to_string(user.role))),
-    ]),
-  )
-}
-
-pub fn users_encoder(users: List(User)) -> Dynamic {
-  types.to_dynamic(list.map(users, user_to_dynamic))
-}
-
-pub fn user_encoder(user: User) -> Dynamic {
-  user_to_dynamic(user)
+pub fn message_type() -> schema.ObjectType {
+  types.object("Message")
+  |> types.description("A message in a channel")
+  |> types.id("id", fn(m: Message) { m.id })
+  |> types.string("content", fn(m: Message) { m.content })
+  |> types.string("channel", fn(m: Message) { m.channel })
+  |> types.int("timestamp", fn(m: Message) { m.timestamp })
+  |> types.build(decode_message)
 }
 
 // ============================================================================
@@ -205,13 +229,37 @@ pub fn decode_user_by_id_args(
   }
 }
 
+pub type ChannelArgs {
+  ChannelArgs(channel: String)
+}
+
+pub fn decode_channel_args(
+  args: Dict(String, Dynamic),
+) -> Result(ChannelArgs, String) {
+  case dict.get(args, "channel") {
+    Ok(ch_dyn) -> {
+      case decode.run(ch_dyn, decode.string) {
+        Ok(ch) -> Ok(ChannelArgs(channel: ch))
+        Error(_) -> Error("Invalid channel argument")
+      }
+    }
+    Error(_) -> Error("Missing required argument: channel")
+  }
+}
+
+/// Resolve the topic for onMessage subscription based on channel argument
+pub fn on_message_topic_resolver(
+  args: ChannelArgs,
+  _ctx: schema.ExecutionContext,
+) -> Result(String, String) {
+  Ok("message:" <> args.channel)
+}
+
 // ============================================================================
 // Schema Builder
 // ============================================================================
 
 pub fn build_schema() -> schema.Schema {
-  let user_t = user_type()
-
   let users_query =
     query.query(
       "users",
@@ -244,7 +292,6 @@ pub fn build_schema() -> schema.Schema {
       "onUserCreated",
       schema.Named("User"),
       "userCreated",
-      // topic name
       user_encoder,
     )
     |> query.subscription_description("Subscribe to new user creation events")
@@ -265,91 +312,8 @@ pub fn build_schema() -> schema.Schema {
   |> query.add_query(user_query)
   |> query.add_subscription(on_user_created)
   |> query.add_subscription(on_message)
-  |> query.add_type(user_t)
+  |> query.add_type(user_type())
   |> query.add_type(message_type())
   |> query.add_enum(role_enum())
   |> query.build
-}
-
-// ============================================================================
-// Message Type for Subscriptions
-// ============================================================================
-
-pub type Message {
-  Message(id: String, content: String, channel: String, timestamp: Int)
-}
-
-pub fn message_type() -> schema.ObjectType {
-  schema.object("Message")
-  |> schema.description("A message in a channel")
-  |> schema.field(
-    schema.field_def("id", schema.non_null(schema.id_type()))
-    |> schema.resolver(fn(info: schema.ResolverInfo) {
-      extract_field(info.parent, "id")
-    }),
-  )
-  |> schema.field(
-    schema.field_def("content", schema.non_null(schema.string_type()))
-    |> schema.resolver(fn(info: schema.ResolverInfo) {
-      extract_field(info.parent, "content")
-    }),
-  )
-  |> schema.field(
-    schema.field_def("channel", schema.non_null(schema.string_type()))
-    |> schema.resolver(fn(info: schema.ResolverInfo) {
-      extract_field(info.parent, "channel")
-    }),
-  )
-  |> schema.field(
-    schema.field_def("timestamp", schema.non_null(schema.int_type()))
-    |> schema.resolver(fn(info: schema.ResolverInfo) {
-      extract_field(info.parent, "timestamp")
-    }),
-  )
-}
-
-pub fn message_to_dynamic(msg: Message) -> Dynamic {
-  types.to_dynamic(
-    dict.from_list([
-      #("id", types.to_dynamic(msg.id)),
-      #("content", types.to_dynamic(msg.content)),
-      #("channel", types.to_dynamic(msg.channel)),
-      #("timestamp", types.to_dynamic(msg.timestamp)),
-    ]),
-  )
-}
-
-pub fn message_encoder(msg: Message) -> Dynamic {
-  message_to_dynamic(msg)
-}
-
-// ============================================================================
-// Subscription Topic Resolvers
-// ============================================================================
-
-pub type ChannelArgs {
-  ChannelArgs(channel: String)
-}
-
-pub fn decode_channel_args(
-  args: Dict(String, Dynamic),
-) -> Result(ChannelArgs, String) {
-  case dict.get(args, "channel") {
-    Ok(ch_dyn) -> {
-      case decode.run(ch_dyn, decode.string) {
-        Ok(ch) -> Ok(ChannelArgs(channel: ch))
-        Error(_) -> Error("Invalid channel argument")
-      }
-    }
-    Error(_) -> Error("Missing required argument: channel")
-  }
-}
-
-/// Resolve the topic for onMessage subscription based on channel argument
-pub fn on_message_topic_resolver(
-  args: ChannelArgs,
-  _ctx: schema.ExecutionContext,
-) -> Result(String, String) {
-  // Return the topic name based on the channel argument
-  Ok("message:" <> args.channel)
 }

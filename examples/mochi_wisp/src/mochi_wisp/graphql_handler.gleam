@@ -227,7 +227,7 @@ fn execute_with_cache(
     }
     Error(_parse_error) -> {
       executor.ExecutionResult(data: None, errors: [
-        executor.ValidationError("Failed to parse query", []),
+        executor.ValidationError("Failed to parse query", [], None),
       ])
     }
   }
@@ -239,10 +239,10 @@ fn log_errors(request_id: String, errors: List(executor.ExecutionError)) -> Nil 
     [] -> Nil
     [error, ..rest] -> {
       let #(msg, path) = case error {
-        executor.ValidationError(m, p) -> #("ValidationError: " <> m, p)
-        executor.ResolverError(m, p) -> #("ResolverError: " <> m, p)
-        executor.TypeError(m, p) -> #("TypeError: " <> m, p)
-        executor.NullValueError(m, p) -> #("NullValueError: " <> m, p)
+        executor.ValidationError(m, p, _loc) -> #("ValidationError: " <> m, p)
+        executor.ResolverError(m, p, _loc) -> #("ResolverError: " <> m, p)
+        executor.TypeError(m, p, _loc) -> #("TypeError: " <> m, p)
+        executor.NullValueError(m, p, _loc) -> #("NullValueError: " <> m, p)
       }
       let path_str = string.join(path, ".")
       logging.log(
@@ -295,10 +295,10 @@ pub fn dynamic_to_json(data: Dynamic) -> json.Json {
 fn encode_errors(errors: List(executor.ExecutionError)) -> json.Json {
   json.array(errors, fn(err) {
     let #(msg, path) = case err {
-      executor.ValidationError(m, p) -> #(m, p)
-      executor.ResolverError(m, p) -> #(m, p)
-      executor.TypeError(m, p) -> #(m, p)
-      executor.NullValueError(m, p) -> #(m, p)
+      executor.ValidationError(m, p, _loc) -> #(m, p)
+      executor.ResolverError(m, p, _loc) -> #(m, p)
+      executor.TypeError(m, p, _loc) -> #(m, p)
+      executor.NullValueError(m, p, _loc) -> #(m, p)
     }
     case path {
       [] -> json.object([#("message", json.string(msg))])
