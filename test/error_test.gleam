@@ -1,8 +1,13 @@
 // Tests for GraphQL error extensions
 
 import gleam/dict
+import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
 import mochi/error
+import mochi/executor
+import mochi/query
+import mochi/response
+import mochi/schema
 import mochi/types
 
 // ============================================================================
@@ -430,5 +435,88 @@ pub fn append_field_test() {
   case new_path {
     [error.FieldSegment("query"), error.FieldSegment("users")] -> Nil
     _ -> panic as "Should append field segment"
+  }
+}
+
+// ============================================================================
+// Integration Test: Error Locations from Query Execution (Issue #32)
+// ============================================================================
+
+pub type TestPerson {
+  TestPerson(id: String, name: String)
+}
+
+fn decode_person(_dyn: Dynamic) -> Result(TestPerson, String) {
+  Ok(TestPerson("1", "Test"))
+}
+
+fn create_person_schema() -> schema.Schema {
+  let person_type =
+    types.object("Person")
+    |> types.id("id", fn(p: TestPerson) { p.id })
+    |> types.string("name", fn(p: TestPerson) { p.name })
+    |> types.build(decode_person)
+
+  let person_query =
+    query.query(
+      "person",
+      schema.named_type("Person"),
+      fn(_ctx) { Ok(TestPerson("1", "Test")) },
+      types.to_dynamic,
+    )
+
+  query.new()
+  |> query.add_query(person_query)
+  |> query.add_type(person_type)
+  |> query.build
+}
+
+/// Test that querying a non-existent field produces an error with source location
+pub fn error_location_from_execution_test() {
+  let test_schema = create_person_schema()
+
+  // Query a field that doesn't exist - "nonexistent" on line 2
+  let query_str =
+    "{\n  person {\n    nonexistent\n  }\n}"
+
+  let result = executor.execute_query(test_schema, query_str)
+
+  // Should have errors
+  case result.errors {
+    [] -> panic as "Should have validation error for nonexistent field"
+    [err, ..] -> {
+      // Convert to GraphQL error format
+      let gql_err = response.execution_error_to_graphql_error(err)
+
+      // Verify it has location information
+      case gql_err.locations {
+        Some([error.Location(line, _col)]) -> {
+          // The "nonexistent" field is on line 3
+          case line == 3 {
+            True -> Nil
+            False ->
+              panic as {
+                "Error location should be line 3, got line "
+                <> { line |> int_to_string }
+              }
+          }
+        }
+        Some(_) -> Nil
+        // Multiple locations is also acceptable
+        None -> panic as "Error should have source location"
+      }
+    }
+  }
+}
+
+fn int_to_string(i: Int) -> String {
+  case i {
+    0 -> "0"
+    1 -> "1"
+    2 -> "2"
+    3 -> "3"
+    4 -> "4"
+    5 -> "5"
+    _ -> "?"
   }
 }

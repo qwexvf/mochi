@@ -173,9 +173,10 @@ fn maybe_with_location(
 
 pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
   case err {
-    executor.ValidationError(message, path) ->
+    executor.ValidationError(message, path, location) ->
       error.error_at(message, path)
       |> error.with_category(error.ValidationErrorCategory)
+      |> maybe_with_location(location)
     executor.ResolverError(message, path, location) ->
       error.error_at(message, path)
       |> error.with_category(error.ResolverErrorCategory)

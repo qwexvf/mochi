@@ -527,3 +527,163 @@ pub fn input_field_default_value_test() {
     Error(_) -> panic as "Expected limit input field"
   }
 }
+
+// ============================================================================
+// Issue #34: Introspection sub-field traversal tests
+// ============================================================================
+
+fn get_nested_field(d: Dynamic, keys: List(String)) -> Dynamic {
+  case keys {
+    [] -> d
+    [key, ..rest] -> {
+      let nested =
+        decode.run(d, decode.at([key], decode.dynamic))
+        |> result.unwrap(types.to_dynamic(Nil))
+      get_nested_field(nested, rest)
+    }
+  }
+}
+
+// Test that deeply nested ofType traversal works (issue #34)
+pub fn deep_oftype_traversal_test() {
+  let test_schema = create_test_schema()
+  // Query a field type - the users field returns List(Named("User"))
+  // This creates a nested ofType structure: LIST -> User
+  let result =
+    executor.execute_query(
+      test_schema,
+      "{ __schema { queryType { fields { name type { kind name ofType { kind name } } } } } }",
+    )
+  let data = get_data(result)
+  let schema_obj = find_field(data, "__schema")
+  let query_type = get_nested_field(schema_obj, ["queryType"])
+  let fields = get_list_field(query_type, "fields")
+
+  // Find the "users" field which returns List(Named("User"))
+  let users_field =
+    list.find(fields, fn(f) { get_string_field(f, "name") == "users" })
+  case users_field {
+    Ok(f) -> {
+      let field_type = get_nested_field(f, ["type"])
+      // First level: LIST
+      assert_true(
+        get_string_field(field_type, "kind") == "LIST",
+        "users field type should be LIST at top level",
+      )
+      // ofType should be the User object type
+      let of_type = get_nested_field(field_type, ["ofType"])
+      assert_true(
+        get_string_field(of_type, "kind") == "OBJECT",
+        "ofType should be OBJECT",
+      )
+      assert_true(
+        get_string_field(of_type, "name") == "User",
+        "ofType name should be User",
+      )
+    }
+    Error(_) -> panic as "Expected users field"
+  }
+}
+
+// Test that __schema sub-selections are properly processed (issue #34)
+pub fn schema_selection_set_test() {
+  let test_schema = create_test_schema()
+  // Only request specific fields from __schema
+  let result =
+    executor.execute_query(test_schema, "{ __schema { queryType { name } } }")
+  let data = get_data(result)
+  let schema_obj = find_field(data, "__schema")
+
+  // queryType should have name
+  let query_type = get_nested_field(schema_obj, ["queryType"])
+  assert_true(
+    get_string_field(query_type, "name") == "Query",
+    "queryType.name should be Query",
+  )
+}
+
+// Test that __type sub-selections traverse nested type info (issue #34)
+pub fn type_nested_fields_traversal_test() {
+  let test_schema = create_test_schema()
+  let result =
+    executor.execute_query(
+      test_schema,
+      "{ __type(name: \"User\") { fields { name type { kind name ofType { kind name } } } } }",
+    )
+  let data = get_data(result)
+  let type_obj = find_field(data, "__type")
+  let fields = get_list_field(type_obj, "fields")
+
+  // Find the "id" field (ID type wrapped in NonNull)
+  let id_field =
+    list.find(fields, fn(f) { get_string_field(f, "name") == "id" })
+  case id_field {
+    Ok(f) -> {
+      let field_type = get_nested_field(f, ["type"])
+      // id field type should be NON_NULL
+      assert_true(
+        get_string_field(field_type, "kind") == "NON_NULL",
+        "id field type should be NON_NULL",
+      )
+      // Check that we can access the nested ofType
+      let of_type = get_nested_field(field_type, ["ofType"])
+      // ofType should be SCALAR(ID)
+      assert_true(
+        get_string_field(of_type, "kind") == "SCALAR",
+        "ofType.kind for id field should be SCALAR",
+      )
+      assert_true(
+        get_string_field(of_type, "name") == "ID",
+        "ofType.name for id field should be ID",
+      )
+    }
+    Error(_) -> panic as "Expected id field on User type"
+  }
+}
+
+// Test full introspection query with deep nesting (issue #34)
+pub fn full_introspection_deep_nesting_test() {
+  let test_schema = create_test_schema()
+  let query_str =
+    "
+    {
+      __schema {
+        types {
+          kind
+          name
+          fields {
+            name
+            type {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  "
+  let result = executor.execute_query(test_schema, query_str)
+
+  // Should complete without errors
+  assert_true(result.errors == [], "Full introspection should have no errors")
+
+  let data = get_data(result)
+  let schema_obj = find_field(data, "__schema")
+  let types_list = get_list_field(schema_obj, "types")
+
+  // Find Query type and verify its fields have proper type info
+  let query_type =
+    list.find(types_list, fn(t) { get_string_field(t, "kind") == "OBJECT" })
+  case query_type {
+    Ok(_) -> Nil
+    Error(_) -> panic as "Should have at least one OBJECT type"
+  }
+}

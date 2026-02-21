@@ -375,6 +375,7 @@ fn execute_event_field(
             executor.ValidationError(
               "Field '" <> field.name <> "' not found",
               [],
+              location: None,
             ),
           ])
         Ok(field_def) -> {

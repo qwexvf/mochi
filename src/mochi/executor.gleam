@@ -26,7 +26,12 @@ pub type ExecutionResult {
 }
 
 pub type ExecutionError {
-  ValidationError(message: String, path: List(String))
+  ValidationError(
+    message: String,
+    path: List(String),
+    /// Source location of the field in the query document (line, column)
+    location: Option(#(Int, Int)),
+  )
   ResolverError(
     message: String,
     path: List(String),
@@ -79,7 +84,15 @@ fn error_result(error: ExecutionError) -> ExecutionResult {
 }
 
 fn validation_error(msg: String, path: List(String)) -> ExecutionResult {
-  error_result(ValidationError(msg, path))
+  error_result(ValidationError(msg, path, location: None))
+}
+
+fn validation_error_at(
+  msg: String,
+  path: List(String),
+  loc: Option(#(Int, Int)),
+) -> ExecutionResult {
+  error_result(ValidationError(msg, path, location: loc))
 }
 
 fn resolver_error(msg: String, path: List(String)) -> ExecutionResult {
@@ -96,6 +109,14 @@ fn resolver_error_at(
 
 fn type_error(msg: String, path: List(String)) -> ExecutionResult {
   error_result(TypeError(msg, path, location: None))
+}
+
+fn type_error_at(
+  msg: String,
+  path: List(String),
+  loc: Option(#(Int, Int)),
+) -> ExecutionResult {
+  error_result(TypeError(msg, path, location: loc))
 }
 
 fn null_value_error(msg: String, path: List(String)) -> ExecutionResult {
@@ -314,7 +335,11 @@ fn coerce_variable_values(
               errs,
             )
             Error(msg) -> #(values, [
-              ValidationError("Variable \"$" <> var_name <> "\": " <> msg, []),
+              ValidationError(
+                "Variable \"$" <> var_name <> "\": " <> msg,
+                [],
+                None,
+              ),
               ..errs
             ])
           }
@@ -345,6 +370,7 @@ fn coerce_variable_values(
                   <> var_name
                   <> "\" of required type is not provided",
                 [],
+                None,
               ),
               ..errs
             ])
@@ -897,7 +923,16 @@ fn execute_regular_field(
   response_name: String,
   field_path: List(String),
 ) -> ExecutionResult {
-  use field_def <- require_field(object_type, field.name, field_path)
+  // Extract source location from the AST field for error reporting
+  let field_location =
+    option.map(field.location, fn(pos) { #(pos.line, pos.column) })
+
+  use field_def <- require_field(
+    object_type,
+    field.name,
+    field_path,
+    field_location,
+  )
 
   // Coerce and validate arguments with the new input coercion module
   case
@@ -933,7 +968,11 @@ fn execute_regular_field(
       }
     }
     Error(coercion_error) ->
-      validation_error(input_coercion.format_error(coercion_error), field_path)
+      validation_error_at(
+        input_coercion.format_error(coercion_error),
+        field_path,
+        field_location,
+      )
   }
 }
 
@@ -941,18 +980,20 @@ fn require_field(
   object_type: schema.ObjectType,
   field_name: String,
   path: List(String),
+  location: Option(#(Int, Int)),
   next: fn(schema.FieldDefinition) -> ExecutionResult,
 ) -> ExecutionResult {
   case dict.get(object_type.fields, field_name) {
     Ok(field_def) -> next(field_def)
     Error(_) ->
-      validation_error(
+      validation_error_at(
         "Field '"
           <> field_name
           <> "' not found on type '"
           <> object_type.name
           <> "'",
         path,
+        location,
       )
   }
 }
@@ -1496,8 +1537,15 @@ fn get_field_type_definition(
 ) -> Result(schema.TypeDefinition, String) {
   case field_type {
     schema.Named(name) ->
-      dict.get(schema_def.types, name)
-      |> result.map_error(fn(_) { "Type '" <> name <> "' not found in schema" })
+      // First check for introspection types
+      case get_introspection_object_type(name) {
+        Some(obj) -> Ok(schema.ObjectTypeDef(obj))
+        None ->
+          dict.get(schema_def.types, name)
+          |> result.map_error(fn(_) {
+            "Type '" <> name <> "' not found in schema"
+          })
+      }
     schema.NonNull(inner) -> get_field_type_definition(schema_def, inner)
     schema.List(inner) -> get_field_type_definition(schema_def, inner)
   }
@@ -1542,10 +1590,25 @@ fn execute_introspection_schema(
   field: ast.Field,
   response_name: String,
 ) -> ExecutionResult {
-  ok_result(make_field(
-    response_name,
-    build_schema_introspection(context.schema, field),
-  ))
+  let introspection_data = build_schema_introspection(context.schema, field)
+
+  // Process selection set if present
+  case field.selection_set {
+    None -> ok_result(make_field(response_name, introspection_data))
+    Some(selection_set) -> {
+      let schema_type = get_introspection_schema_type()
+      let field_ctx =
+        FieldContext(
+          parent_value: Some(introspection_data),
+          field_name: "__schema",
+          field_args: dict.new(),
+          path: [response_name],
+        )
+      let result =
+        execute_selection_set(context, selection_set, schema_type, field_ctx)
+      wrap_result_in_field(result, response_name)
+    }
+  }
 }
 
 fn execute_introspection_type(
@@ -1556,10 +1619,35 @@ fn execute_introspection_type(
 ) -> ExecutionResult {
   get_string_argument(field.arguments, "name", context.variable_values)
   |> option.map(fn(name) {
-    ok_result(make_field(
-      response_name,
-      build_type_introspection(context.schema, name),
-    ))
+    let introspection_data = build_type_introspection(context.schema, name)
+
+    // Check if the type exists (null check)
+    case is_null(introspection_data) {
+      True -> ok_result(make_field(response_name, types.to_dynamic(Nil)))
+      False ->
+        // Process selection set if present
+        case field.selection_set {
+          None -> ok_result(make_field(response_name, introspection_data))
+          Some(selection_set) -> {
+            let type_type = get_introspection_type_type()
+            let field_ctx =
+              FieldContext(
+                parent_value: Some(introspection_data),
+                field_name: "__type",
+                field_args: dict.new(),
+                path: field_path,
+              )
+            let result =
+              execute_selection_set(
+                context,
+                selection_set,
+                type_type,
+                field_ctx,
+              )
+            wrap_result_in_field(result, response_name)
+          }
+        }
+    }
   })
   |> option.unwrap(validation_error(
     "Missing required argument 'name' for __type",
@@ -1599,6 +1687,255 @@ fn decode_string_from_dynamic(value: Dynamic) -> Option(String) {
 }
 
 // ============================================================================
+// Introspection ObjectTypes
+// ============================================================================
+
+/// Get introspection ObjectType by name (for __Schema, __Type, __Field, etc.)
+fn get_introspection_object_type(name: String) -> Option(schema.ObjectType) {
+  case name {
+    "__Schema" -> Some(get_introspection_schema_type())
+    "__Type" -> Some(get_introspection_type_type())
+    "__Field" -> Some(get_introspection_field_type())
+    "__InputValue" -> Some(get_introspection_input_value_type())
+    "__EnumValue" -> Some(get_introspection_enum_value_type())
+    "__Directive" -> Some(get_introspection_directive_type())
+    _ -> None
+  }
+}
+
+/// Build the __Schema introspection ObjectType
+fn get_introspection_schema_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__Schema",
+    description: Some(
+      "A GraphQL Schema defines the capabilities of a GraphQL server.",
+    ),
+    fields: dict.from_list([
+      #("description", make_introspection_field("description", "String")),
+      #(
+        "types",
+        make_introspection_field_list_non_null("types", "__Type"),
+      ),
+      #(
+        "queryType",
+        make_introspection_field_non_null("queryType", "__Type"),
+      ),
+      #("mutationType", make_introspection_field("mutationType", "__Type")),
+      #(
+        "subscriptionType",
+        make_introspection_field("subscriptionType", "__Type"),
+      ),
+      #(
+        "directives",
+        make_introspection_field_list_non_null("directives", "__Directive"),
+      ),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Build the __Type introspection ObjectType
+fn get_introspection_type_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__Type",
+    description: Some("The fundamental unit of any GraphQL Schema is the type."),
+    fields: dict.from_list([
+      #("kind", make_introspection_field_non_null("kind", "String")),
+      #("name", make_introspection_field("name", "String")),
+      #("description", make_introspection_field("description", "String")),
+      #(
+        "specifiedByURL",
+        make_introspection_field("specifiedByURL", "String"),
+      ),
+      // fields(includeDeprecated: Boolean = false): [__Field!]
+      #("fields", make_introspection_field_list("fields", "__Field")),
+      // interfaces: [__Type!]
+      #("interfaces", make_introspection_field_list("interfaces", "__Type")),
+      // possibleTypes: [__Type!]
+      #(
+        "possibleTypes",
+        make_introspection_field_list("possibleTypes", "__Type"),
+      ),
+      // enumValues(includeDeprecated: Boolean = false): [__EnumValue!]
+      #(
+        "enumValues",
+        make_introspection_field_list("enumValues", "__EnumValue"),
+      ),
+      // inputFields(includeDeprecated: Boolean = false): [__InputValue!]
+      #(
+        "inputFields",
+        make_introspection_field_list("inputFields", "__InputValue"),
+      ),
+      // ofType: __Type
+      #("ofType", make_introspection_field("ofType", "__Type")),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Build the __Field introspection ObjectType
+fn get_introspection_field_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__Field",
+    description: Some("Object and Interface types are described by a list of Fields."),
+    fields: dict.from_list([
+      #("name", make_introspection_field_non_null("name", "String")),
+      #("description", make_introspection_field("description", "String")),
+      #(
+        "args",
+        make_introspection_field_list_non_null("args", "__InputValue"),
+      ),
+      #("type", make_introspection_field_non_null("type", "__Type")),
+      #(
+        "isDeprecated",
+        make_introspection_field_non_null("isDeprecated", "Boolean"),
+      ),
+      #(
+        "deprecationReason",
+        make_introspection_field("deprecationReason", "String"),
+      ),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Build the __InputValue introspection ObjectType
+fn get_introspection_input_value_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__InputValue",
+    description: Some("Arguments provided to Fields or Directives."),
+    fields: dict.from_list([
+      #("name", make_introspection_field_non_null("name", "String")),
+      #("description", make_introspection_field("description", "String")),
+      #("type", make_introspection_field_non_null("type", "__Type")),
+      #("defaultValue", make_introspection_field("defaultValue", "String")),
+      #(
+        "isDeprecated",
+        make_introspection_field("isDeprecated", "Boolean"),
+      ),
+      #(
+        "deprecationReason",
+        make_introspection_field("deprecationReason", "String"),
+      ),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Build the __EnumValue introspection ObjectType
+fn get_introspection_enum_value_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__EnumValue",
+    description: Some("One possible value for a given Enum."),
+    fields: dict.from_list([
+      #("name", make_introspection_field_non_null("name", "String")),
+      #("description", make_introspection_field("description", "String")),
+      #(
+        "isDeprecated",
+        make_introspection_field_non_null("isDeprecated", "Boolean"),
+      ),
+      #(
+        "deprecationReason",
+        make_introspection_field("deprecationReason", "String"),
+      ),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Build the __Directive introspection ObjectType
+fn get_introspection_directive_type() -> schema.ObjectType {
+  schema.ObjectType(
+    name: "__Directive",
+    description: Some("A Directive provides a way to describe alternate runtime execution."),
+    fields: dict.from_list([
+      #("name", make_introspection_field_non_null("name", "String")),
+      #("description", make_introspection_field("description", "String")),
+      #(
+        "isRepeatable",
+        make_introspection_field_non_null("isRepeatable", "Boolean"),
+      ),
+      #(
+        "locations",
+        make_introspection_field_list_non_null("locations", "String"),
+      ),
+      #(
+        "args",
+        make_introspection_field_list_non_null("args", "__InputValue"),
+      ),
+    ]),
+    interfaces: [],
+  )
+}
+
+/// Helper to create a simple introspection field definition (nullable)
+fn make_introspection_field(name: String, type_name: String) -> schema.FieldDefinition {
+  schema.FieldDefinition(
+    name: name,
+    description: None,
+    field_type: schema.Named(type_name),
+    arguments: dict.new(),
+    resolver: None,
+    is_deprecated: False,
+    deprecation_reason: None,
+    topic_fn: None,
+  )
+}
+
+/// Helper to create a non-null introspection field definition
+fn make_introspection_field_non_null(
+  name: String,
+  type_name: String,
+) -> schema.FieldDefinition {
+  schema.FieldDefinition(
+    name: name,
+    description: None,
+    field_type: schema.NonNull(schema.Named(type_name)),
+    arguments: dict.new(),
+    resolver: None,
+    is_deprecated: False,
+    deprecation_reason: None,
+    topic_fn: None,
+  )
+}
+
+/// Helper to create a nullable list introspection field definition
+fn make_introspection_field_list(
+  name: String,
+  type_name: String,
+) -> schema.FieldDefinition {
+  schema.FieldDefinition(
+    name: name,
+    description: None,
+    field_type: schema.List(schema.NonNull(schema.Named(type_name))),
+    arguments: dict.new(),
+    resolver: None,
+    is_deprecated: False,
+    deprecation_reason: None,
+    topic_fn: None,
+  )
+}
+
+/// Helper to create a non-null list introspection field definition
+fn make_introspection_field_list_non_null(
+  name: String,
+  type_name: String,
+) -> schema.FieldDefinition {
+  schema.FieldDefinition(
+    name: name,
+    description: None,
+    field_type: schema.NonNull(
+      schema.List(schema.NonNull(schema.Named(type_name))),
+    ),
+    arguments: dict.new(),
+    resolver: None,
+    is_deprecated: False,
+    deprecation_reason: None,
+    topic_fn: None,
+  )
+}
+
+// ============================================================================
 // Introspection Builders
 // ============================================================================
 
@@ -1608,9 +1945,12 @@ fn build_schema_introspection(
 ) -> Dynamic {
   types.to_dynamic(
     dict.from_list([
-      #("queryType", build_type_ref(schema_def.query)),
-      #("mutationType", build_type_ref(schema_def.mutation)),
-      #("subscriptionType", build_type_ref(schema_def.subscription)),
+      #("queryType", build_type_ref(schema_def, schema_def.query)),
+      #("mutationType", build_type_ref(schema_def, schema_def.mutation)),
+      #(
+        "subscriptionType",
+        build_type_ref(schema_def, schema_def.subscription),
+      ),
       #(
         "types",
         types.to_dynamic(
@@ -1873,11 +2213,12 @@ fn build_specified_by_directive_introspection(
   )
 }
 
-fn build_type_ref(obj: Option(schema.ObjectType)) -> Dynamic {
+fn build_type_ref(
+  schema_def: schema.Schema,
+  obj: Option(schema.ObjectType),
+) -> Dynamic {
   obj
-  |> option.map(fn(o) {
-    types.to_dynamic(dict.from_list([#("name", types.to_dynamic(o.name))]))
-  })
+  |> option.map(fn(o) { build_object_introspection(schema_def, o) })
   |> option.unwrap(types.to_dynamic(Nil))
 }
 

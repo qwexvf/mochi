@@ -462,7 +462,7 @@ fn encode_execution_errors(errors: List(executor.ExecutionError)) -> Dynamic {
   types.to_dynamic(
     list.map(errors, fn(err) {
       let #(msg, path) = case err {
-        executor.ValidationError(m, p) -> #(m, p)
+        executor.ValidationError(message: m, path: p, ..) -> #(m, p)
         executor.ResolverError(message: m, path: p, ..) -> #(m, p)
         executor.TypeError(message: m, path: p, ..) -> #(m, p)
         executor.NullValueError(message: m, path: p, ..) -> #(m, p)

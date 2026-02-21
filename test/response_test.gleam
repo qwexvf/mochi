@@ -95,7 +95,7 @@ pub fn from_execution_result_with_errors_test() {
   let data =
     types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
   let errors = [
-    executor.ValidationError("Field not found", ["user", "email"]),
+    executor.ValidationError("Field not found", ["user", "email"], location: None),
     executor.ResolverError("Database error", ["query", "users"], location: None),
   ]
   let exec_result = executor.ExecutionResult(data: Some(data), errors: errors)
@@ -413,7 +413,8 @@ pub fn format_with_extensions_test() {
 // ============================================================================
 
 pub fn convert_validation_error_test() {
-  let exec_err = executor.ValidationError("Field not found", ["user", "email"])
+  let exec_err =
+    executor.ValidationError("Field not found", ["user", "email"], location: None)
   let gql_err = response.execution_error_to_graphql_error(exec_err)
 
   case gql_err.message == "Field not found" {
@@ -450,5 +451,62 @@ pub fn convert_type_error_test() {
   case gql_err.message == "Type mismatch" {
     True -> Nil
     False -> panic as "Message should be preserved"
+  }
+}
+
+// ============================================================================
+// Error Location Tests (Issue #32)
+// ============================================================================
+
+pub fn error_with_location_test() {
+  // Test that ValidationError with location gets serialized properly
+  let exec_err =
+    executor.ValidationError(
+      "Field not found",
+      ["user", "name"],
+      location: Some(#(5, 10)),
+    )
+  let gql_err = response.execution_error_to_graphql_error(exec_err)
+
+  case gql_err.locations {
+    Some([error.Location(line, col)]) -> {
+      case line == 5 && col == 10 {
+        True -> Nil
+        False -> panic as "Location should be line 5, column 10"
+      }
+    }
+    _ -> panic as "Should have exactly one location"
+  }
+}
+
+pub fn error_without_location_test() {
+  // Test that errors without location don't include locations field
+  let exec_err =
+    executor.ValidationError("Field not found", ["user"], location: None)
+  let gql_err = response.execution_error_to_graphql_error(exec_err)
+
+  case gql_err.locations {
+    None -> Nil
+    Some(_) -> panic as "Should not have locations when None"
+  }
+}
+
+pub fn resolver_error_with_location_test() {
+  let exec_err =
+    executor.ResolverError(
+      "Database error",
+      ["query", "users"],
+      location: Some(#(3, 5)),
+    )
+  let gql_err = response.execution_error_to_graphql_error(exec_err)
+
+  case gql_err.locations {
+    Some([error.Location(line, col)]) -> {
+      case line == 3 && col == 5 {
+        True -> Nil
+        False -> panic as "Location should be line 3, column 5"
+      }
+    }
+    _ -> panic as "Should have exactly one location"
   }
 }

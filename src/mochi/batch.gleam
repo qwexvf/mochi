@@ -163,7 +163,7 @@ pub fn execute_with_operation_name(
     }
     Error(msg) ->
       executor.ExecutionResult(data: None, errors: [
-        executor.ValidationError(msg, []),
+        executor.ValidationError(msg, [], location: None),
       ])
   }
 }
@@ -240,6 +240,7 @@ pub fn execute_batch(
               "Batch size exceeds maximum of "
                 <> string.inspect(config.max_batch_size),
               [],
+              location: None,
             ),
           ]),
         ],
@@ -278,6 +279,7 @@ fn execute_batch_internal(
                 executor.ValidationError(
                   "Batch execution halted due to error",
                   [],
+                  location: None,
                 ),
               ]),
               ..results_acc
@@ -329,6 +331,7 @@ fn execute_single_request(
         executor.ValidationError(
           "Parse error: " <> format_parse_error(parse_error),
           [],
+          location: None,
         ),
       ])
   }
