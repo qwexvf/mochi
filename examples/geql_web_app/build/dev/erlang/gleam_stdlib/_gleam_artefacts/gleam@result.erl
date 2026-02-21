@@ -1,5 +1,5 @@
 -module(gleam@result).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/result.gleam").
 -export([is_ok/1, is_error/1, map/2, map_error/2, flatten/1, 'try'/2, then/2, unwrap/2, lazy_unwrap/2, unwrap_error/2, unwrap_both/1, 'or'/2, lazy_or/2, all/1, partition/1, replace/2, replace_error/2, values/1, try_recover/2]).
 
@@ -88,8 +88,8 @@ is_error(Result) ->
     " // -> Error(1)\n"
     " ```\n"
 ).
--spec map({ok, CPP} | {error, CPQ}, fun((CPP) -> CPT)) -> {ok, CPT} |
-    {error, CPQ}.
+-spec map({ok, CMD} | {error, CME}, fun((CMD) -> CMH)) -> {ok, CMH} |
+    {error, CME}.
 map(Result, Fun) ->
     case Result of
         {ok, X} ->
@@ -119,8 +119,8 @@ map(Result, Fun) ->
     " // -> Ok(1)\n"
     " ```\n"
 ).
--spec map_error({ok, CPW} | {error, CPX}, fun((CPX) -> CQA)) -> {ok, CPW} |
-    {error, CQA}.
+-spec map_error({ok, CMK} | {error, CML}, fun((CML) -> CMO)) -> {ok, CMK} |
+    {error, CMO}.
 map_error(Result, Fun) ->
     case Result of
         {ok, X} ->
@@ -151,8 +151,8 @@ map_error(Result, Fun) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec flatten({ok, {ok, CQD} | {error, CQE}} | {error, CQE}) -> {ok, CQD} |
-    {error, CQE}.
+-spec flatten({ok, {ok, CMR} | {error, CMS}} | {error, CMS}) -> {ok, CMR} |
+    {error, CMS}.
 flatten(Result) ->
     case Result of
         {ok, X} ->
@@ -195,9 +195,9 @@ flatten(Result) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec 'try'({ok, CQL} | {error, CQM}, fun((CQL) -> {ok, CQP} | {error, CQM})) -> {ok,
-        CQP} |
-    {error, CQM}.
+-spec 'try'({ok, CMZ} | {error, CNA}, fun((CMZ) -> {ok, CND} | {error, CNA})) -> {ok,
+        CND} |
+    {error, CNA}.
 'try'(Result, Fun) ->
     case Result of
         {ok, X} ->
@@ -208,9 +208,9 @@ flatten(Result) ->
     end.
 
 -file("src/gleam/result.gleam", 169).
--spec then({ok, CQU} | {error, CQV}, fun((CQU) -> {ok, CQY} | {error, CQV})) -> {ok,
-        CQY} |
-    {error, CQV}.
+-spec then({ok, CNI} | {error, CNJ}, fun((CNI) -> {ok, CNM} | {error, CNJ})) -> {ok,
+        CNM} |
+    {error, CNJ}.
 then(Result, Fun) ->
     'try'(Result, Fun).
 
@@ -231,7 +231,7 @@ then(Result, Fun) ->
     " // -> 0\n"
     " ```\n"
 ).
--spec unwrap({ok, CRD} | {error, any()}, CRD) -> CRD.
+-spec unwrap({ok, CNR} | {error, any()}, CNR) -> CNR.
 unwrap(Result, Default) ->
     case Result of
         {ok, V} ->
@@ -258,7 +258,7 @@ unwrap(Result, Default) ->
     " // -> 0\n"
     " ```\n"
 ).
--spec lazy_unwrap({ok, CRH} | {error, any()}, fun(() -> CRH)) -> CRH.
+-spec lazy_unwrap({ok, CNV} | {error, any()}, fun(() -> CNV)) -> CNV.
 lazy_unwrap(Result, Default) ->
     case Result of
         {ok, V} ->
@@ -285,7 +285,7 @@ lazy_unwrap(Result, Default) ->
     " // -> 0\n"
     " ```\n"
 ).
--spec unwrap_error({ok, any()} | {error, CRM}, CRM) -> CRM.
+-spec unwrap_error({ok, any()} | {error, COA}, COA) -> COA.
 unwrap_error(Result, Default) ->
     case Result of
         {ok, _} ->
@@ -312,7 +312,7 @@ unwrap_error(Result, Default) ->
     " // -> 2\n"
     " ```\n"
 ).
--spec unwrap_both({ok, CRP} | {error, CRP}) -> CRP.
+-spec unwrap_both({ok, COD} | {error, COD}) -> COD.
 unwrap_both(Result) ->
     case Result of
         {ok, A} ->
@@ -348,8 +348,8 @@ unwrap_both(Result) ->
     " // -> Error(\"Error 2\")\n"
     " ```\n"
 ).
--spec 'or'({ok, CRS} | {error, CRT}, {ok, CRS} | {error, CRT}) -> {ok, CRS} |
-    {error, CRT}.
+-spec 'or'({ok, COG} | {error, COH}, {ok, COG} | {error, COH}) -> {ok, COG} |
+    {error, COH}.
 'or'(First, Second) ->
     case First of
         {ok, _} ->
@@ -387,9 +387,9 @@ unwrap_both(Result) ->
     " // -> Error(\"Error 2\")\n"
     " ```\n"
 ).
--spec lazy_or({ok, CSA} | {error, CSB}, fun(() -> {ok, CSA} | {error, CSB})) -> {ok,
-        CSA} |
-    {error, CSB}.
+-spec lazy_or({ok, COO} | {error, COP}, fun(() -> {ok, COO} | {error, COP})) -> {ok,
+        COO} |
+    {error, COP}.
 lazy_or(First, Second) ->
     case First of
         {ok, _} ->
@@ -417,13 +417,13 @@ lazy_or(First, Second) ->
     " // -> Error(\"e\")\n"
     " ```\n"
 ).
--spec all(list({ok, CSI} | {error, CSJ})) -> {ok, list(CSI)} | {error, CSJ}.
+-spec all(list({ok, COW} | {error, COX})) -> {ok, list(COW)} | {error, COX}.
 all(Results) ->
     gleam@list:try_map(Results, fun(Result) -> Result end).
 
 -file("src/gleam/result.gleam", 367).
--spec partition_loop(list({ok, CSX} | {error, CSY}), list(CSX), list(CSY)) -> {list(CSX),
-    list(CSY)}.
+-spec partition_loop(list({ok, CPL} | {error, CPM}), list(CPL), list(CPM)) -> {list(CPL),
+    list(CPM)}.
 partition_loop(Results, Oks, Errors) ->
     case Results of
         [] ->
@@ -450,7 +450,7 @@ partition_loop(Results, Oks, Errors) ->
     " // -> #([2, 1], [\"b\", \"a\"])\n"
     " ```\n"
 ).
--spec partition(list({ok, CSQ} | {error, CSR})) -> {list(CSQ), list(CSR)}.
+-spec partition(list({ok, CPE} | {error, CPF})) -> {list(CPE), list(CPF)}.
 partition(Results) ->
     partition_loop(Results, [], []).
 
@@ -470,7 +470,7 @@ partition(Results) ->
     " // -> Error(1)\n"
     " ```\n"
 ).
--spec replace({ok, any()} | {error, CTG}, CTJ) -> {ok, CTJ} | {error, CTG}.
+-spec replace({ok, any()} | {error, CPU}, CPX) -> {ok, CPX} | {error, CPU}.
 replace(Result, Value) ->
     case Result of
         {ok, _} ->
@@ -496,7 +496,7 @@ replace(Result, Value) ->
     " // -> Ok(1)\n"
     " ```\n"
 ).
--spec replace_error({ok, CTM} | {error, any()}, CTQ) -> {ok, CTM} | {error, CTQ}.
+-spec replace_error({ok, CQA} | {error, any()}, CQE) -> {ok, CQA} | {error, CQE}.
 replace_error(Result, Error) ->
     case Result of
         {ok, X} ->
@@ -517,7 +517,7 @@ replace_error(Result, Error) ->
     " // -> [1, 3]\n"
     " ```\n"
 ).
--spec values(list({ok, CTT} | {error, any()})) -> list(CTT).
+-spec values(list({ok, CQH} | {error, any()})) -> list(CQH).
 values(Results) ->
     gleam@list:filter_map(Results, fun(Result) -> Result end).
 
@@ -553,9 +553,9 @@ values(Results) ->
     " ```\n"
 ).
 -spec try_recover(
-    {ok, CTZ} | {error, CUA},
-    fun((CUA) -> {ok, CTZ} | {error, CUD})
-) -> {ok, CTZ} | {error, CUD}.
+    {ok, CQN} | {error, CQO},
+    fun((CQO) -> {ok, CQN} | {error, CQR})
+) -> {ok, CQN} | {error, CQR}.
 try_recover(Result, Fun) ->
     case Result of
         {ok, Value} ->

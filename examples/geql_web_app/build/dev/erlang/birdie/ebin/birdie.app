@@ -12,6 +12,10 @@
                     term_size,
                     trie_again]},
     {description, "🐦‍⬛ Snapshot testing in Gleam"},
-    {modules, []},
+    {modules, [birdie,
+               birdie@internal@diff,
+               birdie@internal@project,
+               birdie@internal@titles,
+               birdie_ffi]},
     {registered, []}
 ]}.

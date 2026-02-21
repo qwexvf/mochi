@@ -1,5 +1,5 @@
 -module(gleam@option).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/option.gleam").
 -export([all/1, is_some/1, is_none/1, to_result/2, from_result/1, unwrap/2, lazy_unwrap/2, map/2, flatten/1, then/2, 'or'/2, lazy_or/2, values/1]).
 -export_type([option/1]).
@@ -12,10 +12,10 @@
 -define(DOC(Str), -compile([])).
 -endif.
 
--type option(GA) :: {some, GA} | none.
+-type option(FE) :: {some, FE} | none.
 
 -file("src/gleam/option.gleam", 59).
--spec reverse_and_prepend(list(GP), list(GP)) -> list(GP).
+-spec reverse_and_prepend(list(FT), list(FT)) -> list(FT).
 reverse_and_prepend(Prefix, Suffix) ->
     case Prefix of
         [] ->
@@ -26,7 +26,7 @@ reverse_and_prepend(Prefix, Suffix) ->
     end.
 
 -file("src/gleam/option.gleam", 44).
--spec all_loop(list(option(GG)), list(GG)) -> option(list(GG)).
+-spec all_loop(list(option(FK)), list(FK)) -> option(list(FK)).
 all_loop(List, Acc) ->
     case List of
         [] ->
@@ -57,7 +57,7 @@ all_loop(List, Acc) ->
     " // -> None\n"
     " ```\n"
 ).
--spec all(list(option(GB))) -> option(list(GB)).
+-spec all(list(option(FF))) -> option(list(FF)).
 all(List) ->
     all_loop(List, []).
 
@@ -117,7 +117,7 @@ is_none(Option) ->
     " // -> Error(\"some_error\")\n"
     " ```\n"
 ).
--spec to_result(option(GX), HA) -> {ok, GX} | {error, HA}.
+-spec to_result(option(GB), GE) -> {ok, GB} | {error, GE}.
 to_result(Option, E) ->
     case Option of
         {some, A} ->
@@ -143,7 +143,7 @@ to_result(Option, E) ->
     " // -> None\n"
     " ```\n"
 ).
--spec from_result({ok, HD} | {error, any()}) -> option(HD).
+-spec from_result({ok, GH} | {error, any()}) -> option(GH).
 from_result(Result) ->
     case Result of
         {ok, A} ->
@@ -169,7 +169,7 @@ from_result(Result) ->
     " // -> 0\n"
     " ```\n"
 ).
--spec unwrap(option(HI), HI) -> HI.
+-spec unwrap(option(GM), GM) -> GM.
 unwrap(Option, Default) ->
     case Option of
         {some, X} ->
@@ -195,7 +195,7 @@ unwrap(Option, Default) ->
     " // -> 0\n"
     " ```\n"
 ).
--spec lazy_unwrap(option(HK), fun(() -> HK)) -> HK.
+-spec lazy_unwrap(option(GO), fun(() -> GO)) -> GO.
 lazy_unwrap(Option, Default) ->
     case Option of
         {some, X} ->
@@ -225,7 +225,7 @@ lazy_unwrap(Option, Default) ->
     " // -> None\n"
     " ```\n"
 ).
--spec map(option(HM), fun((HM) -> HO)) -> option(HO).
+-spec map(option(GQ), fun((GQ) -> GS)) -> option(GS).
 map(Option, Fun) ->
     case Option of
         {some, X} ->
@@ -256,7 +256,7 @@ map(Option, Fun) ->
     " // -> None\n"
     " ```\n"
 ).
--spec flatten(option(option(HQ))) -> option(HQ).
+-spec flatten(option(option(GU))) -> option(GU).
 flatten(Option) ->
     case Option of
         {some, X} ->
@@ -300,7 +300,7 @@ flatten(Option) ->
     " // -> None\n"
     " ```\n"
 ).
--spec then(option(HU), fun((HU) -> option(HW))) -> option(HW).
+-spec then(option(GY), fun((GY) -> option(HA))) -> option(HA).
 then(Option, Fun) ->
     case Option of
         {some, X} ->
@@ -336,7 +336,7 @@ then(Option, Fun) ->
     " // -> None\n"
     " ```\n"
 ).
--spec 'or'(option(HZ), option(HZ)) -> option(HZ).
+-spec 'or'(option(HD), option(HD)) -> option(HD).
 'or'(First, Second) ->
     case First of
         {some, _} ->
@@ -372,7 +372,7 @@ then(Option, Fun) ->
     " // -> None\n"
     " ```\n"
 ).
--spec lazy_or(option(ID), fun(() -> option(ID))) -> option(ID).
+-spec lazy_or(option(HH), fun(() -> option(HH))) -> option(HH).
 lazy_or(First, Second) ->
     case First of
         {some, _} ->
@@ -383,7 +383,7 @@ lazy_or(First, Second) ->
     end.
 
 -file("src/gleam/option.gleam", 352).
--spec values_loop(list(option(IL)), list(IL)) -> list(IL).
+-spec values_loop(list(option(HP)), list(HP)) -> list(HP).
 values_loop(List, Acc) ->
     case List of
         [] ->
@@ -408,6 +408,6 @@ values_loop(List, Acc) ->
     " // -> [1, 3]\n"
     " ```\n"
 ).
--spec values(list(option(IH))) -> list(IH).
+-spec values(list(option(HL))) -> list(HL).
 values(Options) ->
     values_loop(Options, []).

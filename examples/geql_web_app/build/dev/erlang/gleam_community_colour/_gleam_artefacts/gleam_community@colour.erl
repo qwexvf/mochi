@@ -1,5 +1,5 @@
 -module(gleam_community@colour).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam_community/colour.gleam").
 -export([from_rgb255/3, from_rgb/3, from_rgba/4, from_hsla/4, from_hsl/3, from_rgb_hex/1, from_rgb_hex_string/1, from_rgba_hex/1, from_rgba_hex_string/1, to_rgba/1, to_hsla/1, to_css_rgba_string/1, to_rgba_hex/1, to_rgba_hex_string/1, to_rgb_hex/1, to_rgb_hex_string/1, encode/1, decoder/0]).
 -export_type([colour/0]).

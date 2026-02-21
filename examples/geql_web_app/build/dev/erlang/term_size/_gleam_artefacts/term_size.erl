@@ -1,5 +1,5 @@
 -module(term_size).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/term_size.gleam").
 -export([get/0, rows/0, columns/0]).
 

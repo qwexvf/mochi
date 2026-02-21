@@ -1,5 +1,5 @@
 -module(birl@interval).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birl/interval.gleam").
 -export([from_start_and_end/2, from_start_and_duration/2, shift/2, scale_up/2, scale_down/2, includes/2, contains/2, intersection/2, get_bounds/1]).
 -export_type([interval/0]).

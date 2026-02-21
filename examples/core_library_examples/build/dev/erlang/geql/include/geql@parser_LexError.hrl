@@ -1,1 +1,0 @@
--record(lex_error, {error :: geql@lexer:lexer_error()}).

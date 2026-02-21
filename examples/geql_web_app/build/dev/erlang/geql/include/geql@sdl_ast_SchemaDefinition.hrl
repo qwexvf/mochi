@@ -1,1 +1,0 @@
--record(schema_definition, {schema_def :: geql@sdl_ast:schema_def()}).

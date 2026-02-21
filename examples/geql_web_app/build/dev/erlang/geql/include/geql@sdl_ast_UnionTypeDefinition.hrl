@@ -1,1 +1,0 @@
--record(union_type_definition, {union_def :: geql@sdl_ast:union_type_def()}).

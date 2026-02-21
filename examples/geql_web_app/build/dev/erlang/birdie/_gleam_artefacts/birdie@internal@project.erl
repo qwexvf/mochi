@@ -1,5 +1,5 @@
 -module(birdie@internal@project).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birdie/internal/project.gleam").
 -export([find_root/0]).
 

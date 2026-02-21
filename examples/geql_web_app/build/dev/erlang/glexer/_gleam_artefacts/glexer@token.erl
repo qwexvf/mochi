@@ -1,5 +1,5 @@
 -module(glexer@token).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/glexer/token.gleam").
 -export([to_source/1]).
 -export_type([token/0]).

@@ -1,5 +1,5 @@
 -module(gleam@order).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/order.gleam").
 -export([negate/1, to_int/1, compare/2, reverse/1, break_tie/2, lazy_break_tie/2]).
 -export_type([order/0]).
@@ -125,7 +125,7 @@ compare(A, B) ->
     " // -> [5, 4, 1]\n"
     " ```\n"
 ).
--spec reverse(fun((T, T) -> order())) -> fun((T, T) -> order()).
+-spec reverse(fun((S, S) -> order())) -> fun((S, S) -> order()).
 reverse(Orderer) ->
     fun(A, B) -> Orderer(B, A) end.
 

@@ -1,5 +1,5 @@
 -module(gleam@bytes_tree).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/bytes_tree.gleam").
 -export([append_tree/2, prepend_tree/2, concat/1, new/0, from_string/1, prepend_string/2, append_string/2, from_string_tree/1, from_bit_array/1, prepend/2, append/2, concat_bit_arrays/1, to_bit_array/1, byte_size/1]).
 -export_type([bytes_tree/0]).

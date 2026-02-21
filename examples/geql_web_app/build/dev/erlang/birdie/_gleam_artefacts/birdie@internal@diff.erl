@@ -1,5 +1,5 @@
 -module(birdie@internal@diff).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birdie/internal/diff.gleam").
 -export([histogram/2]).
 -export_type([diff_line/0, diff_line_kind/0, occurs/1]).
@@ -18,9 +18,9 @@
 
 -type diff_line_kind() :: old | new | shared.
 
--type occurs(HZJ) :: {one, integer(), list(HZJ), list(HZJ)} |
-    {other, integer(), list(HZJ), list(HZJ)} |
-    {both, integer(), list(HZJ), list(HZJ), list(HZJ), list(HZJ)}.
+-type occurs(HUF) :: {one, integer(), list(HUF), list(HUF)} |
+    {other, integer(), list(HUF), list(HUF)} |
+    {both, integer(), list(HUF), list(HUF), list(HUF), list(HUF)}.
 
 -file("src/birdie/internal/diff.gleam", 23).
 ?DOC(false).
@@ -111,7 +111,7 @@ match_diff_lines(Lines, Lcs, Line_one, One, Line_other, Other) ->
 
 -file("src/birdie/internal/diff.gleam", 174).
 ?DOC(false).
--spec sum_occurrences(occurs(IAQ), occurs(IAQ)) -> occurs(IAQ).
+-spec sum_occurrences(occurs(HVM), occurs(HVM)) -> occurs(HVM).
 sum_occurrences(One, Other) ->
     case {One, Other} of
         {{one, N, _, _}, {one, M, Before, After}} ->
@@ -140,11 +140,11 @@ sum_occurrences(One, Other) ->
 -file("src/birdie/internal/diff.gleam", 150).
 ?DOC(false).
 -spec histogram_add(
-    gleam@dict:dict(IAE, occurs(IAE)),
-    list(IAE),
-    fun((integer(), list(IAE), list(IAE)) -> occurs(IAE)),
-    list(IAE)
-) -> gleam@dict:dict(IAE, occurs(IAE)).
+    gleam@dict:dict(HVA, occurs(HVA)),
+    list(HVA),
+    fun((integer(), list(HVA), list(HVA)) -> occurs(HVA)),
+    list(HVA)
+) -> gleam@dict:dict(HVA, occurs(HVA)).
 histogram_add(Histogram, List, To_occurrence, Reverse_prefix) ->
     case List of
         [] ->
@@ -172,12 +172,12 @@ histogram_add(Histogram, List, To_occurrence, Reverse_prefix) ->
 
 -file("src/birdie/internal/diff.gleam", 121).
 ?DOC(false).
--spec lowest_occurrence_common_item(list(HZW), list(HZW)) -> gleam@option:option({HZW,
+-spec lowest_occurrence_common_item(list(HUS), list(HUS)) -> gleam@option:option({HUS,
     integer(),
-    list(HZW),
-    list(HZW),
-    list(HZW),
-    list(HZW)}).
+    list(HUS),
+    list(HUS),
+    list(HUS),
+    list(HUS)}).
 lowest_occurrence_common_item(One, Other) ->
     Histogram = begin
         _pipe = histogram_add(
@@ -230,9 +230,9 @@ lowest_occurrence_common_item(One, Other) ->
 
 -file("src/birdie/internal/diff.gleam", 200).
 ?DOC(false).
--spec do_pop_common_prefix(list(IBA), list(IBA), list(IBA)) -> {list(IBA),
-    list(IBA),
-    list(IBA)}.
+-spec do_pop_common_prefix(list(HVW), list(HVW), list(HVW)) -> {list(HVW),
+    list(HVW),
+    list(HVW)}.
 do_pop_common_prefix(Reverse_prefix, One, Other) ->
     case {One, Other} of
         {[First_one | One@1], [First_other | Other@1]} when First_one =:= First_other ->
@@ -244,18 +244,18 @@ do_pop_common_prefix(Reverse_prefix, One, Other) ->
 
 -file("src/birdie/internal/diff.gleam", 192).
 ?DOC(false).
--spec pop_common_prefix(list(IAU), list(IAU)) -> {list(IAU),
-    list(IAU),
-    list(IAU)}.
+-spec pop_common_prefix(list(HVQ), list(HVQ)) -> {list(HVQ),
+    list(HVQ),
+    list(HVQ)}.
 pop_common_prefix(One, Other) ->
     {Reverse_prefix, One@1, Other@1} = do_pop_common_prefix([], One, Other),
     {lists:reverse(Reverse_prefix), One@1, Other@1}.
 
 -file("src/birdie/internal/diff.gleam", 215).
 ?DOC(false).
--spec pop_common_suffix(list(IBH), list(IBH)) -> {list(IBH),
-    list(IBH),
-    list(IBH)}.
+-spec pop_common_suffix(list(HWD), list(HWD)) -> {list(HWD),
+    list(HWD),
+    list(HWD)}.
 pop_common_suffix(One, Other) ->
     {Suffix, Reverse_one, Reverse_other} = do_pop_common_prefix(
         [],
@@ -266,7 +266,7 @@ pop_common_suffix(One, Other) ->
 
 -file("src/birdie/internal/diff.gleam", 74).
 ?DOC(false).
--spec lcs(list(HZS), list(HZS)) -> list(HZS).
+-spec lcs(list(HUO), list(HUO)) -> list(HUO).
 lcs(One, Other) ->
     {Prefix, One@1, Other@1} = pop_common_prefix(One, Other),
     {Suffix, One@2, Other@2} = pop_common_suffix(One@1, Other@1),

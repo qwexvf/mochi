@@ -1,1 +1,0 @@
--record(person, {name :: binary(), age :: integer(), needs_glasses :: boolean()}).

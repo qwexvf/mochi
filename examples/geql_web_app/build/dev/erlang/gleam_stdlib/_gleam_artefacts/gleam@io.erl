@@ -1,5 +1,5 @@
 -module(gleam@io).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/io.gleam").
 -export([print/1, print_error/1, println/1, println_error/1]).
 

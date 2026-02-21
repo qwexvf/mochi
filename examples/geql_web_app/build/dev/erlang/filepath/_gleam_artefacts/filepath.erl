@@ -1,5 +1,5 @@
 -module(filepath).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/filepath.gleam").
 -export([join/2, split_unix/1, directory_name/1, is_absolute/1, split_windows/1, split/1, base_name/1, extension/1, strip_extension/1, expand/1]).
 

@@ -1,5 +1,5 @@
 -module(gleam@regexp).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/regexp.gleam").
 -export([compile/2, from_string/1, check/2, split/2, scan/2, replace/3, match_map/3]).
 -export_type([regexp/0, match/0, compile_error/0, options/0]).

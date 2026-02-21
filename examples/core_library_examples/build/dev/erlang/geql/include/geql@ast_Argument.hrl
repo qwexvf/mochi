@@ -1,1 +1,0 @@
--record(argument, {name :: binary(), value :: geql@ast:value()}).

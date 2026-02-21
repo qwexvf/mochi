@@ -1,5 +1,5 @@
 -module(trie).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/trie.gleam").
 -export([fold/3, get/2, has_path/2, map/2, new/0, delete/2, insert/3, from_list/1, paths/1, singleton/2, size/1, is_empty/1, subtrie/2, to_list/1, update/3, values/1]).
 -export_type([trie/2]).
@@ -12,16 +12,16 @@
 -define(DOC(Str), -compile([])).
 -endif.
 
--opaque trie(EEO, EEP) :: {trie,
-        gleam@option:option(EEP),
-        gleam@dict:dict(EEO, trie(EEO, EEP))}.
+-opaque trie(HGB, HGC) :: {trie,
+        gleam@option:option(HGC),
+        gleam@dict:dict(HGB, trie(HGB, HGC))}.
 
 -file("src/trie.gleam", 43).
 ?DOC(
     " Exactly same behaviour as delete but returns `None` if the tree is empty as a\n"
     " result of the deletion.\n"
 ).
--spec do_delete(trie(EEX, EEY), list(EEX)) -> gleam@option:option(trie(EEX, EEY)).
+-spec do_delete(trie(HGK, HGL), list(HGK)) -> gleam@option:option(trie(HGK, HGL)).
 do_delete(Trie, Path) ->
     case {Path, Trie} of
         {[], {trie, _, Children_map}} ->
@@ -71,7 +71,7 @@ do_delete(Trie, Path) ->
     " 11\n"
     " ```\n"
 ).
--spec fold(trie(EFF, EFG), EFJ, fun((EFJ, list(EFF), EFG) -> EFJ)) -> EFJ.
+-spec fold(trie(HGS, HGT), HGW, fun((HGW, list(HGS), HGT) -> HGW)) -> HGW.
 fold(Trie, Initial, Fun) ->
     gleam@dict:fold(
         erlang:element(3, Trie),
@@ -112,7 +112,7 @@ fold(Trie, Initial, Fun) ->
     " Ok(\"a\")\n"
     " ```\n"
 ).
--spec get(trie(EFR, EFS), list(EFR)) -> {ok, EFS} | {error, nil}.
+-spec get(trie(HHE, HHF), list(HHE)) -> {ok, HHF} | {error, nil}.
 get(From, Path) ->
     case {Path, From} of
         {[], {trie, none, _}} ->
@@ -148,7 +148,7 @@ get(From, Path) ->
     " False\n"
     " ```\n"
 ).
--spec has_path(trie(EFY, any()), list(EFY)) -> boolean().
+-spec has_path(trie(HHL, any()), list(HHL)) -> boolean().
 has_path(Trie, Path) ->
     case get(Trie, Path) of
         {ok, _} ->
@@ -172,7 +172,7 @@ has_path(Trie, Path) ->
     " [#([1, 2], \"a!\"), #([1], \"b!\")]\n"
     " ```\n"
 ).
--spec map(trie(EGO, EGP), fun((EGP) -> EGS)) -> trie(EGO, EGS).
+-spec map(trie(HIB, HIC), fun((HIC) -> HIF)) -> trie(HIB, HIF).
 map(Trie, Fun) ->
     {trie,
         gleam@option:map(erlang:element(2, Trie), Fun),
@@ -218,7 +218,7 @@ new() ->
     " []\n"
     " ```\n"
 ).
--spec delete(trie(EEQ, EER), list(EEQ)) -> trie(EEQ, EER).
+-spec delete(trie(HGD, HGE), list(HGD)) -> trie(HGD, HGE).
 delete(Trie, Path) ->
     _pipe = do_delete(Trie, Path),
     gleam@option:unwrap(_pipe, new()).
@@ -246,7 +246,7 @@ delete(Trie, Path) ->
     " [#([1, 2], \"b\")]\n"
     " ```\n"
 ).
--spec insert(trie(EGD, EGE), list(EGD), EGE) -> trie(EGD, EGE).
+-spec insert(trie(HHQ, HHR), list(HHQ), HHR) -> trie(HHQ, HHR).
 insert(Trie, Path, Value) ->
     case {Path, Trie} of
         {[], {trie, _, Children_map}} ->
@@ -273,7 +273,7 @@ insert(Trie, Path, Value) ->
     " [#([1, 2], \"a\"), #([1], \"b\")]\n"
     " ```\n"
 ).
--spec from_list(list({list(EFL), EFN})) -> trie(EFL, EFN).
+-spec from_list(list({list(HGY), HHA})) -> trie(HGY, HHA).
 from_list(List) ->
     gleam@list:fold(
         List,
@@ -306,7 +306,7 @@ from_list(List) ->
     " []\n"
     " ```\n"
 ).
--spec paths(trie(EGZ, any())) -> list(list(EGZ)).
+-spec paths(trie(HIM, any())) -> list(list(HIM)).
 paths(Trie) ->
     fold(Trie, [], fun(Rest, Path, _) -> [Path | Rest] end).
 
@@ -322,7 +322,7 @@ paths(Trie) ->
     " [#([1, 2], \"a\")]\n"
     " ```\n"
 ).
--spec singleton(list(EHF), EHH) -> trie(EHF, EHH).
+-spec singleton(list(HIS), HIU) -> trie(HIS, HIU).
 singleton(Path, Value) ->
     insert(new(), Path, Value).
 
@@ -379,7 +379,7 @@ is_empty(Trie) ->
     " [#([1, 2, 3], \"a\"), #([1, 2, 4, 5], \"b\")]\n"
     " ```\n"
 ).
--spec subtrie(trie(EHO, EHP), list(EHO)) -> {ok, trie(EHO, EHP)} | {error, nil}.
+-spec subtrie(trie(HJB, HJC), list(HJB)) -> {ok, trie(HJB, HJC)} | {error, nil}.
 subtrie(Trie, Prefix) ->
     case {Prefix, Trie} of
         {[], _} ->
@@ -415,7 +415,7 @@ subtrie(Trie, Prefix) ->
     " []\n"
     " ```\n"
 ).
--spec to_list(trie(EHX, EHY)) -> list({list(EHX), EHY}).
+-spec to_list(trie(HJK, HJL)) -> list({list(HJK), HJL}).
 to_list(Trie) ->
     fold(Trie, [], fun(Rest, Path, Value) -> [{Path, Value} | Rest] end).
 
@@ -425,10 +425,10 @@ to_list(Trie) ->
     " result of the (possible) deletion.\n"
 ).
 -spec do_update(
-    trie(EIM, EIN),
-    list(EIM),
-    fun((gleam@option:option(EIN)) -> gleam@option:option(EIN))
-) -> gleam@option:option(trie(EIM, EIN)).
+    trie(HJZ, HKA),
+    list(HJZ),
+    fun((gleam@option:option(HKA)) -> gleam@option:option(HKA))
+) -> gleam@option:option(trie(HJZ, HKA)).
 do_update(Trie, Path, Fun) ->
     case {Path, Trie} of
         {[], {trie, Entry, Children_map}} ->
@@ -505,10 +505,10 @@ do_update(Trie, Path, Fun) ->
     " ```\n"
 ).
 -spec update(
-    trie(EID, EIE),
-    list(EID),
-    fun((gleam@option:option(EIE)) -> gleam@option:option(EIE))
-) -> trie(EID, EIE).
+    trie(HJQ, HJR),
+    list(HJQ),
+    fun((gleam@option:option(HJR)) -> gleam@option:option(HJR))
+) -> trie(HJQ, HJR).
 update(Trie, Path, Fun) ->
     _pipe = do_update(Trie, Path, Fun),
     gleam@option:unwrap(_pipe, new()).
@@ -536,6 +536,6 @@ update(Trie, Path, Fun) ->
     " []\n"
     " ```\n"
 ).
--spec values(trie(any(), EIX)) -> list(EIX).
+-spec values(trie(any(), HKK)) -> list(HKK).
 values(Trie) ->
     fold(Trie, [], fun(Values, _, Value) -> [Value | Values] end).

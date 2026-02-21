@@ -1,1 +1,0 @@
--record(non_null_type, {inner_type :: geql@ast:type()}).

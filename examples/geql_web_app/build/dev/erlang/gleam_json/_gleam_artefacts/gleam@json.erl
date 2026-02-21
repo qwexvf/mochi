@@ -1,5 +1,5 @@
 -module(gleam@json).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/json.gleam").
 -export([parse_bits/2, parse/2, to_string/1, to_string_tree/1, string/1, bool/1, int/1, float/1, null/0, nullable/2, object/1, preprocessed_array/1, array/2, dict/3]).
 -export_type([json/0, decode_error/0]).
@@ -41,7 +41,7 @@
     " Error(UnableToDecode([decode.DecodeError(\"String\", \"Int\", [])])),\n"
     " ```\n"
 ).
--spec parse_bits(bitstring(), gleam@dynamic@decode:decoder(DPU)) -> {ok, DPU} |
+-spec parse_bits(bitstring(), gleam@dynamic@decode:decoder(GEV)) -> {ok, GEV} |
     {error, decode_error()}.
 parse_bits(Json, Decoder) ->
     gleam@result:'try'(
@@ -56,7 +56,7 @@ parse_bits(Json, Decoder) ->
     ).
 
 -file("src/gleam/json.gleam", 47).
--spec do_parse(binary(), gleam@dynamic@decode:decoder(DPO)) -> {ok, DPO} |
+-spec do_parse(binary(), gleam@dynamic@decode:decoder(GEP)) -> {ok, GEP} |
     {error, decode_error()}.
 do_parse(Json, Decoder) ->
     Bits = gleam_stdlib:identity(Json),
@@ -84,7 +84,7 @@ do_parse(Json, Decoder) ->
     " Error(UnableToDecode([decode.DecodeError(\"String\", \"Int\", [])]))\n"
     " ```\n"
 ).
--spec parse(binary(), gleam@dynamic@decode:decoder(DPK)) -> {ok, DPK} |
+-spec parse(binary(), gleam@dynamic@decode:decoder(GEL)) -> {ok, GEL} |
     {error, decode_error()}.
 parse(Json, Decoder) ->
     do_parse(Json, Decoder).
@@ -217,7 +217,7 @@ null() ->
     " \"null\"\n"
     " ```\n"
 ).
--spec nullable(gleam@option:option(DQA), fun((DQA) -> json())) -> json().
+-spec nullable(gleam@option:option(GFB), fun((GFB) -> json())) -> json().
 nullable(Input, Inner_type) ->
     case Input of
         {some, Value} ->
@@ -271,7 +271,7 @@ preprocessed_array(From) ->
     " \"[1, 2, 3]\"\n"
     " ```\n"
 ).
--spec array(list(DQE), fun((DQE) -> json())) -> json().
+-spec array(list(GFF), fun((GFF) -> json())) -> json().
 array(Entries, Inner_type) ->
     _pipe = Entries,
     _pipe@1 = gleam@list:map(_pipe, Inner_type),
@@ -290,9 +290,9 @@ array(Entries, Inner_type) ->
     " ```\n"
 ).
 -spec dict(
-    gleam@dict:dict(DQI, DQJ),
-    fun((DQI) -> binary()),
-    fun((DQJ) -> json())
+    gleam@dict:dict(GFJ, GFK),
+    fun((GFJ) -> binary()),
+    fun((GFK) -> json())
 ) -> json().
 dict(Dict, Keys, Values) ->
     object(

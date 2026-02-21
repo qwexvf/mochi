@@ -4,6 +4,6 @@
                     gleam_regexp,
                     gleam_stdlib]},
     {description, "ANSI colours, formatting, and control codes"},
-    {modules, []},
+    {modules, [gleam_community@ansi]},
     {registered, []}
 ]}.

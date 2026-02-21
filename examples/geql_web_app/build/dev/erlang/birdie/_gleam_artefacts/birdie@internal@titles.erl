@@ -1,5 +1,5 @@
 -module(birdie@internal@titles).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birdie/internal/titles.gleam").
 -export([new/0, literals/1, prefixes/1, find/2, from_module/3, from_test_directory/0]).
 -export_type([titles/0, test_info/0, match/0, error/0, birdie_import/0, snap_title/0]).
@@ -47,8 +47,7 @@ new() ->
 add_literal_title(Titles, Title, Info) ->
     Literals = erlang:element(2, Titles),
     New_literals = gleam@dict:insert(Literals, Title, Info),
-    _record = Titles,
-    {titles, New_literals, erlang:element(3, _record)}.
+    {titles, New_literals, erlang:element(3, Titles)}.
 
 -file("src/birdie/internal/titles.gleam", 90).
 ?DOC(false).
@@ -362,7 +361,7 @@ snap_call(Birdie_import, Expression) ->
 
 -file("src/birdie/internal/titles.gleam", 563).
 ?DOC(false).
--spec try_or({ok, IHY} | {error, any()}, IIC, fun((IHY) -> IIC)) -> IIC.
+-spec try_or({ok, ICU} | {error, any()}, ICY, fun((ICU) -> ICY)) -> ICY.
 try_or(Result, Default, Fun) ->
     case Result of
         {ok, A} ->
@@ -375,10 +374,10 @@ try_or(Result, Default, Fun) ->
 -file("src/birdie/internal/titles.gleam", 570).
 ?DOC(false).
 -spec 'try'(
-    {ok, IID} | {error, IIE},
-    fun((IIE) -> IIH),
-    fun((IID) -> {ok, III} | {error, IIH})
-) -> {ok, III} | {error, IIH}.
+    {ok, ICZ} | {error, IDA},
+    fun((IDA) -> IDD),
+    fun((ICZ) -> {ok, IDE} | {error, IDD})
+) -> {ok, IDE} | {error, IDD}.
 'try'(Result, Map_error, Fun) ->
     case Result of
         {ok, A} ->
@@ -392,9 +391,9 @@ try_or(Result, Default, Fun) ->
 ?DOC(false).
 -spec try_fold_expression(
     glance:expression(),
-    IGW,
-    fun((IGW, glance:expression()) -> {ok, IGW} | {error, IGX})
-) -> {ok, IGW} | {error, IGX}.
+    IBS,
+    fun((IBS, glance:expression()) -> {ok, IBS} | {error, IBT})
+) -> {ok, IBS} | {error, IBT}.
 try_fold_expression(Expression, Acc, Fun) ->
     gleam@result:'try'(Fun(Acc, Expression), fun(Acc@1) -> case Expression of
                 {int, _, _} ->
@@ -547,13 +546,34 @@ try_fold_expression(Expression, Acc, Fun) ->
                     )
             end end).
 
+-file("src/birdie/internal/titles.gleam", 536).
+?DOC(false).
+-spec try_fold_clauses(
+    list(glance:clause()),
+    ICH,
+    fun((ICH, glance:expression()) -> {ok, ICH} | {error, ICI})
+) -> {ok, ICH} | {error, ICI}.
+try_fold_clauses(Clauses, Acc, Fun) ->
+    gleam@list:try_fold(Clauses, Acc, fun(Acc@1, Clause) -> case Clause of
+                {clause, _, none, Body} ->
+                    try_fold_expression(Body, Acc@1, Fun);
+
+                {clause, _, {some, Guard}, Body@1} ->
+                    gleam@result:'try'(
+                        try_fold_expression(Guard, Acc@1, Fun),
+                        fun(Acc@2) ->
+                            try_fold_expression(Body@1, Acc@2, Fun)
+                        end
+                    )
+            end end).
+
 -file("src/birdie/internal/titles.gleam", 403).
 ?DOC(false).
 -spec try_fold_statements(
     list(glance:statement()),
-    IGQ,
-    fun((IGQ, glance:expression()) -> {ok, IGQ} | {error, IGR})
-) -> {ok, IGQ} | {error, IGR}.
+    IBM,
+    fun((IBM, glance:expression()) -> {ok, IBM} | {error, IBN})
+) -> {ok, IBM} | {error, IBN}.
 try_fold_statements(Statements, Acc, Fun) ->
     gleam@list:try_fold(
         Statements,
@@ -703,9 +723,9 @@ from_test_directory() ->
 ?DOC(false).
 -spec try_fold_fields(
     list(glance:field(glance:expression())),
-    IHE,
-    fun((IHE, glance:expression()) -> {ok, IHE} | {error, IHF})
-) -> {ok, IHE} | {error, IHF}.
+    ICA,
+    fun((ICA, glance:expression()) -> {ok, ICA} | {error, ICB})
+) -> {ok, ICA} | {error, ICB}.
 try_fold_fields(Fields, Acc, Fun) ->
     gleam@list:try_fold(Fields, Acc, fun(Acc@1, Field) -> case Field of
                 {labelled_field, _, Item} ->
@@ -718,34 +738,13 @@ try_fold_fields(Fields, Acc, Fun) ->
                     {ok, Acc@1}
             end end).
 
--file("src/birdie/internal/titles.gleam", 536).
-?DOC(false).
--spec try_fold_clauses(
-    list(glance:clause()),
-    IHL,
-    fun((IHL, glance:expression()) -> {ok, IHL} | {error, IHM})
-) -> {ok, IHL} | {error, IHM}.
-try_fold_clauses(Clauses, Acc, Fun) ->
-    gleam@list:try_fold(Clauses, Acc, fun(Acc@1, Clause) -> case Clause of
-                {clause, _, none, Body} ->
-                    try_fold_expression(Body, Acc@1, Fun);
-
-                {clause, _, {some, Guard}, Body@1} ->
-                    gleam@result:'try'(
-                        try_fold_expression(Guard, Acc@1, Fun),
-                        fun(Acc@2) ->
-                            try_fold_expression(Body@1, Acc@2, Fun)
-                        end
-                    )
-            end end).
-
 -file("src/birdie/internal/titles.gleam", 552).
 ?DOC(false).
 -spec try_fold_expressions(
     list(glance:expression()),
-    IHS,
-    fun((IHS, glance:expression()) -> {ok, IHS} | {error, IHT})
-) -> {ok, IHS} | {error, IHT}.
+    ICO,
+    fun((ICO, glance:expression()) -> {ok, ICO} | {error, ICP})
+) -> {ok, ICO} | {error, ICP}.
 try_fold_expressions(Expressions, Acc, Fun) ->
     gleam@list:try_fold(
         Expressions,

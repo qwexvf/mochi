@@ -1,1 +1,0 @@
--record(object_value, {fields :: list(geql@sdl_ast:object_field_value())}).

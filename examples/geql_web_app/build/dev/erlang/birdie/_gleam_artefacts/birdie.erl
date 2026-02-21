@@ -1,5 +1,5 @@
 -module(birdie).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birdie.gleam").
 -export([snap/2, main/0]).
 -export_type([error/0, new/0, accepted/0, snapshot/1, outcome/0, info_line/0, split/0, command/0, review_mode/0, review_choice/0]).
@@ -29,11 +29,11 @@
 
 -type accepted() :: any().
 
--type snapshot(IWV) :: {snapshot,
+-type snapshot(IRR) :: {snapshot,
         binary(),
         binary(),
         gleam@option:option(birdie@internal@titles:test_info())} |
-    {gleam_phantom, IWV}.
+    {gleam_phantom, IRR}.
 
 -type outcome() :: {new_snapshot_created, snapshot(new()), binary()} |
     {different, snapshot(accepted()), snapshot(new())} |
@@ -1233,14 +1233,10 @@ update_accepted_snapshots(Snapshots_folder, Titles) ->
                                             2,
                                             Match
                                         ) =/= Existing_info ->
-                                            _pipe = begin
-                                                _record = Snapshot@1,
-                                                {snapshot,
-                                                    erlang:element(2, _record),
-                                                    erlang:element(3, _record),
-                                                    {some,
-                                                        erlang:element(2, Match)}}
-                                            end,
+                                            _pipe = {snapshot,
+                                                erlang:element(2, Snapshot@1),
+                                                erlang:element(3, Snapshot@1),
+                                                {some, erlang:element(2, Match)}},
                                             _pipe@1 = serialise(_pipe),
                                             _pipe@2 = simplifile:write(
                                                 Accepted_snapshot,
@@ -1256,17 +1252,11 @@ update_accepted_snapshots(Snapshots_folder, Titles) ->
                                             );
 
                                         {{ok, Match@1}, none} ->
-                                            _pipe@3 = begin
-                                                _record@1 = Snapshot@1,
-                                                {snapshot,
-                                                    erlang:element(2, _record@1),
-                                                    erlang:element(3, _record@1),
-                                                    {some,
-                                                        erlang:element(
-                                                            2,
-                                                            Match@1
-                                                        )}}
-                                            end,
+                                            _pipe@3 = {snapshot,
+                                                erlang:element(2, Snapshot@1),
+                                                erlang:element(3, Snapshot@1),
+                                                {some,
+                                                    erlang:element(2, Match@1)}},
                                             _pipe@4 = serialise(_pipe@3),
                                             _pipe@5 = simplifile:write(
                                                 Accepted_snapshot,
@@ -1323,13 +1313,10 @@ review_loop(New_snapshot_paths, Titles, Current, Out_of, Mode) ->
                         {error, _} ->
                             none
                     end,
-                    New_snapshot@1 = begin
-                        _record = New_snapshot,
-                        {snapshot,
-                            erlang:element(2, _record),
-                            erlang:element(3, _record),
-                            New_snapshot_info}
-                    end,
+                    New_snapshot@1 = {snapshot,
+                        erlang:element(2, New_snapshot),
+                        erlang:element(3, New_snapshot),
+                        New_snapshot_info},
                     Accepted_snapshot_path = to_accepted_path(New_snapshot_path),
                     gleam@result:'try'(
                         read_accepted(Accepted_snapshot_path),

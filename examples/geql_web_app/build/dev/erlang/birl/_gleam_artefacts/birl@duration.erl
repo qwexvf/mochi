@@ -1,5 +1,5 @@
 -module(birl@duration).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birl/duration.gleam").
 -export([add/2, subtract/2, scale_up/2, scale_down/2, micro_seconds/1, compare/2, milli_seconds/1, seconds/1, minutes/1, hours/1, days/1, weeks/1, months/1, years/1, new/1, decompose/1, blur_to/2, blur/1, accurate_new/1, accurate_decompose/1, parse/1]).
 -export_type([duration/0, unit/0]).

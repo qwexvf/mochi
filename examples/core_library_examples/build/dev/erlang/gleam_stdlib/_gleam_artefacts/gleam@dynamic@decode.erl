@@ -1,5 +1,5 @@
 -module(gleam@dynamic@decode).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/dynamic/decode.gleam").
 -export([run/2, success/1, decode_dynamic/1, map/2, map_errors/2, then/2, one_of/2, recursive/1, optional/1, decode_error/2, decode_bool/1, decode_int/1, decode_float/1, decode_bit_array/1, collapse_errors/2, failure/2, new_primitive_decoder/2, decode_string/1, dict/2, list/1, subfield/3, at/2, field/3, optional_field/4, optionally_at/3]).
 -export_type([decode_error/0, decoder/1]).
@@ -282,8 +282,8 @@
 
 -type decode_error() :: {decode_error, binary(), binary(), list(binary())}.
 
--opaque decoder(BXN) :: {decoder,
-        fun((gleam@dynamic:dynamic_()) -> {BXN, list(decode_error())})}.
+-opaque decoder(BUO) :: {decoder,
+        fun((gleam@dynamic:dynamic_()) -> {BUO, list(decode_error())})}.
 
 -file("src/gleam/dynamic/decode.gleam", 356).
 ?DOC(
@@ -302,7 +302,7 @@
     " decode.run(data, decoder)\n"
     " ```\n"
 ).
--spec run(gleam@dynamic:dynamic_(), decoder(BXV)) -> {ok, BXV} |
+-spec run(gleam@dynamic:dynamic_(), decoder(BUW)) -> {ok, BUW} |
     {error, list(decode_error())}.
 run(Data, Decoder) ->
     {Maybe_invalid_data, Errors} = (erlang:element(2, Decoder))(Data),
@@ -336,7 +336,7 @@ run(Data, Decoder) ->
     " assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))\n"
     " ```\n"
 ).
--spec success(BYW) -> decoder(BYW).
+-spec success(BVX) -> decoder(BVX).
 success(Data) ->
     {decoder, fun(_) -> {Data, []} end}.
 
@@ -358,7 +358,7 @@ decode_dynamic(Data) ->
     " assert result == Ok(\"1000\")\n"
     " ```\n"
 ).
--spec map(decoder(CBT), fun((CBT) -> CBV)) -> decoder(CBV).
+-spec map(decoder(BYU), fun((BYU) -> BYW)) -> decoder(BYW).
 map(Decoder, Transformer) ->
     {decoder,
         fun(D) ->
@@ -369,9 +369,9 @@ map(Decoder, Transformer) ->
 -file("src/gleam/dynamic/decode.gleam", 880).
 ?DOC(" Apply a transformation function to any errors returned by the decoder.\n").
 -spec map_errors(
-    decoder(CBX),
+    decoder(BYY),
     fun((list(decode_error())) -> list(decode_error()))
-) -> decoder(CBX).
+) -> decoder(BYY).
 map_errors(Decoder, Transformer) ->
     {decoder,
         fun(D) ->
@@ -385,7 +385,7 @@ map_errors(Decoder, Transformer) ->
     "\n"
     " This may be useful to run one previous decoder to use in further decoding.\n"
 ).
--spec then(decoder(CCF), fun((CCF) -> decoder(CCH))) -> decoder(CCH).
+-spec then(decoder(BZG), fun((BZG) -> decoder(BZI))) -> decoder(BZI).
 then(Decoder, Next) ->
     {decoder,
         fun(Dynamic_data) ->
@@ -404,9 +404,9 @@ then(Decoder, Next) ->
 -file("src/gleam/dynamic/decode.gleam", 961).
 -spec run_decoders(
     gleam@dynamic:dynamic_(),
-    {CCP, list(decode_error())},
-    list(decoder(CCP))
-) -> {CCP, list(decode_error())}.
+    {BZQ, list(decode_error())},
+    list(decoder(BZQ))
+) -> {BZQ, list(decode_error())}.
 run_decoders(Data, Failure, Decoders) ->
     case Decoders of
         [] ->
@@ -443,7 +443,7 @@ run_decoders(Data, Failure, Decoders) ->
     " // -> Ok(\"1000\")\n"
     " ```\n"
 ).
--spec one_of(decoder(CCK), list(decoder(CCK))) -> decoder(CCK).
+-spec one_of(decoder(BZL), list(decoder(BZL))) -> decoder(BZL).
 one_of(First, Alternatives) ->
     {decoder,
         fun(Dynamic_data) ->
@@ -480,7 +480,7 @@ one_of(First, Alternatives) ->
     " }\n"
     " ```\n"
 ).
--spec recursive(fun(() -> decoder(CDA))) -> decoder(CDA).
+-spec recursive(fun(() -> decoder(CAB))) -> decoder(CAB).
 recursive(Inner) ->
     {decoder,
         fun(Data) ->
@@ -509,7 +509,7 @@ recursive(Inner) ->
     " assert result == Ok(option.None)\n"
     " ```\n"
 ).
--spec optional(decoder(CBP)) -> decoder(gleam@option:option(CBP)).
+-spec optional(decoder(BYQ)) -> decoder(gleam@option:option(BYQ)).
 optional(Inner) ->
     {decoder, fun(Data) -> case gleam_stdlib:is_null(Data) of
                 true ->
@@ -530,8 +530,8 @@ decode_error(Expected, Found) ->
 -spec run_dynamic_function(
     gleam@dynamic:dynamic_(),
     binary(),
-    fun((gleam@dynamic:dynamic_()) -> {ok, BZQ} | {error, BZQ})
-) -> {BZQ, list(decode_error())}.
+    fun((gleam@dynamic:dynamic_()) -> {ok, BWR} | {error, BWR})
+) -> {BWR, list(decode_error())}.
 run_dynamic_function(Data, Name, F) ->
     case F(Data) of
         {ok, Data@1} ->
@@ -595,7 +595,7 @@ decode_bit_array(Data) ->
     " assert result == Error([DecodeError(\"MyThing\", \"Int\", [])])\n"
     " ```\n"
 ).
--spec collapse_errors(decoder(CCC), binary()) -> decoder(CCC).
+-spec collapse_errors(decoder(BZD), binary()) -> decoder(BZD).
 collapse_errors(Decoder, Name) ->
     {decoder,
         fun(Dynamic_data) ->
@@ -614,7 +614,7 @@ collapse_errors(Decoder, Name) ->
     " Define a decoder that always fails. The parameter for this function is the\n"
     " name of the type that has failed to decode.\n"
 ).
--spec failure(CCU, binary()) -> decoder(CCU).
+-spec failure(BZV, binary()) -> decoder(BZV).
 failure(Zero, Expected) ->
     {decoder, fun(D) -> {Zero, decode_error(Expected, D)} end}.
 
@@ -647,8 +647,8 @@ failure(Zero, Expected) ->
 ).
 -spec new_primitive_decoder(
     binary(),
-    fun((gleam@dynamic:dynamic_()) -> {ok, CCW} | {error, CCW})
-) -> decoder(CCW).
+    fun((gleam@dynamic:dynamic_()) -> {ok, BZX} | {error, BZX})
+) -> decoder(BZX).
 new_primitive_decoder(Name, Decoding_function) ->
     {decoder, fun(D) -> case Decoding_function(D) of
                 {ok, T} ->
@@ -688,12 +688,12 @@ decode_string(Data) ->
 
 -file("src/gleam/dynamic/decode.gleam", 803).
 -spec fold_dict(
-    {gleam@dict:dict(CBB, CBC), list(decode_error())},
+    {gleam@dict:dict(BYC, BYD), list(decode_error())},
     gleam@dynamic:dynamic_(),
     gleam@dynamic:dynamic_(),
-    fun((gleam@dynamic:dynamic_()) -> {CBB, list(decode_error())}),
-    fun((gleam@dynamic:dynamic_()) -> {CBC, list(decode_error())})
-) -> {gleam@dict:dict(CBB, CBC), list(decode_error())}.
+    fun((gleam@dynamic:dynamic_()) -> {BYC, list(decode_error())}),
+    fun((gleam@dynamic:dynamic_()) -> {BYD, list(decode_error())})
+) -> {gleam@dict:dict(BYC, BYD), list(decode_error())}.
 fold_dict(Acc, Key, Value, Key_decoder, Value_decoder) ->
     case Key_decoder(Key) of
         {Key@1, []} ->
@@ -732,7 +732,7 @@ fold_dict(Acc, Key, Value, Key_decoder, Value_decoder) ->
     " assert result == Ok(values)\n"
     " ```\n"
 ).
--spec dict(decoder(CAU), decoder(CAW)) -> decoder(gleam@dict:dict(CAU, CAW)).
+-spec dict(decoder(BXV), decoder(BXX)) -> decoder(gleam@dict:dict(BXV, BXX)).
 dict(Key, Value) ->
     {decoder, fun(Data) -> case gleam_stdlib:dict(Data) of
                 {error, _} ->
@@ -771,7 +771,7 @@ dict(Key, Value) ->
     " assert result == Ok([1, 2, 3])\n"
     " ```\n"
 ).
--spec list(decoder(CAI)) -> decoder(list(CAI)).
+-spec list(decoder(BXJ)) -> decoder(list(BXJ)).
 list(Inner) ->
     {decoder,
         fun(Data) ->
@@ -785,7 +785,7 @@ list(Inner) ->
         end}.
 
 -file("src/gleam/dynamic/decode.gleam", 438).
--spec push_path({BYR, list(decode_error())}, list(any())) -> {BYR,
+-spec push_path({BVS, list(decode_error())}, list(any())) -> {BVS,
     list(decode_error())}.
 push_path(Layer, Path) ->
     Decoder = one_of(
@@ -812,22 +812,23 @@ push_path(Layer, Path) ->
     ),
     Errors = gleam@list:map(
         erlang:element(2, Layer),
-        fun(Error) -> _record = Error,
+        fun(Error) ->
             {decode_error,
-                erlang:element(2, _record),
-                erlang:element(3, _record),
-                lists:append(Path@1, erlang:element(4, Error))} end
+                erlang:element(2, Error),
+                erlang:element(3, Error),
+                lists:append(Path@1, erlang:element(4, Error))}
+        end
     ),
     {erlang:element(1, Layer), Errors}.
 
 -file("src/gleam/dynamic/decode.gleam", 403).
 -spec index(
-    list(BYF),
-    list(BYF),
-    fun((gleam@dynamic:dynamic_()) -> {BYI, list(decode_error())}),
+    list(BVG),
+    list(BVG),
+    fun((gleam@dynamic:dynamic_()) -> {BVJ, list(decode_error())}),
     gleam@dynamic:dynamic_(),
-    fun((gleam@dynamic:dynamic_(), list(BYF)) -> {BYI, list(decode_error())})
-) -> {BYI, list(decode_error())}.
+    fun((gleam@dynamic:dynamic_(), list(BVG)) -> {BVJ, list(decode_error())})
+) -> {BVJ, list(decode_error())}.
 index(Path, Position, Inner, Data, Handle_miss) ->
     case Path of
         [] ->
@@ -881,7 +882,7 @@ index(Path, Position, Inner, Data, Handle_miss) ->
     " assert result == Ok(SignUp(name: \"Lucy\", email: \"lucy@example.com\"))\n"
     " ```\n"
 ).
--spec subfield(list(any()), decoder(BXQ), fun((BXQ) -> decoder(BXS))) -> decoder(BXS).
+-spec subfield(list(any()), decoder(BUR), fun((BUR) -> decoder(BUT))) -> decoder(BUT).
 subfield(Field_path, Field_decoder, Next) ->
     {decoder,
         fun(Data) ->
@@ -935,7 +936,7 @@ subfield(Field_path, Field_decoder, Next) ->
     " // -> Ok(option.None)\n"
     " ```\n"
 ).
--spec at(list(any()), decoder(BYC)) -> decoder(BYC).
+-spec at(list(any()), decoder(BVD)) -> decoder(BVD).
 at(Path, Inner) ->
     {decoder,
         fun(Data) ->
@@ -990,7 +991,7 @@ at(Path, Inner) ->
     " If you wish to return a default in the event that a field is not present,\n"
     " see [`optional_field`](#optional_field) and / [`optionally_at`](#optionally_at).\n"
 ).
--spec field(any(), decoder(BZA), fun((BZA) -> decoder(BZC))) -> decoder(BZC).
+-spec field(any(), decoder(BWB), fun((BWB) -> decoder(BWD))) -> decoder(BWD).
 field(Field_name, Field_decoder, Next) ->
     subfield([Field_name], Field_decoder, Next).
 
@@ -1021,7 +1022,7 @@ field(Field_name, Field_decoder, Next) ->
     " assert result == Ok(SignUp(name: \"Lucy\", email: \"n/a\"))\n"
     " ```\n"
 ).
--spec optional_field(any(), BZG, decoder(BZG), fun((BZG) -> decoder(BZI))) -> decoder(BZI).
+-spec optional_field(any(), BWH, decoder(BWH), fun((BWH) -> decoder(BWJ))) -> decoder(BWJ).
 optional_field(Key, Default, Field_decoder, Next) ->
     {decoder,
         fun(Data) ->
@@ -1069,7 +1070,7 @@ optional_field(Key, Default, Field_decoder, Next) ->
     " // -> Ok(100)\n"
     " ```\n"
 ).
--spec optionally_at(list(any()), BZN, decoder(BZN)) -> decoder(BZN).
+-spec optionally_at(list(any()), BWO, decoder(BWO)) -> decoder(BWO).
 optionally_at(Path, Default, Inner) ->
     {decoder,
         fun(Data) ->

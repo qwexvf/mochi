@@ -1,1 +1,0 @@
--record(operation_definition, {operation :: geql@ast:operation()}).

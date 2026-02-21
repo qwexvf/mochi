@@ -1,1 +1,0 @@
--record(inline_fragment, {inline_fragment :: geql@ast:inline_fragment_value()}).

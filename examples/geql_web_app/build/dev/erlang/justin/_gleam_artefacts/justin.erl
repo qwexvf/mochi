@@ -1,5 +1,5 @@
 -module(justin).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/justin.gleam").
 -export([snake_case/1, camel_case/1, pascal_case/1, kebab_case/1, sentence_case/1]).
 

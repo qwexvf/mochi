@@ -1,5 +1,5 @@
 -module(gleam_community@ansi).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam_community/ansi.gleam").
 -export([strip/1, reset/1, bold/1, dim/1, italic/1, underline/1, inverse/1, hidden/1, strikethrough/1, black/1, red/1, green/1, yellow/1, blue/1, magenta/1, cyan/1, white/1, bright_black/1, grey/1, gray/1, bright_red/1, bright_green/1, bright_yellow/1, bright_blue/1, bright_magenta/1, bright_cyan/1, bright_white/1, pink/1, hex/2, colour/2, color/2, bg_black/1, bg_red/1, bg_green/1, bg_yellow/1, bg_blue/1, bg_magenta/1, bg_cyan/1, bg_white/1, bg_bright_black/1, bg_bright_red/1, bg_bright_green/1, bg_bright_yellow/1, bg_bright_blue/1, bg_bright_magenta/1, bg_bright_cyan/1, bg_bright_white/1, bg_pink/1, bg_hex/2, bg_colour/2, bg_color/2]).
 -export_type([code/0]).

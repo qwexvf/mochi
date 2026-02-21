@@ -1,5 +1,5 @@
 -module(gleam@dict).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/dict.gleam").
 -export([size/1, is_empty/1, to_list/1, new/0, get/2, has_key/2, insert/3, from_list/1, keys/1, values/1, take/2, merge/2, delete/2, drop/2, upsert/3, fold/3, map_values/2, filter/2, each/2, combine/3]).
 -export_type([dict/2]).
@@ -12,7 +12,7 @@
 -define(DOC(Str), -compile([])).
 -endif.
 
--type dict(LA, LB) :: any() | {gleam_phantom, LA, LB}.
+-type dict(KE, KF) :: any() | {gleam_phantom, KE, KF}.
 
 -file("src/gleam/dict.gleam", 36).
 ?DOC(
@@ -79,7 +79,7 @@ is_empty(Dict) ->
     " // -> [#(\"a\", 0), #(\"b\", 1), #(\"c\", 2)]\n"
     " ```\n"
 ).
--spec to_list(dict(LK, LL)) -> list({LK, LL}).
+-spec to_list(dict(KO, KP)) -> list({KO, KP}).
 to_list(Dict) ->
     maps:to_list(Dict).
 
@@ -108,7 +108,7 @@ new() ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec get(dict(MN, MO), MN) -> {ok, MO} | {error, nil}.
+-spec get(dict(LR, LS), LR) -> {ok, LS} | {error, nil}.
 get(From, Get) ->
     gleam_stdlib:map_get(From, Get).
 
@@ -128,7 +128,7 @@ get(From, Get) ->
     " // -> False\n"
     " ```\n"
 ).
--spec has_key(dict(MB, any()), MB) -> boolean().
+-spec has_key(dict(LF, any()), LF) -> boolean().
 has_key(Dict, Key) ->
     maps:is_key(Key, Dict).
 
@@ -151,12 +151,12 @@ has_key(Dict, Key) ->
     " // -> from_list([#(\"a\", 5)])\n"
     " ```\n"
 ).
--spec insert(dict(MT, MU), MT, MU) -> dict(MT, MU).
+-spec insert(dict(LX, LY), LX, LY) -> dict(LX, LY).
 insert(Dict, Key, Value) ->
     maps:put(Key, Value, Dict).
 
 -file("src/gleam/dict.gleam", 92).
--spec from_list_loop(list({LU, LV}), dict(LU, LV)) -> dict(LU, LV).
+-spec from_list_loop(list({KY, KZ}), dict(KY, KZ)) -> dict(KY, KZ).
 from_list_loop(List, Initial) ->
     case List of
         [] ->
@@ -173,12 +173,12 @@ from_list_loop(List, Initial) ->
     " If two tuples have the same key the last one in the list will be the one\n"
     " that is present in the dict.\n"
 ).
--spec from_list(list({LP, LQ})) -> dict(LP, LQ).
+-spec from_list(list({KT, KU})) -> dict(KT, KU).
 from_list(List) ->
     maps:from_list(List).
 
 -file("src/gleam/dict.gleam", 223).
--spec reverse_and_concat(list(OD), list(OD)) -> list(OD).
+-spec reverse_and_concat(list(NH), list(NH)) -> list(NH).
 reverse_and_concat(Remaining, Accumulator) ->
     case Remaining of
         [] ->
@@ -189,7 +189,7 @@ reverse_and_concat(Remaining, Accumulator) ->
     end.
 
 -file("src/gleam/dict.gleam", 216).
--spec do_keys_loop(list({NY, any()}), list(NY)) -> list(NY).
+-spec do_keys_loop(list({NC, any()}), list(NC)) -> list(NC).
 do_keys_loop(List, Acc) ->
     case List of
         [] ->
@@ -214,12 +214,12 @@ do_keys_loop(List, Acc) ->
     " // -> [\"a\", \"b\"]\n"
     " ```\n"
 ).
--spec keys(dict(NT, any())) -> list(NT).
+-spec keys(dict(MX, any())) -> list(MX).
 keys(Dict) ->
     maps:keys(Dict).
 
 -file("src/gleam/dict.gleam", 249).
--spec do_values_loop(list({any(), ON}), list(ON)) -> list(ON).
+-spec do_values_loop(list({any(), NR}), list(NR)) -> list(NR).
 do_values_loop(List, Acc) ->
     case List of
         [] ->
@@ -244,12 +244,12 @@ do_values_loop(List, Acc) ->
     " // -> [0, 1]\n"
     " ```\n"
 ).
--spec values(dict(any(), OI)) -> list(OI).
+-spec values(dict(any(), NM)) -> list(NM).
 values(Dict) ->
     maps:values(Dict).
 
 -file("src/gleam/dict.gleam", 318).
--spec do_take_loop(dict(PR, PS), list(PR), dict(PR, PS)) -> dict(PR, PS).
+-spec do_take_loop(dict(OV, OW), list(OV), dict(OV, OW)) -> dict(OV, OW).
 do_take_loop(Dict, Desired_keys, Acc) ->
     Insert = fun(Taken, Key) -> case gleam_stdlib:map_get(Dict, Key) of
             {ok, Value} ->
@@ -285,17 +285,17 @@ do_take_loop(Dict, Desired_keys, Acc) ->
     " // -> from_list([#(\"a\", 0), #(\"b\", 1)])\n"
     " ```\n"
 ).
--spec take(dict(PD, PE), list(PD)) -> dict(PD, PE).
+-spec take(dict(OH, OI), list(OH)) -> dict(OH, OI).
 take(Dict, Desired_keys) ->
     maps:with(Desired_keys, Dict).
 
 -file("src/gleam/dict.gleam", 363).
--spec insert_pair(dict(QP, QQ), {QP, QQ}) -> dict(QP, QQ).
+-spec insert_pair(dict(PT, PU), {PT, PU}) -> dict(PT, PU).
 insert_pair(Dict, Pair) ->
     insert(Dict, erlang:element(1, Pair), erlang:element(2, Pair)).
 
 -file("src/gleam/dict.gleam", 356).
--spec fold_inserts(list({QI, QJ}), dict(QI, QJ)) -> dict(QI, QJ).
+-spec fold_inserts(list({PM, PN}), dict(PM, PN)) -> dict(PM, PN).
 fold_inserts(New_entries, Dict) ->
     case New_entries of
         [] ->
@@ -321,7 +321,7 @@ fold_inserts(New_entries, Dict) ->
     " // -> from_list([#(\"a\", 0), #(\"b\", 2), #(\"c\", 3)])\n"
     " ```\n"
 ).
--spec merge(dict(QA, QB), dict(QA, QB)) -> dict(QA, QB).
+-spec merge(dict(PE, PF), dict(PE, PF)) -> dict(PE, PF).
 merge(Dict, New_entries) ->
     maps:merge(Dict, New_entries).
 
@@ -342,7 +342,7 @@ merge(Dict, New_entries) ->
     " // -> from_list([#(\"a\", 0), #(\"b\", 1)])\n"
     " ```\n"
 ).
--spec delete(dict(QV, QW), QV) -> dict(QV, QW).
+-spec delete(dict(PZ, QA), PZ) -> dict(PZ, QA).
 delete(Dict, Key) ->
     maps:remove(Key, Dict).
 
@@ -368,7 +368,7 @@ delete(Dict, Key) ->
     " // -> from_list([])\n"
     " ```\n"
 ).
--spec drop(dict(RH, RI), list(RH)) -> dict(RH, RI).
+-spec drop(dict(QL, QM), list(QL)) -> dict(QL, QM).
 drop(Dict, Disallowed_keys) ->
     case Disallowed_keys of
         [] ->
@@ -403,7 +403,7 @@ drop(Dict, Disallowed_keys) ->
     " // -> from_list([#(\"a\", 0), #(\"b\", 0)])\n"
     " ```\n"
 ).
--spec upsert(dict(RO, RP), RO, fun((gleam@option:option(RP)) -> RP)) -> dict(RO, RP).
+-spec upsert(dict(QS, QT), QS, fun((gleam@option:option(QT)) -> QT)) -> dict(QS, QT).
 upsert(Dict, Key, Fun) ->
     case gleam_stdlib:map_get(Dict, Key) of
         {ok, Value} ->
@@ -414,7 +414,7 @@ upsert(Dict, Key, Fun) ->
     end.
 
 -file("src/gleam/dict.gleam", 484).
--spec fold_loop(list({SA, SB}), SD, fun((SD, SA, SB) -> SD)) -> SD.
+-spec fold_loop(list({RE, RF}), RH, fun((RH, RE, RF) -> RH)) -> RH.
 fold_loop(List, Initial, Fun) ->
     case List of
         [] ->
@@ -451,7 +451,7 @@ fold_loop(List, Initial, Fun) ->
     " // -> \"abc\"\n"
     " ```\n"
 ).
--spec fold(dict(RV, RW), RZ, fun((RZ, RV, RW) -> RZ)) -> RZ.
+-spec fold(dict(QZ, RA), RD, fun((RD, QZ, RA) -> RD)) -> RD.
 fold(Dict, Initial, Fun) ->
     fold_loop(maps:to_list(Dict), Initial, Fun).
 
@@ -468,7 +468,7 @@ fold(Dict, Initial, Fun) ->
     " // -> from_list([#(3, 9), #(2, 8)])\n"
     " ```\n"
 ).
--spec map_values(dict(NF, NG), fun((NF, NG) -> NJ)) -> dict(NF, NJ).
+-spec map_values(dict(MJ, MK), fun((MJ, MK) -> MN)) -> dict(MJ, MN).
 map_values(Dict, Fun) ->
     maps:map(Fun, Dict).
 
@@ -491,7 +491,7 @@ map_values(Dict, Fun) ->
     " // -> from_list([#(\"a\", 0), #(\"b\", 1)])\n"
     " ```\n"
 ).
--spec filter(dict(OR, OS), fun((OR, OS) -> boolean())) -> dict(OR, OS).
+-spec filter(dict(NV, NW), fun((NV, NW) -> boolean())) -> dict(NV, NW).
 filter(Dict, Predicate) ->
     maps:filter(Predicate, Dict).
 
@@ -519,7 +519,7 @@ filter(Dict, Predicate) ->
     " The order of elements in the iteration is an implementation detail that\n"
     " should not be relied upon.\n"
 ).
--spec each(dict(SE, SF), fun((SE, SF) -> any())) -> nil.
+-spec each(dict(RI, RJ), fun((RI, RJ) -> any())) -> nil.
 each(Dict, Fun) ->
     fold(
         Dict,
@@ -546,7 +546,7 @@ each(Dict, Fun) ->
     " // -> from_list([#(\"a\", 2), #(\"b\", 1), #(\"c\", 3)])\n"
     " ```\n"
 ).
--spec combine(dict(SJ, SK), dict(SJ, SK), fun((SK, SK) -> SK)) -> dict(SJ, SK).
+-spec combine(dict(RN, RO), dict(RN, RO), fun((RO, RO) -> RO)) -> dict(RN, RO).
 combine(Dict, Other, Fun) ->
     fold(
         Dict,

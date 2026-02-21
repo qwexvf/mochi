@@ -1,5 +1,5 @@
 -module(gleam@set).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/set.gleam").
 -export([new/0, size/1, is_empty/1, contains/2, delete/2, to_list/1, fold/3, filter/2, drop/2, take/2, intersection/2, difference/2, is_subset/2, is_disjoint/2, each/2, insert/2, from_list/1, map/2, union/2, symmetric_difference/2]).
 -export_type([set/1]).
@@ -12,7 +12,7 @@
 -define(DOC(Str), -compile([])).
 -endif.
 
--opaque set(CYN) :: {set, gleam@dict:dict(CYN, list(nil))}.
+-opaque set(CVC) :: {set, gleam@dict:dict(CVC, list(nil))}.
 
 -file("src/gleam/set.gleam", 32).
 ?DOC(" Creates a new empty set.\n").
@@ -82,7 +82,7 @@ is_empty(Set) ->
     " // -> False\n"
     " ```\n"
 ).
--spec contains(set(CYY), CYY) -> boolean().
+-spec contains(set(CVN), CVN) -> boolean().
 contains(Set, Member) ->
     _pipe = erlang:element(2, Set),
     _pipe@1 = gleam_stdlib:map_get(_pipe, Member),
@@ -105,7 +105,7 @@ contains(Set, Member) ->
     " // -> False\n"
     " ```\n"
 ).
--spec delete(set(CZA), CZA) -> set(CZA).
+-spec delete(set(CVP), CVP) -> set(CVP).
 delete(Set, Member) ->
     {set, gleam@dict:delete(erlang:element(2, Set), Member)}.
 
@@ -125,7 +125,7 @@ delete(Set, Member) ->
     " // -> [2]\n"
     " ```\n"
 ).
--spec to_list(set(CZD)) -> list(CZD).
+-spec to_list(set(CVS)) -> list(CVS).
 to_list(Set) ->
     maps:keys(erlang:element(2, Set)).
 
@@ -146,7 +146,7 @@ to_list(Set) ->
     " // -> 13\n"
     " ```\n"
 ).
--spec fold(set(CZJ), CZL, fun((CZL, CZJ) -> CZL)) -> CZL.
+-spec fold(set(CVY), CWA, fun((CWA, CVY) -> CWA)) -> CWA.
 fold(Set, Initial, Reducer) ->
     gleam@dict:fold(
         erlang:element(2, Set),
@@ -172,7 +172,7 @@ fold(Set, Initial, Reducer) ->
     " // -> [4, 6, 44]\n"
     " ```\n"
 ).
--spec filter(set(CZM), fun((CZM) -> boolean())) -> set(CZM).
+-spec filter(set(CWB), fun((CWB) -> boolean())) -> set(CWB).
 filter(Set, Predicate) ->
     {set,
         gleam@dict:filter(erlang:element(2, Set), fun(M, _) -> Predicate(M) end)}.
@@ -191,7 +191,7 @@ filter(Set, Predicate) ->
     " // -> [2, 4]\n"
     " ```\n"
 ).
--spec drop(set(CZT), list(CZT)) -> set(CZT).
+-spec drop(set(CWI), list(CWI)) -> set(CWI).
 drop(Set, Disallowed) ->
     gleam@list:fold(Disallowed, Set, fun delete/2).
 
@@ -211,12 +211,12 @@ drop(Set, Disallowed) ->
     " // -> [1, 3]\n"
     " ```\n"
 ).
--spec take(set(CZX), list(CZX)) -> set(CZX).
+-spec take(set(CWM), list(CWM)) -> set(CWM).
 take(Set, Desired) ->
     {set, gleam@dict:take(erlang:element(2, Set), Desired)}.
 
 -file("src/gleam/set.gleam", 287).
--spec order(set(DAF), set(DAF)) -> {set(DAF), set(DAF)}.
+-spec order(set(CWU), set(CWU)) -> {set(CWU), set(CWU)}.
 order(First, Second) ->
     case maps:size(erlang:element(2, First)) > maps:size(
         erlang:element(2, Second)
@@ -241,7 +241,7 @@ order(First, Second) ->
     " // -> [2]\n"
     " ```\n"
 ).
--spec intersection(set(DAK), set(DAK)) -> set(DAK).
+-spec intersection(set(CWZ), set(CWZ)) -> set(CWZ).
 intersection(First, Second) ->
     {Larger, Smaller} = order(First, Second),
     take(Larger, to_list(Smaller)).
@@ -258,7 +258,7 @@ intersection(First, Second) ->
     " // -> [1]\n"
     " ```\n"
 ).
--spec difference(set(DAO), set(DAO)) -> set(DAO).
+-spec difference(set(CXD), set(CXD)) -> set(CXD).
 difference(First, Second) ->
     drop(First, to_list(Second)).
 
@@ -278,7 +278,7 @@ difference(First, Second) ->
     " // -> False\n"
     " ```\n"
 ).
--spec is_subset(set(DAS), set(DAS)) -> boolean().
+-spec is_subset(set(CXH), set(CXH)) -> boolean().
 is_subset(First, Second) ->
     intersection(First, Second) =:= First.
 
@@ -298,7 +298,7 @@ is_subset(First, Second) ->
     " // -> False\n"
     " ```\n"
 ).
--spec is_disjoint(set(DAV), set(DAV)) -> boolean().
+-spec is_disjoint(set(CXK), set(CXK)) -> boolean().
 is_disjoint(First, Second) ->
     intersection(First, Second) =:= new().
 
@@ -322,7 +322,7 @@ is_disjoint(First, Second) ->
     " The order of elements in the iteration is an implementation detail that\n"
     " should not be relied upon.\n"
 ).
--spec each(set(DBC), fun((DBC) -> any())) -> nil.
+-spec each(set(CXR), fun((CXR) -> any())) -> nil.
 each(Set, Fun) ->
     fold(
         Set,
@@ -349,7 +349,7 @@ each(Set, Fun) ->
     " // -> 2\n"
     " ```\n"
 ).
--spec insert(set(CYV), CYV) -> set(CYV).
+-spec insert(set(CVK), CVK) -> set(CVK).
 insert(Set, Member) ->
     {set, gleam@dict:insert(erlang:element(2, Set), Member, [])}.
 
@@ -369,7 +369,7 @@ insert(Set, Member) ->
     " // -> [1, 2, 3, 4]\n"
     " ```\n"
 ).
--spec from_list(list(CZG)) -> set(CZG).
+-spec from_list(list(CVV)) -> set(CVV).
 from_list(Members) ->
     Dict = gleam@list:fold(
         Members,
@@ -392,7 +392,7 @@ from_list(Members) ->
     " // -> [2, 4, 6, 8]\n"
     " ```\n"
 ).
--spec map(set(CZP), fun((CZP) -> CZR)) -> set(CZR).
+-spec map(set(CWE), fun((CWE) -> CWG)) -> set(CWG).
 map(Set, Fun) ->
     fold(Set, new(), fun(Acc, Member) -> insert(Acc, Fun(Member)) end).
 
@@ -409,7 +409,7 @@ map(Set, Fun) ->
     " // -> [1, 2, 3]\n"
     " ```\n"
 ).
--spec union(set(DAB), set(DAB)) -> set(DAB).
+-spec union(set(CWQ), set(CWQ)) -> set(CWQ).
 union(First, Second) ->
     {Larger, Smaller} = order(First, Second),
     fold(Smaller, Larger, fun insert/2).
@@ -424,6 +424,6 @@ union(First, Second) ->
     " // -> [1, 2, 4]\n"
     " ```\n"
 ).
--spec symmetric_difference(set(DAY), set(DAY)) -> set(DAY).
+-spec symmetric_difference(set(CXN), set(CXN)) -> set(CXN).
 symmetric_difference(First, Second) ->
     difference(union(First, Second), intersection(First, Second)).

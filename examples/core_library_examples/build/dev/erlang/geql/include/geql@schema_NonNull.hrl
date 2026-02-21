@@ -1,1 +1,0 @@
--record(non_null, {inner :: geql@schema:field_type()}).

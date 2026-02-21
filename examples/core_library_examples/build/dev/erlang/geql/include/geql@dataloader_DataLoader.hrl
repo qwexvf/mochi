@@ -1,1 +1,0 @@
--record(data_loader, {state :: geql@dataloader:data_loader_state(any(), any())}).

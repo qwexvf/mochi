@@ -1,5 +1,5 @@
 -module(gleam@dynamic).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/dynamic.gleam").
 -export([classify/1, bool/1, string/1, float/1, int/1, bit_array/1, list/1, array/1, properties/1, nil/0]).
 -export_type([dynamic_/0]).

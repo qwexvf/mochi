@@ -1,1 +1,0 @@
--record(list_value, {values :: list(geql@ast:value())}).

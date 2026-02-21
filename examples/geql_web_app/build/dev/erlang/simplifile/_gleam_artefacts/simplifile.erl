@@ -1,5 +1,5 @@
 -module(simplifile).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/simplifile.gleam").
 -export([describe_error/1, file_info_permissions_octal/1, file_info_type/1, file_info/1, link_info/1, delete/1, delete_all/1, read_bits/1, read/1, write_bits/2, write/2, append_bits/2, append/2, is_directory/1, create_directory/1, create_symlink/2, create_link/2, read_directory/1, is_file/1, is_symlink/1, create_file/1, create_directory_all/1, copy_file/2, rename_file/2, rename/2, copy_directory/2, copy/2, rename_directory/2, clear_directory/1, get_files/1, file_permissions_to_octal/1, file_info_permissions/1, set_permissions_octal/2, set_permissions/2, current_directory/0]).
 -export_type([file_error/0, file_info/0, file_type/0, permission/0, file_permissions/0]).

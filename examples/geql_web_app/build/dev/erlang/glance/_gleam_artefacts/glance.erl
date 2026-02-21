@@ -1,5 +1,5 @@
 -module(glance).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/glance.gleam").
 -export([precedence/1, module/1]).
 -export_type([definition/1, attribute/0, module_/0, function_/0, span/0, statement/0, assignment_kind/0, use_pattern/0, pattern/0, expression/0, clause/0, bit_string_segment_option/1, binary_operator/0, fn_parameter/0, function_parameter/0, assignment_name/0, import/0, constant/0, unqualified_import/0, publicity/0, type_alias/0, custom_type/0, variant/0, record_update_field/1, variant_field/0, field/1, type/0, error/0, unqualified_imports/0, pattern_constructor_arguments/0, parse_expression_unit_context/0, parsed_list/1]).
@@ -12,7 +12,7 @@
 -define(DOC(Str), -compile([])).
 -endif.
 
--type definition(FMB) :: {definition, list(attribute()), FMB}.
+-type definition(DUG) :: {definition, list(attribute()), DUG}.
 
 -type attribute() :: {attribute, binary(), list(expression())}.
 
@@ -114,7 +114,7 @@
         gleam@option:option(expression()),
         expression()}.
 
--type bit_string_segment_option(FMC) :: bytes_option |
+-type bit_string_segment_option(DUH) :: bytes_option |
     int_option |
     float_option |
     bits_option |
@@ -129,7 +129,7 @@
     big_option |
     little_option |
     native_option |
-    {size_value_option, FMC} |
+    {size_value_option, DUH} |
     {size_option, integer()} |
     {unit_option, integer()}.
 
@@ -205,16 +205,16 @@
 
 -type variant() :: {variant, binary(), list(variant_field()), list(attribute())}.
 
--type record_update_field(FMD) :: {record_update_field,
+-type record_update_field(DUI) :: {record_update_field,
         binary(),
-        gleam@option:option(FMD)}.
+        gleam@option:option(DUI)}.
 
 -type variant_field() :: {labelled_variant_field, type(), binary()} |
     {unlabelled_variant_field, type()}.
 
--type field(FME) :: {labelled_field, binary(), FME} |
+-type field(DUJ) :: {labelled_field, binary(), DUJ} |
     {shorthand_field, binary()} |
-    {unlabelled_field, FME}.
+    {unlabelled_field, DUJ}.
 
 -type type() :: {named_type,
         span(),
@@ -244,9 +244,9 @@
 -type parse_expression_unit_context() :: regular_expression_unit |
     expression_unit_after_pipe.
 
--type parsed_list(FMF) :: {parsed_list,
-        list(FMF),
-        gleam@option:option(FMF),
+-type parsed_list(DUK) :: {parsed_list,
+        list(DUK),
+        gleam@option:option(DUK),
         list({glexer@token:token(), glexer:position()}),
         integer()}.
 
@@ -327,13 +327,12 @@ precedence(Operator) ->
 -file("src/glance.gleam", 391).
 -spec push_variant(custom_type(), variant()) -> custom_type().
 push_variant(Custom_type, Variant) ->
-    _record = Custom_type,
     {custom_type,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
-        erlang:element(4, _record),
-        erlang:element(5, _record),
-        erlang:element(6, _record),
+        erlang:element(2, Custom_type),
+        erlang:element(3, Custom_type),
+        erlang:element(4, Custom_type),
+        erlang:element(5, Custom_type),
+        erlang:element(6, Custom_type),
         [Variant | erlang:element(7, Custom_type)]}.
 
 -file("src/glance.gleam", 395).
@@ -341,9 +340,9 @@ push_variant(Custom_type, Variant) ->
     glexer@token:token(),
     list({glexer@token:token(), glexer:position()}),
     fun((glexer:position(), list({glexer@token:token(), glexer:position()})) -> {ok,
-            FMN} |
+            DUS} |
         {error, error()})
-) -> {ok, FMN} | {error, error()}.
+) -> {ok, DUS} | {error, error()}.
 expect(Expected, Tokens, Next) ->
     case Tokens of
         [] ->
@@ -360,9 +359,9 @@ expect(Expected, Tokens, Next) ->
 -spec expect_upper_name(
     list({glexer@token:token(), glexer:position()}),
     fun((binary(), integer(), list({glexer@token:token(), glexer:position()})) -> {ok,
-            FMS} |
+            DUX} |
         {error, error()})
-) -> {ok, FMS} | {error, error()}.
+) -> {ok, DUX} | {error, error()}.
 expect_upper_name(Tokens, Next) ->
     case Tokens of
         [] ->
@@ -378,9 +377,9 @@ expect_upper_name(Tokens, Next) ->
 -file("src/glance.gleam", 419).
 -spec expect_name(
     list({glexer@token:token(), glexer:position()}),
-    fun((binary(), list({glexer@token:token(), glexer:position()})) -> {ok, FMX} |
+    fun((binary(), list({glexer@token:token(), glexer:position()})) -> {ok, DVC} |
         {error, error()})
-) -> {ok, FMX} | {error, error()}.
+) -> {ok, DVC} | {error, error()}.
 expect_name(Tokens, Next) ->
     case Tokens of
         [] ->
@@ -599,12 +598,12 @@ string_offset(Start, String) ->
 -file("src/glance.gleam", 430).
 -spec until(
     glexer@token:token(),
-    FNC,
+    DVH,
     list({glexer@token:token(), glexer:position()}),
-    fun((FNC, list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FNC, list({glexer@token:token(), glexer:position()})}} |
+    fun((DVH, list({glexer@token:token(), glexer:position()})) -> {ok,
+            {DVH, list({glexer@token:token(), glexer:position()})}} |
         {error, error()})
-) -> {ok, {FNC, integer(), list({glexer@token:token(), glexer:position()})}} |
+) -> {ok, {DVH, integer(), list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 until(Limit, Acc, Tokens, Callback) ->
     case Tokens of
@@ -653,12 +652,12 @@ optional_module_alias(Tokens, End) ->
 -file("src/glance.gleam", 1714).
 -spec list(
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FSV, list({glexer@token:token(), glexer:position()})}} |
+            {EBA, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
-    gleam@option:option(fun((span()) -> FSV)),
-    list(FSV),
+    gleam@option:option(fun((span()) -> EBA)),
+    list(EBA),
     list({glexer@token:token(), glexer:position()})
-) -> {ok, parsed_list(FSV)} | {error, error()}.
+) -> {ok, parsed_list(EBA)} | {error, error()}.
 list(Parser, Discard, Acc, Tokens) ->
     case Tokens of
         [{right_square, {position, End}} | Tokens@1] ->
@@ -787,60 +786,53 @@ list(Parser, Discard, Acc, Tokens) ->
 -file("src/glance.gleam", 345).
 -spec push_constant(module_(), list(attribute()), constant()) -> module_().
 push_constant(Module, Attributes, Constant) ->
-    _record = Module,
     {module,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
-        erlang:element(4, _record),
+        erlang:element(2, Module),
+        erlang:element(3, Module),
+        erlang:element(4, Module),
         [{definition, lists:reverse(Attributes), Constant} |
             erlang:element(5, Module)],
-        erlang:element(6, _record)}.
+        erlang:element(6, Module)}.
 
 -file("src/glance.gleam", 356).
 -spec push_function(module_(), list(attribute()), function_()) -> module_().
 push_function(Module, Attributes, Function) ->
-    _record = Module,
     {module,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
-        erlang:element(4, _record),
-        erlang:element(5, _record),
+        erlang:element(2, Module),
+        erlang:element(3, Module),
+        erlang:element(4, Module),
+        erlang:element(5, Module),
         [{definition, lists:reverse(Attributes), Function} |
             erlang:element(6, Module)]}.
 
 -file("src/glance.gleam", 367).
 -spec push_custom_type(module_(), list(attribute()), custom_type()) -> module_().
 push_custom_type(Module, Attributes, Custom_type) ->
-    Custom_type@1 = begin
-        _record = Custom_type,
-        {custom_type,
-            erlang:element(2, _record),
-            erlang:element(3, _record),
-            erlang:element(4, _record),
-            erlang:element(5, _record),
-            erlang:element(6, _record),
-            lists:reverse(erlang:element(7, Custom_type))}
-    end,
-    _record@1 = Module,
+    Custom_type@1 = {custom_type,
+        erlang:element(2, Custom_type),
+        erlang:element(3, Custom_type),
+        erlang:element(4, Custom_type),
+        erlang:element(5, Custom_type),
+        erlang:element(6, Custom_type),
+        lists:reverse(erlang:element(7, Custom_type))},
     {module,
-        erlang:element(2, _record@1),
+        erlang:element(2, Module),
         [{definition, lists:reverse(Attributes), Custom_type@1} |
             erlang:element(3, Module)],
-        erlang:element(4, _record@1),
-        erlang:element(5, _record@1),
-        erlang:element(6, _record@1)}.
+        erlang:element(4, Module),
+        erlang:element(5, Module),
+        erlang:element(6, Module)}.
 
 -file("src/glance.gleam", 380).
 -spec push_type_alias(module_(), list(attribute()), type_alias()) -> module_().
 push_type_alias(Module, Attributes, Type_alias) ->
-    _record = Module,
     {module,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
+        erlang:element(2, Module),
+        erlang:element(3, Module),
         [{definition, lists:reverse(Attributes), Type_alias} |
             erlang:element(4, Module)],
-        erlang:element(5, _record),
-        erlang:element(6, _record)}.
+        erlang:element(5, Module),
+        erlang:element(6, Module)}.
 
 -file("src/glance.gleam", 618).
 -spec unqualified_imports(
@@ -1008,15 +1000,12 @@ import_statement(Module, Attributes, Tokens, Start) ->
                     Definition = {definition,
                         lists:reverse(Attributes),
                         Import_},
-                    Module@1 = begin
-                        _record = Module,
-                        {module,
-                            [Definition | erlang:element(2, Module)],
-                            erlang:element(3, _record),
-                            erlang:element(4, _record),
-                            erlang:element(5, _record),
-                            erlang:element(6, _record)}
-                    end,
+                    Module@1 = {module,
+                        [Definition | erlang:element(2, Module)],
+                        erlang:element(3, Module),
+                        erlang:element(4, Module),
+                        erlang:element(5, Module),
+                        erlang:element(6, Module)},
                     {ok, {Module@1, Tokens@3}}
                 end
             )
@@ -1026,12 +1015,12 @@ import_statement(Module, Attributes, Tokens, Start) ->
 -file("src/glance.gleam", 1342).
 -spec bit_string_segment_options(
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FQS, list({glexer@token:token(), glexer:position()})}} |
+            {DYX, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
-    list(bit_string_segment_option(FQS)),
+    list(bit_string_segment_option(DYX)),
     list({glexer@token:token(), glexer:position()})
 ) -> {ok,
-        {list(bit_string_segment_option(FQS)),
+        {list(bit_string_segment_option(DYX)),
             list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 bit_string_segment_options(Parser, Options, Tokens) ->
@@ -1144,11 +1133,11 @@ bit_string_segment_options(Parser, Options, Tokens) ->
 -file("src/glance.gleam", 1332).
 -spec optional_bit_string_segment_options(
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FQL, list({glexer@token:token(), glexer:position()})}} |
+            {DYQ, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
     list({glexer@token:token(), glexer:position()})
 ) -> {ok,
-        {list(bit_string_segment_option(FQL)),
+        {list(bit_string_segment_option(DYQ)),
             list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 optional_bit_string_segment_options(Parser, Tokens) ->
@@ -1163,11 +1152,11 @@ optional_bit_string_segment_options(Parser, Tokens) ->
 -file("src/glance.gleam", 1322).
 -spec bit_string_segment(
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FQE, list({glexer@token:token(), glexer:position()})}} |
+            {DYJ, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
     list({glexer@token:token(), glexer:position()})
 ) -> {ok,
-        {{FQE, list(bit_string_segment_option(FQE))},
+        {{DYJ, list(bit_string_segment_option(DYJ))},
             list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 bit_string_segment(Parser, Tokens) ->
@@ -1188,13 +1177,13 @@ bit_string_segment(Parser, Tokens) ->
 
 -file("src/glance.gleam", 1671).
 -spec delimited(
-    list(FSL),
+    list(EAQ),
     list({glexer@token:token(), glexer:position()}),
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FSL, list({glexer@token:token(), glexer:position()})}} |
+            {EAQ, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
     glexer@token:token()
-) -> {ok, {list(FSL), list({glexer@token:token(), glexer:position()})}} |
+) -> {ok, {list(EAQ), list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 delimited(Acc, Tokens, Parser, Delimeter) ->
     gleam@result:'try'(
@@ -1214,14 +1203,14 @@ delimited(Acc, Tokens, Parser, Delimeter) ->
 
 -file("src/glance.gleam", 1867).
 -spec comma_delimited(
-    list(FTN),
+    list(EBS),
     list({glexer@token:token(), glexer:position()}),
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FTN, list({glexer@token:token(), glexer:position()})}} |
+            {EBS, list({glexer@token:token(), glexer:position()})}} |
         {error, error()}),
     glexer@token:token()
 ) -> {ok,
-        {list(FTN), integer(), list({glexer@token:token(), glexer:position()})}} |
+        {list(EBS), integer(), list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 comma_delimited(Items, Tokens, Parser, Final) ->
     case Tokens of
@@ -1288,9 +1277,9 @@ name(Tokens) ->
 -spec field(
     list({glexer@token:token(), glexer:position()}),
     fun((list({glexer@token:token(), glexer:position()})) -> {ok,
-            {FUY, list({glexer@token:token(), glexer:position()})}} |
+            {EDD, list({glexer@token:token(), glexer:position()})}} |
         {error, error()})
-) -> {ok, {field(FUY), list({glexer@token:token(), glexer:position()})}} |
+) -> {ok, {field(EDD), list({glexer@token:token(), glexer:position()})}} |
     {error, error()}.
 field(Tokens, Parser) ->
     case Tokens of
@@ -1349,6 +1338,46 @@ statement(Tokens) ->
                 end
             )
     end.
+
+-file("src/glance.gleam", 819).
+-spec assert_(list({glexer@token:token(), glexer:position()}), integer()) -> {ok,
+        {statement(), list({glexer@token:token(), glexer:position()})}} |
+    {error, error()}.
+assert_(Tokens, Start) ->
+    gleam@result:'try'(
+        expression(Tokens),
+        fun(_use0) ->
+            {Subject, Tokens@1} = _use0,
+            case Tokens@1 of
+                [{as, _} | Tokens@2] ->
+                    case expression(Tokens@2) of
+                        {error, Error} ->
+                            {error, Error};
+
+                        {ok, {Message, Tokens@3}} ->
+                            Statement = {assert,
+                                {span,
+                                    Start,
+                                    erlang:element(
+                                        3,
+                                        erlang:element(2, Message)
+                                    )},
+                                Subject,
+                                {some, Message}},
+                            {ok, {Statement, Tokens@3}}
+                    end;
+
+                _ ->
+                    Statement@1 = {assert,
+                        {span,
+                            Start,
+                            erlang:element(3, erlang:element(2, Subject))},
+                        Subject,
+                        none},
+                    {ok, {Statement@1, Tokens@1}}
+            end
+        end
+    ).
 
 -file("src/glance.gleam", 1053).
 -spec expression(list({glexer@token:token(), glexer:position()})) -> {ok,
@@ -1629,6 +1658,57 @@ expression_unit(Tokens, Context) ->
             end
         end).
 
+-file("src/glance.gleam", 1686).
+-spec fn_(list({glexer@token:token(), glexer:position()}), integer()) -> {ok,
+        {gleam@option:option(expression()),
+            list({glexer@token:token(), glexer:position()})}} |
+    {error, error()}.
+fn_(Tokens, Start) ->
+    expect(
+        left_paren,
+        Tokens,
+        fun(_, Tokens@1) ->
+            Result = comma_delimited(
+                [],
+                Tokens@1,
+                fun fn_parameter/1,
+                right_paren
+            ),
+            gleam@result:'try'(
+                Result,
+                fun(_use0) ->
+                    {Parameters, _, Tokens@2} = _use0,
+                    gleam@result:'try'(
+                        optional_return_annotation(0, Tokens@2),
+                        fun(_use0@1) ->
+                            {Return, _, Tokens@3} = _use0@1,
+                            expect(
+                                left_brace,
+                                Tokens@3,
+                                fun(_, Tokens@4) ->
+                                    gleam@result:'try'(
+                                        statements([], Tokens@4),
+                                        fun(_use0@2) ->
+                                            {Body, End, Tokens@5} = _use0@2,
+                                            {ok,
+                                                {{some,
+                                                        {fn,
+                                                            {span, Start, End},
+                                                            Parameters,
+                                                            Return,
+                                                            Body}},
+                                                    Tokens@5}}
+                                        end
+                                    )
+                                end
+                            )
+                        end
+                    )
+                end
+            )
+        end
+    ).
+
 -file("src/glance.gleam", 791).
 -spec statements(
     list(statement()),
@@ -1689,46 +1769,6 @@ attribute(Tokens) ->
                     {ok, {{attribute, Name@1, []}, Tokens@2}}
             end
         end).
-
--file("src/glance.gleam", 819).
--spec assert_(list({glexer@token:token(), glexer:position()}), integer()) -> {ok,
-        {statement(), list({glexer@token:token(), glexer:position()})}} |
-    {error, error()}.
-assert_(Tokens, Start) ->
-    gleam@result:'try'(
-        expression(Tokens),
-        fun(_use0) ->
-            {Subject, Tokens@1} = _use0,
-            case Tokens@1 of
-                [{as, _} | Tokens@2] ->
-                    case expression(Tokens@2) of
-                        {error, Error} ->
-                            {error, Error};
-
-                        {ok, {Message, Tokens@3}} ->
-                            Statement = {assert,
-                                {span,
-                                    Start,
-                                    erlang:element(
-                                        3,
-                                        erlang:element(2, Message)
-                                    )},
-                                Subject,
-                                {some, Message}},
-                            {ok, {Statement, Tokens@3}}
-                    end;
-
-                _ ->
-                    Statement@1 = {assert,
-                        {span,
-                            Start,
-                            erlang:element(3, erlang:element(2, Subject))},
-                        Subject,
-                        none},
-                    {ok, {Statement@1, Tokens@1}}
-            end
-        end
-    ).
 
 -file("src/glance.gleam", 1301).
 -spec todo_panic(
@@ -2054,49 +2094,6 @@ call(Arguments, Function, Tokens) ->
             )
     end.
 
--file("src/glance.gleam", 1415).
--spec after_expression(
-    expression(),
-    list({glexer@token:token(), glexer:position()})
-) -> {ok, {expression(), list({glexer@token:token(), glexer:position()})}} |
-    {error, error()}.
-after_expression(Parsed, Tokens) ->
-    case Tokens of
-        [{dot, _}, {{name, Label}, {position, Label_start}} | Tokens@1] ->
-            Span = {span,
-                erlang:element(2, erlang:element(2, Parsed)),
-                string_offset(Label_start, Label)},
-            Expression = {field_access, Span, Parsed, Label},
-            after_expression(Expression, Tokens@1);
-
-        [{dot, _}, {{upper_name, Label}, {position, Label_start}} | Tokens@1] ->
-            Span = {span,
-                erlang:element(2, erlang:element(2, Parsed)),
-                string_offset(Label_start, Label)},
-            Expression = {field_access, Span, Parsed, Label},
-            after_expression(Expression, Tokens@1);
-
-        [{dot, _}, {{int, Value} = Token, Position} | Tokens@2] ->
-            case gleam_stdlib:parse_int(Value) of
-                {ok, I} ->
-                    End = string_offset(erlang:element(2, Position), Value),
-                    Span@1 = {span,
-                        erlang:element(2, erlang:element(2, Parsed)),
-                        End},
-                    Expression@1 = {tuple_index, Span@1, Parsed, I},
-                    after_expression(Expression@1, Tokens@2);
-
-                {error, _} ->
-                    {error, {unexpected_token, Token, Position}}
-            end;
-
-        [{left_paren, _} | Tokens@3] ->
-            call([], Parsed, Tokens@3);
-
-        _ ->
-            {ok, {Parsed, Tokens}}
-    end.
-
 -file("src/glance.gleam", 1529).
 -spec fn_capture(
     gleam@option:option(binary()),
@@ -2159,6 +2156,49 @@ fn_capture(Label, Function, Before, After, Tokens) ->
                     end
                 end
             )
+    end.
+
+-file("src/glance.gleam", 1415).
+-spec after_expression(
+    expression(),
+    list({glexer@token:token(), glexer:position()})
+) -> {ok, {expression(), list({glexer@token:token(), glexer:position()})}} |
+    {error, error()}.
+after_expression(Parsed, Tokens) ->
+    case Tokens of
+        [{dot, _}, {{name, Label}, {position, Label_start}} | Tokens@1] ->
+            Span = {span,
+                erlang:element(2, erlang:element(2, Parsed)),
+                string_offset(Label_start, Label)},
+            Expression = {field_access, Span, Parsed, Label},
+            after_expression(Expression, Tokens@1);
+
+        [{dot, _}, {{upper_name, Label}, {position, Label_start}} | Tokens@1] ->
+            Span = {span,
+                erlang:element(2, erlang:element(2, Parsed)),
+                string_offset(Label_start, Label)},
+            Expression = {field_access, Span, Parsed, Label},
+            after_expression(Expression, Tokens@1);
+
+        [{dot, _}, {{int, Value} = Token, Position} | Tokens@2] ->
+            case gleam_stdlib:parse_int(Value) of
+                {ok, I} ->
+                    End = string_offset(erlang:element(2, Position), Value),
+                    Span@1 = {span,
+                        erlang:element(2, erlang:element(2, Parsed)),
+                        End},
+                    Expression@1 = {tuple_index, Span@1, Parsed, I},
+                    after_expression(Expression@1, Tokens@2);
+
+                {error, _} ->
+                    {error, {unexpected_token, Token, Position}}
+            end;
+
+        [{left_paren, _} | Tokens@3] ->
+            call([], Parsed, Tokens@3);
+
+        _ ->
+            {ok, {Parsed, Tokens}}
     end.
 
 -file("src/glance.gleam", 914).
@@ -2823,57 +2863,6 @@ fn_parameter(Tokens) ->
             )
         end).
 
--file("src/glance.gleam", 1686).
--spec fn_(list({glexer@token:token(), glexer:position()}), integer()) -> {ok,
-        {gleam@option:option(expression()),
-            list({glexer@token:token(), glexer:position()})}} |
-    {error, error()}.
-fn_(Tokens, Start) ->
-    expect(
-        left_paren,
-        Tokens,
-        fun(_, Tokens@1) ->
-            Result = comma_delimited(
-                [],
-                Tokens@1,
-                fun fn_parameter/1,
-                right_paren
-            ),
-            gleam@result:'try'(
-                Result,
-                fun(_use0) ->
-                    {Parameters, _, Tokens@2} = _use0,
-                    gleam@result:'try'(
-                        optional_return_annotation(0, Tokens@2),
-                        fun(_use0@1) ->
-                            {Return, _, Tokens@3} = _use0@1,
-                            expect(
-                                left_brace,
-                                Tokens@3,
-                                fun(_, Tokens@4) ->
-                                    gleam@result:'try'(
-                                        statements([], Tokens@4),
-                                        fun(_use0@2) ->
-                                            {Body, End, Tokens@5} = _use0@2,
-                                            {ok,
-                                                {{some,
-                                                        {fn,
-                                                            {span, Start, End},
-                                                            Parameters,
-                                                            Return,
-                                                            Body}},
-                                                    Tokens@5}}
-                                        end
-                                    )
-                                end
-                            )
-                        end
-                    )
-                end
-            )
-        end
-    ).
-
 -file("src/glance.gleam", 1799).
 -spec function_parameter(list({glexer@token:token(), glexer:position()})) -> {ok,
         {function_parameter(), list({glexer@token:token(), glexer:position()})}} |
@@ -3192,16 +3181,13 @@ custom_type(
         variants(Ct, Tokens),
         fun(_use0) ->
             {Ct@1, End, Tokens@1} = _use0,
-            Ct@2 = begin
-                _record = Ct@1,
-                {custom_type,
-                    {span, Start, End},
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    erlang:element(7, _record)}
-            end,
+            Ct@2 = {custom_type,
+                {span, Start, End},
+                erlang:element(3, Ct@1),
+                erlang:element(4, Ct@1),
+                erlang:element(5, Ct@1),
+                erlang:element(6, Ct@1),
+                erlang:element(7, Ct@1)},
             Module@1 = push_custom_type(Module, Attributes, Ct@2),
             {ok, {Module@1, Tokens@1}}
         end

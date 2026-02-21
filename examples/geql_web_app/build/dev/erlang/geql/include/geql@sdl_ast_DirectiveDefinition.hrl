@@ -1,1 +1,0 @@
--record(directive_definition, {directive_def :: geql@sdl_ast:directive_def()}).

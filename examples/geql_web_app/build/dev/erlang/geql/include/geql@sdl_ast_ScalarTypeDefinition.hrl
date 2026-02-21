@@ -1,1 +1,0 @@
--record(scalar_type_definition, {scalar_def :: geql@sdl_ast:scalar_type_def()}).

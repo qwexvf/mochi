@@ -1,5 +1,5 @@
 -module(gleam@pair).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/pair.gleam").
 -export([first/1, second/1, swap/1, map_first/2, map_second/2, new/2]).
 
@@ -22,7 +22,7 @@
     " // -> 1\n"
     " ```\n"
 ).
--spec first({COH, any()}) -> COH.
+-spec first({CKW, any()}) -> CKW.
 first(Pair) ->
     {A, _} = Pair,
     A.
@@ -38,7 +38,7 @@ first(Pair) ->
     " // -> 2\n"
     " ```\n"
 ).
--spec second({any(), COK}) -> COK.
+-spec second({any(), CKZ}) -> CKZ.
 second(Pair) ->
     {_, A} = Pair,
     A.
@@ -54,7 +54,7 @@ second(Pair) ->
     " // -> #(2, 1)\n"
     " ```\n"
 ).
--spec swap({COL, COM}) -> {COM, COL}.
+-spec swap({CLA, CLB}) -> {CLB, CLA}.
 swap(Pair) ->
     {A, B} = Pair,
     {B, A}.
@@ -71,7 +71,7 @@ swap(Pair) ->
     " // -> #(2, 2)\n"
     " ```\n"
 ).
--spec map_first({CON, COO}, fun((CON) -> COP)) -> {COP, COO}.
+-spec map_first({CLC, CLD}, fun((CLC) -> CLE)) -> {CLE, CLD}.
 map_first(Pair, Fun) ->
     {A, B} = Pair,
     {Fun(A), B}.
@@ -88,7 +88,7 @@ map_first(Pair, Fun) ->
     " // -> #(1, 4)\n"
     " ```\n"
 ).
--spec map_second({COQ, COR}, fun((COR) -> COS)) -> {COQ, COS}.
+-spec map_second({CLF, CLG}, fun((CLG) -> CLH)) -> {CLF, CLH}.
 map_second(Pair, Fun) ->
     {A, B} = Pair,
     {A, Fun(B)}.
@@ -105,6 +105,6 @@ map_second(Pair, Fun) ->
     " // -> #(1, 2)\n"
     " ```\n"
 ).
--spec new(COT, COU) -> {COT, COU}.
+-spec new(CLI, CLJ) -> {CLI, CLJ}.
 new(First, Second) ->
     {First, Second}.

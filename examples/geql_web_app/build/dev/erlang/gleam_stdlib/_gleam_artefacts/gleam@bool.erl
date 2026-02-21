@@ -1,5 +1,5 @@
 -module(gleam@bool).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/bool.gleam").
 -export(['and'/2, 'or'/2, negate/1, nor/2, nand/2, exclusive_or/2, exclusive_nor/2, to_string/1, guard/3, lazy_guard/3]).
 
@@ -299,7 +299,7 @@ to_string(Bool) ->
     " // -> \"Hello, Kamaka\"\n"
     " ```\n"
 ).
--spec guard(boolean(), BVQ, fun(() -> BVQ)) -> BVQ.
+-spec guard(boolean(), BSZ, fun(() -> BSZ)) -> BSZ.
 guard(Requirement, Consequence, Alternative) ->
     case Requirement of
         true ->
@@ -341,7 +341,7 @@ guard(Requirement, Consequence, Alternative) ->
     " // -> \"Welcome, User 54\"\n"
     " ```\n"
 ).
--spec lazy_guard(boolean(), fun(() -> BVR), fun(() -> BVR)) -> BVR.
+-spec lazy_guard(boolean(), fun(() -> BTA), fun(() -> BTA)) -> BTA.
 lazy_guard(Requirement, Consequence, Alternative) ->
     case Requirement of
         true ->

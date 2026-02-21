@@ -1,5 +1,5 @@
 -module(birl).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/birl.gleam").
 -export([time_of_day_to_string/1, time_of_day_to_short_string/1, to_unix/1, from_unix/1, to_unix_milli/1, from_unix_milli/1, to_unix_micro/1, from_unix_micro/1, compare/2, difference/2, add/2, subtract/2, weekday_to_string/1, weekday_to_short_string/1, range/3, set_timezone/2, get_timezone/1, set_offset/2, get_offset/1, parse_time_of_day/1, parse_naive_time_of_day/1, utc_now/0, now_with_offset/1, now_with_timezone/1, monotonic_now/0, to_date_string/1, to_naive_date_string/1, to_time_string/1, to_naive_time_string/1, to_iso8601/1, to_naive/1, month/1, string_month/1, short_string_month/1, get_day/1, get_time_of_day/1, to_erlang_datetime/1, to_erlang_universal_datetime/1, parse/1, from_naive/1, set_day/2, set_time_of_day/2, weekday/1, string_weekday/1, short_string_weekday/1, to_http/1, to_http_with_offset/1, now/0, has_occured/1, from_erlang_local_datetime/1, from_erlang_universal_datetime/1, parse_relative/2, legible_difference/2, parse_weekday/1, from_http/1, parse_month/1]).
 -export_type([time/0, day/0, time_of_day/0, weekday/0, month/0]).

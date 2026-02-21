@@ -1,1 +1,0 @@
--record(list_type, {inner_type :: geql@ast:type()}).

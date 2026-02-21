@@ -1,5 +1,5 @@
 -module(glexer).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/glexer.gleam").
 -export([new/1, discard_whitespace/1, discard_comments/1, to_source/1, unescape_string/1, lex/1]).
 -export_type([lexer/0, lexer_mode/0, position/0, comment_kind/0, lex_number_mode/0]).
@@ -40,38 +40,35 @@ new(Source) ->
 -file("src/glexer.gleam", 45).
 -spec discard_whitespace(lexer()) -> lexer().
 discard_whitespace(Lexer) ->
-    _record = Lexer,
     {lexer,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
-        erlang:element(4, _record),
+        erlang:element(2, Lexer),
+        erlang:element(3, Lexer),
+        erlang:element(4, Lexer),
         false,
-        erlang:element(6, _record),
-        erlang:element(7, _record)}.
+        erlang:element(6, Lexer),
+        erlang:element(7, Lexer)}.
 
 -file("src/glexer.gleam", 49).
 -spec discard_comments(lexer()) -> lexer().
 discard_comments(Lexer) ->
-    _record = Lexer,
     {lexer,
-        erlang:element(2, _record),
-        erlang:element(3, _record),
-        erlang:element(4, _record),
-        erlang:element(5, _record),
+        erlang:element(2, Lexer),
+        erlang:element(3, Lexer),
+        erlang:element(4, Lexer),
+        erlang:element(5, Lexer),
         false,
-        erlang:element(7, _record)}.
+        erlang:element(7, Lexer)}.
 
 -file("src/glexer.gleam", 875).
 -spec advance(lexer(), binary(), integer()) -> lexer().
 advance(Lexer, Source, Offset) ->
-    _record = Lexer,
     {lexer,
-        erlang:element(2, _record),
+        erlang:element(2, Lexer),
         Source,
         erlang:element(4, Lexer) + Offset,
-        erlang:element(5, _record),
-        erlang:element(6, _record),
-        erlang:element(7, _record)}.
+        erlang:element(5, Lexer),
+        erlang:element(6, Lexer),
+        erlang:element(7, Lexer)}.
 
 -file("src/glexer.gleam", 879).
 -spec advanced({glexer@token:token(), position()}, lexer(), binary(), integer()) -> {lexer(),
@@ -95,16 +92,13 @@ check_for_minus(Lexer) ->
         <<"-"/utf8, Source/binary>> ->
             {Lexer@1, Token} = token(Lexer, minus, Source, 1),
             {ok,
-                {begin
-                        _record = Lexer@1,
-                        {lexer,
-                            erlang:element(2, _record),
-                            erlang:element(3, _record),
-                            erlang:element(4, _record),
-                            erlang:element(5, _record),
-                            erlang:element(6, _record),
-                            normal}
-                    end,
+                {{lexer,
+                        erlang:element(2, Lexer@1),
+                        erlang:element(3, Lexer@1),
+                        erlang:element(4, Lexer@1),
+                        erlang:element(5, Lexer@1),
+                        erlang:element(6, Lexer@1),
+                        normal},
                     Token}};
 
         _ ->
@@ -125,151 +119,121 @@ check_for_nested_dot(Lexer) ->
                 <<"0"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"1"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"2"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"3"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"4"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"5"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"6"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"7"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"8"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 <<"9"/utf8, _/binary>> ->
                     {Lexer@1, Token} = token(Lexer, dot, Source@1, 1),
                     {ok,
-                        {begin
-                                _record = Lexer@1,
-                                {lexer,
-                                    erlang:element(2, _record),
-                                    erlang:element(3, _record),
-                                    erlang:element(4, _record),
-                                    erlang:element(5, _record),
-                                    erlang:element(6, _record),
-                                    has_nested_dot}
-                            end,
+                        {{lexer,
+                                erlang:element(2, Lexer@1),
+                                erlang:element(3, Lexer@1),
+                                erlang:element(4, Lexer@1),
+                                erlang:element(5, Lexer@1),
+                                erlang:element(6, Lexer@1),
+                                has_nested_dot},
                             Token}};
 
                 _ ->
@@ -988,30 +952,24 @@ lex_number(Lexer, Mode, Start, Slice_size) ->
             lex_number(_pipe@3, lex_float_exponent, Start, Slice_size + 1);
 
         {_, lex_int} ->
-            Lexer@1 = begin
-                _record = Lexer,
-                {lexer,
-                    erlang:element(2, _record),
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    check_for_minus}
-            end,
+            Lexer@1 = {lexer,
+                erlang:element(2, Lexer),
+                erlang:element(3, Lexer),
+                erlang:element(4, Lexer),
+                erlang:element(5, Lexer),
+                erlang:element(6, Lexer),
+                check_for_minus},
             Content = binary:part(erlang:element(2, Lexer@1), Start, Slice_size),
             {Lexer@1, {{int, Content}, {position, Start}}};
 
         {_, lex_float} ->
-            Lexer@2 = begin
-                _record@1 = Lexer,
-                {lexer,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    erlang:element(4, _record@1),
-                    erlang:element(5, _record@1),
-                    erlang:element(6, _record@1),
-                    check_for_minus}
-            end,
+            Lexer@2 = {lexer,
+                erlang:element(2, Lexer),
+                erlang:element(3, Lexer),
+                erlang:element(4, Lexer),
+                erlang:element(5, Lexer),
+                erlang:element(6, Lexer),
+                check_for_minus},
             Content@1 = binary:part(
                 erlang:element(2, Lexer@2),
                 Start,
@@ -1020,16 +978,13 @@ lex_number(Lexer, Mode, Start, Slice_size) ->
             {Lexer@2, {{float, Content@1}, {position, Start}}};
 
         {_, lex_float_exponent} ->
-            Lexer@2 = begin
-                _record@1 = Lexer,
-                {lexer,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    erlang:element(4, _record@1),
-                    erlang:element(5, _record@1),
-                    erlang:element(6, _record@1),
-                    check_for_minus}
-            end,
+            Lexer@2 = {lexer,
+                erlang:element(2, Lexer),
+                erlang:element(3, Lexer),
+                erlang:element(4, Lexer),
+                erlang:element(5, Lexer),
+                erlang:element(6, Lexer),
+                check_for_minus},
             Content@1 = binary:part(
                 erlang:element(2, Lexer@2),
                 Start,
@@ -1281,16 +1236,13 @@ next(Lexer) ->
 
                 {error, nil} ->
                     next(
-                        begin
-                            _record = Lexer,
-                            {lexer,
-                                erlang:element(2, _record),
-                                erlang:element(3, _record),
-                                erlang:element(4, _record),
-                                erlang:element(5, _record),
-                                erlang:element(6, _record),
-                                normal}
-                        end
+                        {lexer,
+                            erlang:element(2, Lexer),
+                            erlang:element(3, Lexer),
+                            erlang:element(4, Lexer),
+                            erlang:element(5, Lexer),
+                            erlang:element(6, Lexer),
+                            normal}
                     )
             end;
 
@@ -1301,16 +1253,13 @@ next(Lexer) ->
 
                 {error, nil} ->
                     next(
-                        begin
-                            _record@1 = Lexer,
-                            {lexer,
-                                erlang:element(2, _record@1),
-                                erlang:element(3, _record@1),
-                                erlang:element(4, _record@1),
-                                erlang:element(5, _record@1),
-                                erlang:element(6, _record@1),
-                                normal}
-                        end
+                        {lexer,
+                            erlang:element(2, Lexer),
+                            erlang:element(3, Lexer),
+                            erlang:element(4, Lexer),
+                            erlang:element(5, Lexer),
+                            erlang:element(6, Lexer),
+                            normal}
                     )
             end;
 
@@ -1326,16 +1275,13 @@ next(Lexer) ->
 
                         {error, nil} ->
                             next(
-                                begin
-                                    _record@2 = Lexer,
-                                    {lexer,
-                                        erlang:element(2, _record@2),
-                                        erlang:element(3, _record@2),
-                                        erlang:element(4, _record@2),
-                                        erlang:element(5, _record@2),
-                                        erlang:element(6, _record@2),
-                                        normal}
-                                end
+                                {lexer,
+                                    erlang:element(2, Lexer),
+                                    erlang:element(3, Lexer),
+                                    erlang:element(4, Lexer),
+                                    erlang:element(5, Lexer),
+                                    erlang:element(6, Lexer),
+                                    normal}
                             )
                     end
             end;
@@ -1348,16 +1294,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"1"/utf8, Source/binary>> ->
@@ -1366,16 +1309,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"2"/utf8, Source/binary>> ->
@@ -1384,16 +1324,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"3"/utf8, Source/binary>> ->
@@ -1402,16 +1339,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"4"/utf8, Source/binary>> ->
@@ -1420,16 +1354,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"5"/utf8, Source/binary>> ->
@@ -1438,16 +1369,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"6"/utf8, Source/binary>> ->
@@ -1456,16 +1384,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"7"/utf8, Source/binary>> ->
@@ -1474,16 +1399,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"8"/utf8, Source/binary>> ->
@@ -1492,16 +1414,13 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 <<"9"/utf8, Source/binary>> ->
@@ -1510,30 +1429,24 @@ next(Lexer) ->
                         _pipe = advance(Lexer, Source, 1),
                         lex_digits(_pipe, Byte_offset, 1)
                     end,
-                    Lexer@6 = begin
-                        _record@3 = Lexer@5,
-                        {lexer,
-                            erlang:element(2, _record@3),
-                            erlang:element(3, _record@3),
-                            erlang:element(4, _record@3),
-                            erlang:element(5, _record@3),
-                            erlang:element(6, _record@3),
-                            check_for_nested_dot}
-                    end,
+                    Lexer@6 = {lexer,
+                        erlang:element(2, Lexer@5),
+                        erlang:element(3, Lexer@5),
+                        erlang:element(4, Lexer@5),
+                        erlang:element(5, Lexer@5),
+                        erlang:element(6, Lexer@5),
+                        check_for_nested_dot},
                     {Lexer@6, {{int, Int}, {position, Byte_offset}}};
 
                 _ ->
                     next(
-                        begin
-                            _record@4 = Lexer,
-                            {lexer,
-                                erlang:element(2, _record@4),
-                                erlang:element(3, _record@4),
-                                erlang:element(4, _record@4),
-                                erlang:element(5, _record@4),
-                                erlang:element(6, _record@4),
-                                normal}
-                        end
+                        {lexer,
+                            erlang:element(2, Lexer),
+                            erlang:element(3, Lexer),
+                            erlang:element(4, Lexer),
+                            erlang:element(5, Lexer),
+                            erlang:element(6, Lexer),
+                            normal}
                     )
             end;
 
@@ -1906,16 +1819,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"b"/utf8, Source@54/binary>> ->
@@ -1994,16 +1904,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"c"/utf8, Source@54/binary>> ->
@@ -2082,16 +1989,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"d"/utf8, Source@54/binary>> ->
@@ -2170,16 +2074,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"e"/utf8, Source@54/binary>> ->
@@ -2258,16 +2159,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"f"/utf8, Source@54/binary>> ->
@@ -2346,16 +2244,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"g"/utf8, Source@54/binary>> ->
@@ -2434,16 +2329,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"h"/utf8, Source@54/binary>> ->
@@ -2522,16 +2414,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"i"/utf8, Source@54/binary>> ->
@@ -2610,16 +2499,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"j"/utf8, Source@54/binary>> ->
@@ -2698,16 +2584,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"k"/utf8, Source@54/binary>> ->
@@ -2786,16 +2669,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"l"/utf8, Source@54/binary>> ->
@@ -2874,16 +2754,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"m"/utf8, Source@54/binary>> ->
@@ -2962,16 +2839,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"n"/utf8, Source@54/binary>> ->
@@ -3050,16 +2924,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"o"/utf8, Source@54/binary>> ->
@@ -3138,16 +3009,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"p"/utf8, Source@54/binary>> ->
@@ -3226,16 +3094,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"q"/utf8, Source@54/binary>> ->
@@ -3314,16 +3179,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"r"/utf8, Source@54/binary>> ->
@@ -3402,16 +3264,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"s"/utf8, Source@54/binary>> ->
@@ -3490,16 +3349,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"t"/utf8, Source@54/binary>> ->
@@ -3578,16 +3434,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"u"/utf8, Source@54/binary>> ->
@@ -3666,16 +3519,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"v"/utf8, Source@54/binary>> ->
@@ -3754,16 +3604,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"w"/utf8, Source@54/binary>> ->
@@ -3842,16 +3689,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"x"/utf8, Source@54/binary>> ->
@@ -3930,16 +3774,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"y"/utf8, Source@54/binary>> ->
@@ -4018,16 +3859,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"z"/utf8, Source@54/binary>> ->
@@ -4106,16 +3944,13 @@ next(Lexer) ->
                         _ ->
                             {name, Name@1}
                     end,
-                    Lexer@9 = begin
-                        _record@5 = Lexer@8,
-                        {lexer,
-                            erlang:element(2, _record@5),
-                            erlang:element(3, _record@5),
-                            erlang:element(4, _record@5),
-                            erlang:element(5, _record@5),
-                            erlang:element(6, _record@5),
-                            check_for_nested_dot_or_minus}
-                    end,
+                    Lexer@9 = {lexer,
+                        erlang:element(2, Lexer@8),
+                        erlang:element(3, Lexer@8),
+                        erlang:element(4, Lexer@8),
+                        erlang:element(5, Lexer@8),
+                        erlang:element(6, Lexer@8),
+                        check_for_nested_dot_or_minus},
                     {Lexer@9, {Token@4, {position, Byte_offset@2}}};
 
                 <<"A"/utf8, Source@55/binary>> ->

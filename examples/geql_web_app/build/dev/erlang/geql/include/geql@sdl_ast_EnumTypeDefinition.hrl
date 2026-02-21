@@ -1,1 +1,0 @@
--record(enum_type_definition, {enum_def :: geql@sdl_ast:enum_type_def()}).

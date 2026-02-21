@@ -1,5 +1,5 @@
 -module(gleam@list).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/list.gleam").
 -export([length/1, count/2, reverse/1, is_empty/1, contains/2, first/1, rest/1, group/2, filter/2, filter_map/2, map/2, map2/3, map_fold/3, index_map/2, try_map/2, drop/2, take/2, new/0, wrap/1, append/2, prepend/2, flatten/1, flat_map/2, fold/3, fold_right/3, index_fold/3, try_fold/3, fold_until/3, find/2, find_map/2, all/2, any/2, zip/2, strict_zip/2, unzip/1, intersperse/2, unique/1, sort/2, range/2, repeat/2, split/2, split_while/2, key_find/2, key_filter/2, key_pop/2, key_set/3, each/2, try_each/2, partition/2, permutations/1, window/2, window_by_2/1, drop_while/2, take_while/2, chunk/2, sized_chunk/2, reduce/2, scan/3, last/1, combinations/2, combination_pairs/1, transpose/1, interleave/1, shuffle/1, max/2, sample/2]).
 -export_type([continue_or_stop/1, sorting/0]).
@@ -38,7 +38,7 @@
     "\n"
 ).
 
--type continue_or_stop(YR) :: {continue, YR} | {stop, YR}.
+-type continue_or_stop(XO) :: {continue, XO} | {stop, XO}.
 
 -type sorting() :: ascending | descending.
 
@@ -85,7 +85,7 @@ length(List) ->
     erlang:length(List).
 
 -file("src/gleam/list.gleam", 93).
--spec count_loop(list(YY), fun((YY) -> boolean()), integer()) -> integer().
+-spec count_loop(list(XV), fun((XV) -> boolean()), integer()) -> integer().
 count_loop(List, Predicate, Acc) ->
     case List of
         [] ->
@@ -125,7 +125,7 @@ count_loop(List, Predicate, Acc) ->
     " // -> 2\n"
     " ```\n"
 ).
--spec count(list(YW), fun((YW) -> boolean())) -> integer().
+-spec count(list(XT), fun((XT) -> boolean())) -> integer().
 count(List, Predicate) ->
     count_loop(List, Predicate, 0).
 
@@ -135,7 +135,7 @@ count(List, Predicate) ->
     " This function runs in linear time, proportional to the length of the list\n"
     " to prepend.\n"
 ).
--spec reverse_and_prepend(list(AAD), list(AAD)) -> list(AAD).
+-spec reverse_and_prepend(list(YA), list(YA)) -> list(YA).
 reverse_and_prepend(Prefix, Suffix) ->
     case Prefix of
         [] ->
@@ -173,7 +173,7 @@ reverse_and_prepend(Prefix, Suffix) ->
     " // -> [2, 1]\n"
     " ```\n"
 ).
--spec reverse(list(AAA)) -> list(AAA).
+-spec reverse(list(XX)) -> list(XX).
 reverse(List) ->
     lists:reverse(List).
 
@@ -238,7 +238,7 @@ is_empty(List) ->
     " // -> True\n"
     " ```\n"
 ).
--spec contains(list(AAJ), AAJ) -> boolean().
+-spec contains(list(YG), YG) -> boolean().
 contains(List, Elem) ->
     case List of
         [] ->
@@ -272,7 +272,7 @@ contains(List, Elem) ->
     " // -> Ok(1)\n"
     " ```\n"
 ).
--spec first(list(AAL)) -> {ok, AAL} | {error, nil}.
+-spec first(list(YI)) -> {ok, YI} | {error, nil}.
 first(List) ->
     case List of
         [] ->
@@ -306,7 +306,7 @@ first(List) ->
     " // -> Ok([2])\n"
     " ```\n"
 ).
--spec rest(list(AAP)) -> {ok, list(AAP)} | {error, nil}.
+-spec rest(list(YM)) -> {ok, list(YM)} | {error, nil}.
 rest(List) ->
     case List of
         [] ->
@@ -317,7 +317,7 @@ rest(List) ->
     end.
 
 -file("src/gleam/list.gleam", 301).
--spec group_loop(list(ABA), fun((ABA) -> ABC), gleam@dict:dict(ABC, list(ABA))) -> gleam@dict:dict(ABC, list(ABA)).
+-spec group_loop(list(YX), fun((YX) -> YZ), gleam@dict:dict(YZ, list(YX))) -> gleam@dict:dict(YZ, list(YX)).
 group_loop(List, To_key, Groups) ->
     case List of
         [] ->
@@ -368,12 +368,12 @@ group_loop(List, To_key, Groups) ->
     " // -> [#(0, [3]), #(1, [4, 1]), #(2, [5, 2])]\n"
     " ```\n"
 ).
--spec group(list(AAU), fun((AAU) -> AAW)) -> gleam@dict:dict(AAW, list(AAU)).
+-spec group(list(YR), fun((YR) -> YT)) -> gleam@dict:dict(YT, list(YR)).
 group(List, Key) ->
     group_loop(List, Key, maps:new()).
 
 -file("src/gleam/list.gleam", 338).
--spec filter_loop(list(ABM), fun((ABM) -> boolean()), list(ABM)) -> list(ABM).
+-spec filter_loop(list(AAJ), fun((AAJ) -> boolean()), list(AAJ)) -> list(AAJ).
 filter_loop(List, Fun, Acc) ->
     case List of
         [] ->
@@ -407,16 +407,16 @@ filter_loop(List, Fun, Acc) ->
     " // -> []\n"
     " ```\n"
 ).
--spec filter(list(ABJ), fun((ABJ) -> boolean())) -> list(ABJ).
+-spec filter(list(AAG), fun((AAG) -> boolean())) -> list(AAG).
 filter(List, Predicate) ->
     filter_loop(List, Predicate, []).
 
 -file("src/gleam/list.gleam", 370).
 -spec filter_map_loop(
-    list(ABX),
-    fun((ABX) -> {ok, ABZ} | {error, any()}),
-    list(ABZ)
-) -> list(ABZ).
+    list(AAU),
+    fun((AAU) -> {ok, AAW} | {error, any()}),
+    list(AAW)
+) -> list(AAW).
 filter_map_loop(List, Fun, Acc) ->
     case List of
         [] ->
@@ -450,12 +450,12 @@ filter_map_loop(List, Fun, Acc) ->
     " // -> [3, 5, 7, 2]\n"
     " ```\n"
 ).
--spec filter_map(list(ABQ), fun((ABQ) -> {ok, ABS} | {error, any()})) -> list(ABS).
+-spec filter_map(list(AAN), fun((AAN) -> {ok, AAP} | {error, any()})) -> list(AAP).
 filter_map(List, Fun) ->
     filter_map_loop(List, Fun, []).
 
 -file("src/gleam/list.gleam", 401).
--spec map_loop(list(ACJ), fun((ACJ) -> ACL), list(ACL)) -> list(ACL).
+-spec map_loop(list(ABG), fun((ABG) -> ABI), list(ABI)) -> list(ABI).
 map_loop(List, Fun, Acc) ->
     case List of
         [] ->
@@ -477,12 +477,12 @@ map_loop(List, Fun, Acc) ->
     " // -> [4, 8, 12]\n"
     " ```\n"
 ).
--spec map(list(ACF), fun((ACF) -> ACH)) -> list(ACH).
+-spec map(list(ABC), fun((ABC) -> ABE)) -> list(ABE).
 map(List, Fun) ->
     map_loop(List, Fun, []).
 
 -file("src/gleam/list.gleam", 428).
--spec map2_loop(list(ACU), list(ACW), fun((ACU, ACW) -> ACY), list(ACY)) -> list(ACY).
+-spec map2_loop(list(ABR), list(ABT), fun((ABR, ABT) -> ABV), list(ABV)) -> list(ABV).
 map2_loop(List1, List2, Fun, Acc) ->
     case {List1, List2} of
         {[], _} ->
@@ -513,13 +513,13 @@ map2_loop(List1, List2, Fun, Acc) ->
     " // -> [#(1, \"a\"), #(2, \"b\")]\n"
     " ```\n"
 ).
--spec map2(list(ACO), list(ACQ), fun((ACO, ACQ) -> ACS)) -> list(ACS).
+-spec map2(list(ABL), list(ABN), fun((ABL, ABN) -> ABP)) -> list(ABP).
 map2(List1, List2, Fun) ->
     map2_loop(List1, List2, Fun, []).
 
 -file("src/gleam/list.gleam", 461).
--spec map_fold_loop(list(ADG), fun((ADI, ADG) -> {ADI, ADJ}), ADI, list(ADJ)) -> {ADI,
-    list(ADJ)}.
+-spec map_fold_loop(list(ACD), fun((ACF, ACD) -> {ACF, ACG}), ACF, list(ACG)) -> {ACF,
+    list(ACG)}.
 map_fold_loop(List, Fun, Acc, List_acc) ->
     case List of
         [] ->
@@ -545,18 +545,18 @@ map_fold_loop(List, Fun, Acc, List_acc) ->
     " // -> #(106, [2, 4, 6])\n"
     " ```\n"
 ).
--spec map_fold(list(ADB), ADD, fun((ADD, ADB) -> {ADD, ADE})) -> {ADD,
-    list(ADE)}.
+-spec map_fold(list(ABY), ACA, fun((ACA, ABY) -> {ACA, ACB})) -> {ACA,
+    list(ACB)}.
 map_fold(List, Initial, Fun) ->
     map_fold_loop(List, Fun, Initial, []).
 
 -file("src/gleam/list.gleam", 493).
 -spec index_map_loop(
-    list(ADQ),
-    fun((ADQ, integer()) -> ADS),
+    list(ACN),
+    fun((ACN, integer()) -> ACP),
     integer(),
-    list(ADS)
-) -> list(ADS).
+    list(ACP)
+) -> list(ACP).
 index_map_loop(List, Fun, Index, Acc) ->
     case List of
         [] ->
@@ -582,14 +582,14 @@ index_map_loop(List, Fun, Index, Acc) ->
     " // -> [#(0, \"a\"), #(1, \"b\")]\n"
     " ```\n"
 ).
--spec index_map(list(ADM), fun((ADM, integer()) -> ADO)) -> list(ADO).
+-spec index_map(list(ACJ), fun((ACJ, integer()) -> ACL)) -> list(ACL).
 index_map(List, Fun) ->
     index_map_loop(List, Fun, 0, []).
 
 -file("src/gleam/list.gleam", 547).
--spec try_map_loop(list(AEE), fun((AEE) -> {ok, AEG} | {error, AEH}), list(AEG)) -> {ok,
-        list(AEG)} |
-    {error, AEH}.
+-spec try_map_loop(list(ADB), fun((ADB) -> {ok, ADD} | {error, ADE}), list(ADD)) -> {ok,
+        list(ADD)} |
+    {error, ADE}.
 try_map_loop(List, Fun, Acc) ->
     case List of
         [] ->
@@ -639,9 +639,9 @@ try_map_loop(List, Fun, Acc) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec try_map(list(ADV), fun((ADV) -> {ok, ADX} | {error, ADY})) -> {ok,
-        list(ADX)} |
-    {error, ADY}.
+-spec try_map(list(ACS), fun((ACS) -> {ok, ACU} | {error, ACV})) -> {ok,
+        list(ACU)} |
+    {error, ACV}.
 try_map(List, Fun) ->
     try_map_loop(List, Fun, []).
 
@@ -667,7 +667,7 @@ try_map(List, Fun) ->
     " // -> []\n"
     " ```\n"
 ).
--spec drop(list(AEO), integer()) -> list(AEO).
+-spec drop(list(ADL), integer()) -> list(ADL).
 drop(List, N) ->
     case N =< 0 of
         true ->
@@ -684,7 +684,7 @@ drop(List, N) ->
     end.
 
 -file("src/gleam/list.gleam", 617).
--spec take_loop(list(AEU), integer(), list(AEU)) -> list(AEU).
+-spec take_loop(list(ADR), integer(), list(ADR)) -> list(ADR).
 take_loop(List, N, Acc) ->
     case N =< 0 of
         true ->
@@ -722,7 +722,7 @@ take_loop(List, N, Acc) ->
     " // -> [1, 2, 3, 4]\n"
     " ```\n"
 ).
--spec take(list(AER), integer()) -> list(AER).
+-spec take(list(ADO), integer()) -> list(ADO).
 take(List, N) ->
     take_loop(List, N, []).
 
@@ -758,12 +758,12 @@ new() ->
     " // -> [[[]]]\n"
     " ```\n"
 ).
--spec wrap(AFA) -> list(AFA).
+-spec wrap(ADX) -> list(ADX).
 wrap(Item) ->
     [Item].
 
 -file("src/gleam/list.gleam", 678).
--spec append_loop(list(AFG), list(AFG)) -> list(AFG).
+-spec append_loop(list(AED), list(AED)) -> list(AED).
 append_loop(First, Second) ->
     case First of
         [] ->
@@ -787,7 +787,7 @@ append_loop(First, Second) ->
     " // -> [1, 2, 3]\n"
     " ```\n"
 ).
--spec append(list(AFC), list(AFC)) -> list(AFC).
+-spec append(list(ADZ), list(ADZ)) -> list(ADZ).
 append(First, Second) ->
     lists:append(First, Second).
 
@@ -806,12 +806,12 @@ append(First, Second) ->
     " // -> [1, 2, 3, 4]\n"
     " ```\n"
 ).
--spec prepend(list(AFK), AFK) -> list(AFK).
+-spec prepend(list(AEH), AEH) -> list(AEH).
 prepend(List, Item) ->
     [Item | List].
 
 -file("src/gleam/list.gleam", 719).
--spec flatten_loop(list(list(AFR)), list(AFR)) -> list(AFR).
+-spec flatten_loop(list(list(AEO)), list(AEO)) -> list(AEO).
 flatten_loop(Lists, Acc) ->
     case Lists of
         [] ->
@@ -835,7 +835,7 @@ flatten_loop(Lists, Acc) ->
     " // -> [1, 2, 3]\n"
     " ```\n"
 ).
--spec flatten(list(list(AFN))) -> list(AFN).
+-spec flatten(list(list(AEK))) -> list(AEK).
 flatten(Lists) ->
     lists:append(Lists).
 
@@ -850,7 +850,7 @@ flatten(Lists) ->
     " // -> [2, 3, 4, 5, 6, 7]\n"
     " ```\n"
 ).
--spec flat_map(list(AFW), fun((AFW) -> list(AFY))) -> list(AFY).
+-spec flat_map(list(AET), fun((AET) -> list(AEV))) -> list(AEV).
 flat_map(List, Fun) ->
     lists:append(map(List, Fun)).
 
@@ -864,7 +864,7 @@ flat_map(List, Fun) ->
     "\n"
     " This function runs in linear time.\n"
 ).
--spec fold(list(AGB), AGD, fun((AGD, AGB) -> AGD)) -> AGD.
+-spec fold(list(AEY), AFA, fun((AFA, AEY) -> AFA)) -> AFA.
 fold(List, Initial, Fun) ->
     case List of
         [] ->
@@ -887,7 +887,7 @@ fold(List, Initial, Fun) ->
     " Unlike `fold` this function is not tail recursive. Where possible use\n"
     " `fold` instead as it will use less memory.\n"
 ).
--spec fold_right(list(AGE), AGG, fun((AGG, AGE) -> AGG)) -> AGG.
+-spec fold_right(list(AFB), AFD, fun((AFD, AFB) -> AFD)) -> AFD.
 fold_right(List, Initial, Fun) ->
     case List of
         [] ->
@@ -899,11 +899,11 @@ fold_right(List, Initial, Fun) ->
 
 -file("src/gleam/list.gleam", 798).
 -spec index_fold_loop(
-    list(AGK),
-    AGM,
-    fun((AGM, AGK, integer()) -> AGM),
+    list(AFH),
+    AFJ,
+    fun((AFJ, AFH, integer()) -> AFJ),
     integer()
-) -> AGM.
+) -> AFJ.
 index_fold_loop(Over, Acc, With, Index) ->
     case Over of
         [] ->
@@ -924,7 +924,7 @@ index_fold_loop(Over, Acc, With, Index) ->
     " |> index_fold([], fn(acc, item, index) { ... })\n"
     " ```\n"
 ).
--spec index_fold(list(AGH), AGJ, fun((AGJ, AGH, integer()) -> AGJ)) -> AGJ.
+-spec index_fold(list(AFE), AFG, fun((AFG, AFE, integer()) -> AFG)) -> AFG.
 index_fold(List, Initial, Fun) ->
     index_fold_loop(List, Initial, Fun, 0).
 
@@ -949,9 +949,9 @@ index_fold(List, Initial, Fun) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec try_fold(list(AGN), AGP, fun((AGP, AGN) -> {ok, AGP} | {error, AGQ})) -> {ok,
-        AGP} |
-    {error, AGQ}.
+-spec try_fold(list(AFK), AFM, fun((AFM, AFK) -> {ok, AFM} | {error, AFN})) -> {ok,
+        AFM} |
+    {error, AFN}.
 try_fold(List, Initial, Fun) ->
     case List of
         [] ->
@@ -988,7 +988,7 @@ try_fold(List, Initial, Fun) ->
     " // -> 3\n"
     " ```\n"
 ).
--spec fold_until(list(AGV), AGX, fun((AGX, AGV) -> continue_or_stop(AGX))) -> AGX.
+-spec fold_until(list(AFS), AFU, fun((AFU, AFS) -> continue_or_stop(AFU))) -> AFU.
 fold_until(List, Initial, Fun) ->
     case List of
         [] ->
@@ -1028,7 +1028,7 @@ fold_until(List, Initial, Fun) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec find(list(AGZ), fun((AGZ) -> boolean())) -> {ok, AGZ} | {error, nil}.
+-spec find(list(AFW), fun((AFW) -> boolean())) -> {ok, AFW} | {error, nil}.
 find(List, Is_desired) ->
     case List of
         [] ->
@@ -1068,7 +1068,7 @@ find(List, Is_desired) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec find_map(list(AHD), fun((AHD) -> {ok, AHF} | {error, any()})) -> {ok, AHF} |
+-spec find_map(list(AGA), fun((AGA) -> {ok, AGC} | {error, any()})) -> {ok, AGC} |
     {error, nil}.
 find_map(List, Fun) ->
     case List of
@@ -1108,7 +1108,7 @@ find_map(List, Fun) ->
     " // -> False\n"
     " ```\n"
 ).
--spec all(list(AHL), fun((AHL) -> boolean())) -> boolean().
+-spec all(list(AGI), fun((AGI) -> boolean())) -> boolean().
 all(List, Predicate) ->
     case List of
         [] ->
@@ -1152,7 +1152,7 @@ all(List, Predicate) ->
     " // -> True\n"
     " ```\n"
 ).
--spec any(list(AHN), fun((AHN) -> boolean())) -> boolean().
+-spec any(list(AGK), fun((AGK) -> boolean())) -> boolean().
 any(List, Predicate) ->
     case List of
         [] ->
@@ -1169,7 +1169,7 @@ any(List, Predicate) ->
     end.
 
 -file("src/gleam/list.gleam", 1056).
--spec zip_loop(list(AHU), list(AHW), list({AHU, AHW})) -> list({AHU, AHW}).
+-spec zip_loop(list(AGR), list(AGT), list({AGR, AGT})) -> list({AGR, AGT}).
 zip_loop(One, Other, Acc) ->
     case {One, Other} of
         {[First_one | Rest_one], [First_other | Rest_other]} ->
@@ -1208,13 +1208,13 @@ zip_loop(One, Other, Acc) ->
     " // -> [#(1, 3), #(2, 4)]\n"
     " ```\n"
 ).
--spec zip(list(AHP), list(AHR)) -> list({AHP, AHR}).
+-spec zip(list(AGM), list(AGO)) -> list({AGM, AGO}).
 zip(List, Other) ->
     zip_loop(List, Other, []).
 
 -file("src/gleam/list.gleam", 1097).
--spec strict_zip_loop(list(AIH), list(AIJ), list({AIH, AIJ})) -> {ok,
-        list({AIH, AIJ})} |
+-spec strict_zip_loop(list(AHE), list(AHG), list({AHE, AHG})) -> {ok,
+        list({AHE, AHG})} |
     {error, nil}.
 strict_zip_loop(One, Other, Acc) ->
     case {One, Other} of
@@ -1263,13 +1263,13 @@ strict_zip_loop(One, Other, Acc) ->
     " // -> Ok([#(1, 3), #(2, 4)])\n"
     " ```\n"
 ).
--spec strict_zip(list(AIA), list(AIC)) -> {ok, list({AIA, AIC})} | {error, nil}.
+-spec strict_zip(list(AGX), list(AGZ)) -> {ok, list({AGX, AGZ})} | {error, nil}.
 strict_zip(List, Other) ->
     strict_zip_loop(List, Other, []).
 
 -file("src/gleam/list.gleam", 1128).
--spec unzip_loop(list({AIU, AIV}), list(AIU), list(AIV)) -> {list(AIU),
-    list(AIV)}.
+-spec unzip_loop(list({AHR, AHS}), list(AHR), list(AHS)) -> {list(AHR),
+    list(AHS)}.
 unzip_loop(Input, One, Other) ->
     case Input of
         [] ->
@@ -1295,12 +1295,12 @@ unzip_loop(Input, One, Other) ->
     " // -> #([], [])\n"
     " ```\n"
 ).
--spec unzip(list({AIP, AIQ})) -> {list(AIP), list(AIQ)}.
+-spec unzip(list({AHM, AHN})) -> {list(AHM), list(AHN)}.
 unzip(Input) ->
     unzip_loop(Input, [], []).
 
 -file("src/gleam/list.gleam", 1163).
--spec intersperse_loop(list(AJE), AJE, list(AJE)) -> list(AJE).
+-spec intersperse_loop(list(AIB), AIB, list(AIB)) -> list(AIB).
 intersperse_loop(List, Separator, Acc) ->
     case List of
         [] ->
@@ -1328,7 +1328,7 @@ intersperse_loop(List, Separator, Acc) ->
     " // -> []\n"
     " ```\n"
 ).
--spec intersperse(list(AJB), AJB) -> list(AJB).
+-spec intersperse(list(AHY), AHY) -> list(AHY).
 intersperse(List, Elem) ->
     case List of
         [] ->
@@ -1342,7 +1342,7 @@ intersperse(List, Elem) ->
     end.
 
 -file("src/gleam/list.gleam", 1186).
--spec unique_loop(list(AJL), gleam@dict:dict(AJL, nil), list(AJL)) -> list(AJL).
+-spec unique_loop(list(AII), gleam@dict:dict(AII, nil), list(AII)) -> list(AII).
 unique_loop(List, Seen, Acc) ->
     case List of
         [] ->
@@ -1375,7 +1375,7 @@ unique_loop(List, Seen, Acc) ->
     " // -> [1, 4, 7, 3]\n"
     " ```\n"
 ).
--spec unique(list(AJI)) -> list(AJI).
+-spec unique(list(AIF)) -> list(AIF).
 unique(List) ->
     unique_loop(List, maps:new(), []).
 
@@ -1405,13 +1405,13 @@ unique(List) ->
     " - `acc` is the accumulator containing the slices sorted in ascending order\n"
 ).
 -spec sequences(
-    list(AJU),
-    fun((AJU, AJU) -> gleam@order:order()),
-    list(AJU),
+    list(AIR),
+    fun((AIR, AIR) -> gleam@order:order()),
+    list(AIR),
     sorting(),
-    AJU,
-    list(list(AJU))
-) -> list(list(AJU)).
+    AIR,
+    list(list(AIR))
+) -> list(list(AIR)).
 sequences(List, Compare, Growing, Direction, Prev, Acc) ->
     Growing@1 = [Prev | Growing],
     case List of
@@ -1547,11 +1547,11 @@ sequences(List, Compare, Growing, Direction, Prev, Acc) ->
     " algorithm has to play around this.\n"
 ).
 -spec merge_ascendings(
-    list(AKR),
-    list(AKR),
-    fun((AKR, AKR) -> gleam@order:order()),
-    list(AKR)
-) -> list(AKR).
+    list(AJO),
+    list(AJO),
+    fun((AJO, AJO) -> gleam@order:order()),
+    list(AJO)
+) -> list(AJO).
 merge_ascendings(List1, List2, Compare, Acc) ->
     case {List1, List2} of
         {[], List} ->
@@ -1580,10 +1580,10 @@ merge_ascendings(List1, List2, Compare, Acc) ->
     " It returns a list of the remaining descending lists.\n"
 ).
 -spec merge_ascending_pairs(
-    list(list(AKF)),
-    fun((AKF, AKF) -> gleam@order:order()),
-    list(list(AKF))
-) -> list(list(AKF)).
+    list(list(AJC)),
+    fun((AJC, AJC) -> gleam@order:order()),
+    list(list(AJC))
+) -> list(list(AJC)).
 merge_ascending_pairs(Sequences, Compare, Acc) ->
     case Sequences of
         [] ->
@@ -1609,11 +1609,11 @@ merge_ascending_pairs(Sequences, Compare, Acc) ->
     " algorithm has to play around this.\n"
 ).
 -spec merge_descendings(
-    list(AKW),
-    list(AKW),
-    fun((AKW, AKW) -> gleam@order:order()),
-    list(AKW)
-) -> list(AKW).
+    list(AJT),
+    list(AJT),
+    fun((AJT, AJT) -> gleam@order:order()),
+    list(AJT)
+) -> list(AJT).
 merge_descendings(List1, List2, Compare, Acc) ->
     case {List1, List2} of
         {[], List} ->
@@ -1638,10 +1638,10 @@ merge_descendings(List1, List2, Compare, Acc) ->
 -file("src/gleam/list.gleam", 1395).
 ?DOC(" This is the same as merge_ascending_pairs but flipped for descending lists.\n").
 -spec merge_descending_pairs(
-    list(list(AKL)),
-    fun((AKL, AKL) -> gleam@order:order()),
-    list(list(AKL))
-) -> list(list(AKL)).
+    list(list(AJI)),
+    fun((AJI, AJI) -> gleam@order:order()),
+    list(list(AJI))
+) -> list(list(AJI)).
 merge_descending_pairs(Sequences, Compare, Acc) ->
     case Sequences of
         [] ->
@@ -1662,10 +1662,10 @@ merge_descending_pairs(Sequences, Compare, Acc) ->
     " ascending order.\n"
 ).
 -spec merge_all(
-    list(list(AKB)),
+    list(list(AIY)),
     sorting(),
-    fun((AKB, AKB) -> gleam@order:order())
-) -> list(AKB).
+    fun((AIY, AIY) -> gleam@order:order())
+) -> list(AIY).
 merge_all(Sequences, Direction, Compare) ->
     case {Sequences, Direction} of
         {[], _} ->
@@ -1700,7 +1700,7 @@ merge_all(Sequences, Direction, Compare) ->
     " // -> [1, 2, 3, 4, 4, 5, 6]\n"
     " ```\n"
 ).
--spec sort(list(AJR), fun((AJR, AJR) -> gleam@order:order())) -> list(AJR).
+-spec sort(list(AIO), fun((AIO, AIO) -> gleam@order:order())) -> list(AIO).
 sort(List, Compare) ->
     case List of
         [] ->
@@ -1764,7 +1764,7 @@ range(Start, Stop) ->
     range_loop(Start, Stop, []).
 
 -file("src/gleam/list.gleam", 1513).
--spec repeat_loop(ALG, integer(), list(ALG)) -> list(ALG).
+-spec repeat_loop(AKD, integer(), list(AKD)) -> list(AKD).
 repeat_loop(Item, Times, Acc) ->
     case Times =< 0 of
         true ->
@@ -1790,12 +1790,12 @@ repeat_loop(Item, Times, Acc) ->
     " // -> [\"a\", \"a\", \"a\", \"a\", \"a\"]\n"
     " ```\n"
 ).
--spec repeat(ALE, integer()) -> list(ALE).
+-spec repeat(AKB, integer()) -> list(AKB).
 repeat(A, Times) ->
     repeat_loop(A, Times, []).
 
 -file("src/gleam/list.gleam", 1546).
--spec split_loop(list(ALN), integer(), list(ALN)) -> {list(ALN), list(ALN)}.
+-spec split_loop(list(AKK), integer(), list(AKK)) -> {list(AKK), list(AKK)}.
 split_loop(List, N, Taken) ->
     case N =< 0 of
         true ->
@@ -1835,13 +1835,13 @@ split_loop(List, N, Taken) ->
     " // -> #([6, 7, 8, 9], [])\n"
     " ```\n"
 ).
--spec split(list(ALJ), integer()) -> {list(ALJ), list(ALJ)}.
+-spec split(list(AKG), integer()) -> {list(AKG), list(AKG)}.
 split(List, Index) ->
     split_loop(List, Index, []).
 
 -file("src/gleam/list.gleam", 1582).
--spec split_while_loop(list(ALW), fun((ALW) -> boolean()), list(ALW)) -> {list(ALW),
-    list(ALW)}.
+-spec split_while_loop(list(AKT), fun((AKT) -> boolean()), list(AKT)) -> {list(AKT),
+    list(AKT)}.
 split_while_loop(List, F, Acc) ->
     case List of
         [] ->
@@ -1877,7 +1877,7 @@ split_while_loop(List, F, Acc) ->
     " // -> #([1, 2, 3, 4, 5], [])\n"
     " ```\n"
 ).
--spec split_while(list(ALS), fun((ALS) -> boolean())) -> {list(ALS), list(ALS)}.
+-spec split_while(list(AKP), fun((AKP) -> boolean())) -> {list(AKP), list(AKP)}.
 split_while(List, Predicate) ->
     split_while_loop(List, Predicate, []).
 
@@ -1908,7 +1908,7 @@ split_while(List, Predicate) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec key_find(list({AMB, AMC}), AMB) -> {ok, AMC} | {error, nil}.
+-spec key_find(list({AKY, AKZ}), AKY) -> {ok, AKZ} | {error, nil}.
 key_find(Keyword_list, Desired_key) ->
     find_map(
         Keyword_list,
@@ -1944,7 +1944,7 @@ key_find(Keyword_list, Desired_key) ->
     " // -> []\n"
     " ```\n"
 ).
--spec key_filter(list({AMG, AMH}), AMG) -> list(AMH).
+-spec key_filter(list({ALD, ALE}), ALD) -> list(ALE).
 key_filter(Keyword_list, Desired_key) ->
     filter_map(
         Keyword_list,
@@ -1961,8 +1961,8 @@ key_filter(Keyword_list, Desired_key) ->
     ).
 
 -file("src/gleam/list.gleam", 1693).
--spec key_pop_loop(list({AMQ, AMR}), AMQ, list({AMQ, AMR})) -> {ok,
-        {AMR, list({AMQ, AMR})}} |
+-spec key_pop_loop(list({ALN, ALO}), ALN, list({ALN, ALO})) -> {ok,
+        {ALO, list({ALN, ALO})}} |
     {error, nil}.
 key_pop_loop(List, Key, Checked) ->
     case List of
@@ -2001,14 +2001,14 @@ key_pop_loop(List, Key, Checked) ->
     " // -> Error(Nil)\n"
     " ```\n"
 ).
--spec key_pop(list({AMK, AML}), AMK) -> {ok, {AML, list({AMK, AML})}} |
+-spec key_pop(list({ALH, ALI}), ALH) -> {ok, {ALI, list({ALH, ALI})}} |
     {error, nil}.
 key_pop(List, Key) ->
     key_pop_loop(List, Key, []).
 
 -file("src/gleam/list.gleam", 1727).
--spec key_set_loop(list({ANB, ANC}), ANB, ANC, list({ANB, ANC})) -> list({ANB,
-    ANC}).
+-spec key_set_loop(list({ALY, ALZ}), ALY, ALZ, list({ALY, ALZ})) -> list({ALY,
+    ALZ}).
 key_set_loop(List, Key, Value, Inspected) ->
     case List of
         [{K, _} | Rest] when K =:= Key ->
@@ -2040,7 +2040,7 @@ key_set_loop(List, Key, Value, Inspected) ->
     " // -> [#(5, 0), #(4, 1), #(1, 100)]\n"
     " ```\n"
 ).
--spec key_set(list({AMX, AMY}), AMX, AMY) -> list({AMX, AMY}).
+-spec key_set(list({ALU, ALV}), ALU, ALV) -> list({ALU, ALV}).
 key_set(List, Key, Value) ->
     key_set_loop(List, Key, Value, []).
 
@@ -2060,7 +2060,7 @@ key_set(List, Key, Value) ->
     " // 3\n"
     " ```\n"
 ).
--spec each(list(ANG), fun((ANG) -> any())) -> nil.
+-spec each(list(AMD), fun((AMD) -> any())) -> nil.
 each(List, F) ->
     case List of
         [] ->
@@ -2089,8 +2089,8 @@ each(List, F) ->
     " // -> Ok(Nil)\n"
     " ```\n"
 ).
--spec try_each(list(ANJ), fun((ANJ) -> {ok, any()} | {error, ANM})) -> {ok, nil} |
-    {error, ANM}.
+-spec try_each(list(AMG), fun((AMG) -> {ok, any()} | {error, AMJ})) -> {ok, nil} |
+    {error, AMJ}.
 try_each(List, Fun) ->
     case List of
         [] ->
@@ -2107,8 +2107,8 @@ try_each(List, Fun) ->
     end.
 
 -file("src/gleam/list.gleam", 1814).
--spec partition_loop(list(BGM), fun((BGM) -> boolean()), list(BGM), list(BGM)) -> {list(BGM),
-    list(BGM)}.
+-spec partition_loop(list(BFJ), fun((BFJ) -> boolean()), list(BFJ), list(BFJ)) -> {list(BFJ),
+    list(BFJ)}.
 partition_loop(List, Categorise, Trues, Falses) ->
     case List of
         [] ->
@@ -2138,7 +2138,7 @@ partition_loop(List, Categorise, Trues, Falses) ->
     " // -> #([1, 3, 5], [2, 4])\n"
     " ```\n"
 ).
--spec partition(list(ANR), fun((ANR) -> boolean())) -> {list(ANR), list(ANR)}.
+-spec partition(list(AMO), fun((AMO) -> boolean())) -> {list(AMO), list(AMO)}.
 partition(List, Categorise) ->
     partition_loop(List, Categorise, [], []).
 
@@ -2153,7 +2153,7 @@ partition(List, Categorise) ->
     " // -> [[1, 2], [2, 1]]\n"
     " ```\n"
 ).
--spec permutations(list(AOA)) -> list(list(AOA)).
+-spec permutations(list(AMX)) -> list(list(AMX)).
 permutations(List) ->
     case List of
         [] ->
@@ -2183,7 +2183,7 @@ permutations(List) ->
     end.
 
 -file("src/gleam/list.gleam", 1874).
--spec window_loop(list(list(AOI)), list(AOI), integer()) -> list(list(AOI)).
+-spec window_loop(list(list(ANF)), list(ANF), integer()) -> list(list(ANF)).
 window_loop(Acc, List, N) ->
     Window = take(List, N),
     case erlang:length(Window) =:= N of
@@ -2210,7 +2210,7 @@ window_loop(Acc, List, N) ->
     " // -> []\n"
     " ```\n"
 ).
--spec window(list(AOE), integer()) -> list(list(AOE)).
+-spec window(list(ANB), integer()) -> list(list(ANB)).
 window(List, N) ->
     case N =< 0 of
         true ->
@@ -2236,7 +2236,7 @@ window(List, N) ->
     " // -> []\n"
     " ```\n"
 ).
--spec window_by_2(list(AOO)) -> list({AOO, AOO}).
+-spec window_by_2(list(ANL)) -> list({ANL, ANL}).
 window_by_2(List) ->
     zip(List, drop(List, 1)).
 
@@ -2251,7 +2251,7 @@ window_by_2(List) ->
     " // -> [3, 4]\n"
     " ```\n"
 ).
--spec drop_while(list(AOR), fun((AOR) -> boolean())) -> list(AOR).
+-spec drop_while(list(ANO), fun((ANO) -> boolean())) -> list(ANO).
 drop_while(List, Predicate) ->
     case List of
         [] ->
@@ -2268,7 +2268,7 @@ drop_while(List, Predicate) ->
     end.
 
 -file("src/gleam/list.gleam", 1940).
--spec take_while_loop(list(AOX), fun((AOX) -> boolean()), list(AOX)) -> list(AOX).
+-spec take_while_loop(list(ANU), fun((ANU) -> boolean()), list(ANU)) -> list(ANU).
 take_while_loop(List, Predicate, Acc) ->
     case List of
         [] ->
@@ -2295,12 +2295,12 @@ take_while_loop(List, Predicate, Acc) ->
     " // -> [1, 2]\n"
     " ```\n"
 ).
--spec take_while(list(AOU), fun((AOU) -> boolean())) -> list(AOU).
+-spec take_while(list(ANR), fun((ANR) -> boolean())) -> list(ANR).
 take_while(List, Predicate) ->
     take_while_loop(List, Predicate, []).
 
 -file("src/gleam/list.gleam", 1972).
--spec chunk_loop(list(APG), fun((APG) -> API), API, list(APG), list(list(APG))) -> list(list(APG)).
+-spec chunk_loop(list(AOD), fun((AOD) -> AOF), AOF, list(AOD), list(list(AOD))) -> list(list(AOD)).
 chunk_loop(List, F, Previous_key, Current_chunk, Acc) ->
     case List of
         [First | Rest] ->
@@ -2330,7 +2330,7 @@ chunk_loop(List, F, Previous_key, Current_chunk, Acc) ->
     " // -> [[1], [2, 2], [3], [4, 4, 6], [7, 7]]\n"
     " ```\n"
 ).
--spec chunk(list(APB), fun((APB) -> any())) -> list(list(APB)).
+-spec chunk(list(ANY), fun((ANY) -> any())) -> list(list(ANY)).
 chunk(List, F) ->
     case List of
         [] ->
@@ -2342,12 +2342,12 @@ chunk(List, F) ->
 
 -file("src/gleam/list.gleam", 2017).
 -spec sized_chunk_loop(
-    list(APS),
+    list(AOP),
     integer(),
     integer(),
-    list(APS),
-    list(list(APS))
-) -> list(list(APS)).
+    list(AOP),
+    list(list(AOP))
+) -> list(list(AOP)).
 sized_chunk_loop(List, Count, Left, Current_chunk, Acc) ->
     case List of
         [] ->
@@ -2397,7 +2397,7 @@ sized_chunk_loop(List, Count, Left, Current_chunk, Acc) ->
     " // -> [[1, 2, 3], [4, 5, 6], [7, 8]]\n"
     " ```\n"
 ).
--spec sized_chunk(list(APO), integer()) -> list(list(APO)).
+-spec sized_chunk(list(AOL), integer()) -> list(list(AOL)).
 sized_chunk(List, Count) ->
     sized_chunk_loop(List, Count, Count, [], []).
 
@@ -2423,7 +2423,7 @@ sized_chunk(List, Count) ->
     " // -> Ok(15)\n"
     " ```\n"
 ).
--spec reduce(list(APZ), fun((APZ, APZ) -> APZ)) -> {ok, APZ} | {error, nil}.
+-spec reduce(list(AOW), fun((AOW, AOW) -> AOW)) -> {ok, AOW} | {error, nil}.
 reduce(List, Fun) ->
     case List of
         [] ->
@@ -2434,7 +2434,7 @@ reduce(List, Fun) ->
     end.
 
 -file("src/gleam/list.gleam", 2085).
--spec scan_loop(list(AQH), AQJ, list(AQJ), fun((AQJ, AQH) -> AQJ)) -> list(AQJ).
+-spec scan_loop(list(APE), APG, list(APG), fun((APG, APE) -> APG)) -> list(APG).
 scan_loop(List, Accumulator, Accumulated, Fun) ->
     case List of
         [] ->
@@ -2456,7 +2456,7 @@ scan_loop(List, Accumulator, Accumulated, Fun) ->
     " // -> [101, 103, 106]\n"
     " ```\n"
 ).
--spec scan(list(AQD), AQF, fun((AQF, AQD) -> AQF)) -> list(AQF).
+-spec scan(list(APA), APC, fun((APC, APA) -> APC)) -> list(APC).
 scan(List, Initial, Fun) ->
     scan_loop(List, Initial, [], Fun).
 
@@ -2480,7 +2480,7 @@ scan(List, Initial, Fun) ->
     " // -> Ok(5)\n"
     " ```\n"
 ).
--spec last(list(AQM)) -> {ok, AQM} | {error, nil}.
+-spec last(list(APJ)) -> {ok, APJ} | {error, nil}.
 last(List) ->
     case List of
         [] ->
@@ -2509,7 +2509,7 @@ last(List) ->
     " // -> [[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]]\n"
     " ```\n"
 ).
--spec combinations(list(AQQ), integer()) -> list(list(AQQ)).
+-spec combinations(list(APN), integer()) -> list(list(APN)).
 combinations(Items, N) ->
     case {N, Items} of
         {0, _} ->
@@ -2526,7 +2526,7 @@ combinations(Items, N) ->
     end.
 
 -file("src/gleam/list.gleam", 2165).
--spec combination_pairs_loop(list(AQX), list({AQX, AQX})) -> list({AQX, AQX}).
+-spec combination_pairs_loop(list(APU), list({APU, APU})) -> list({APU, APU}).
 combination_pairs_loop(Items, Acc) ->
     case Items of
         [] ->
@@ -2549,13 +2549,13 @@ combination_pairs_loop(Items, Acc) ->
     " // -> [#(1, 2), #(1, 3), #(2, 3)]\n"
     " ```\n"
 ).
--spec combination_pairs(list(AQU)) -> list({AQU, AQU}).
+-spec combination_pairs(list(APR)) -> list({APR, APR}).
 combination_pairs(Items) ->
     combination_pairs_loop(Items, []).
 
 -file("src/gleam/list.gleam", 2220).
--spec take_firsts(list(list(ARR)), list(ARR), list(list(ARR))) -> {list(ARR),
-    list(list(ARR))}.
+-spec take_firsts(list(list(AQO)), list(AQO), list(list(AQO))) -> {list(AQO),
+    list(list(AQO))}.
 take_firsts(Rows, Column, Remaining_rows) ->
     case Rows of
         [] ->
@@ -2570,7 +2570,7 @@ take_firsts(Rows, Column, Remaining_rows) ->
     end.
 
 -file("src/gleam/list.gleam", 2207).
--spec transpose_loop(list(list(ARK)), list(list(ARK))) -> list(list(ARK)).
+-spec transpose_loop(list(list(AQH)), list(list(AQH))) -> list(list(AQH)).
 transpose_loop(Rows, Columns) ->
     case Rows of
         [] ->
@@ -2602,7 +2602,7 @@ transpose_loop(Rows, Columns) ->
     " // -> [[1, 101], [2, 102], [3, 103]]\n"
     " ```\n"
 ).
--spec transpose(list(list(ARF))) -> list(list(ARF)).
+-spec transpose(list(list(AQC))) -> list(list(AQC)).
 transpose(List_of_lists) ->
     transpose_loop(List_of_lists, []).
 
@@ -2617,13 +2617,13 @@ transpose(List_of_lists) ->
     " // -> [1, 101, 201, 2, 102, 202]\n"
     " ```\n"
 ).
--spec interleave(list(list(ARB))) -> list(ARB).
+-spec interleave(list(list(APY))) -> list(APY).
 interleave(List) ->
     _pipe = transpose(List),
     lists:append(_pipe).
 
 -file("src/gleam/list.gleam", 2253).
--spec shuffle_pair_unwrap_loop(list({float(), ASD}), list(ASD)) -> list(ASD).
+-spec shuffle_pair_unwrap_loop(list({float(), ARA}), list(ARA)) -> list(ARA).
 shuffle_pair_unwrap_loop(List, Acc) ->
     case List of
         [] ->
@@ -2637,7 +2637,7 @@ shuffle_pair_unwrap_loop(List, Acc) ->
     end.
 
 -file("src/gleam/list.gleam", 2261).
--spec do_shuffle_by_pair_indexes(list({float(), ASH})) -> list({float(), ASH}).
+-spec do_shuffle_by_pair_indexes(list({float(), ARE})) -> list({float(), ARE}).
 do_shuffle_by_pair_indexes(List_of_pairs) ->
     sort(
         List_of_pairs,
@@ -2662,7 +2662,7 @@ do_shuffle_by_pair_indexes(List_of_pairs) ->
     " // -> [1, 6, 9, 10, 3, 8, 4, 2, 7, 5]\n"
     " ```\n"
 ).
--spec shuffle(list(ASA)) -> list(ASA).
+-spec shuffle(list(AQX)) -> list(AQX).
 shuffle(List) ->
     _pipe = List,
     _pipe@1 = fold(_pipe, [], fun(Acc, A) -> [{rand:uniform(), A} | Acc] end),
@@ -2670,7 +2670,7 @@ shuffle(List) ->
     shuffle_pair_unwrap_loop(_pipe@2, []).
 
 -file("src/gleam/list.gleam", 2293).
--spec max_loop(list(ASR), fun((ASR, ASR) -> gleam@order:order()), ASR) -> ASR.
+-spec max_loop(list(ARO), fun((ARO, ARO) -> gleam@order:order()), ARO) -> ARO.
 max_loop(List, Compare, Max) ->
     case List of
         [] ->
@@ -2706,7 +2706,7 @@ max_loop(List, Compare, Max) ->
     " // -> Ok(\"c\")\n"
     " ```\n"
 ).
--spec max(list(ASK), fun((ASK, ASK) -> gleam@order:order())) -> {ok, ASK} |
+-spec max(list(ARH), fun((ARH, ARH) -> gleam@order:order())) -> {ok, ARH} |
     {error, nil}.
 max(List, Compare) ->
     case List of
@@ -2719,10 +2719,10 @@ max(List, Compare) ->
 
 -file("src/gleam/list.gleam", 2374).
 -spec build_reservoir_loop(
-    list(ATG),
+    list(ASD),
     integer(),
-    gleam@dict:dict(integer(), ATG)
-) -> {gleam@dict:dict(integer(), ATG), list(ATG)}.
+    gleam@dict:dict(integer(), ASD)
+) -> {gleam@dict:dict(integer(), ASD), list(ASD)}.
 build_reservoir_loop(List, Size, Reservoir) ->
     Reservoir_size = maps:size(Reservoir),
     case Reservoir_size >= Size of
@@ -2753,8 +2753,8 @@ build_reservoir_loop(List, Size, Reservoir) ->
     " This also returns the remaining elements of `list` that didn't end up in\n"
     " the reservoir.\n"
 ).
--spec build_reservoir(list(ATB), integer()) -> {gleam@dict:dict(integer(), ATB),
-    list(ATB)}.
+-spec build_reservoir(list(ARY), integer()) -> {gleam@dict:dict(integer(), ARY),
+    list(ARY)}.
 build_reservoir(List, N) ->
     build_reservoir_loop(List, N, maps:new()).
 
@@ -2782,11 +2782,11 @@ log_random() ->
 
 -file("src/gleam/list.gleam", 2335).
 -spec sample_loop(
-    list(ASV),
-    gleam@dict:dict(integer(), ASV),
+    list(ARS),
+    gleam@dict:dict(integer(), ARS),
     integer(),
     float()
-) -> gleam@dict:dict(integer(), ASV).
+) -> gleam@dict:dict(integer(), ARS).
 sample_loop(List, Reservoir, N, W) ->
     Skip = begin
         Log@1 = case gleam@float:logarithm(1.0 - W) of
@@ -2843,7 +2843,7 @@ sample_loop(List, Reservoir, N, W) ->
     " // -> [2, 4, 5]  // A random sample of 3 items\n"
     " ```\n"
 ).
--spec sample(list(ASS), integer()) -> list(ASS).
+-spec sample(list(ARP), integer()) -> list(ARP).
 sample(List, N) ->
     {Reservoir, Rest} = build_reservoir(List, N),
     case gleam@dict:is_empty(Reservoir) of

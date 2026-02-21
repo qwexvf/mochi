@@ -3,6 +3,6 @@
     {applications, [gleam_stdlib,
                     gleam_yielder]},
     {description, "create ranges over any type"},
-    {modules, []},
+    {modules, [ranger]},
     {registered, []}
 ]}.

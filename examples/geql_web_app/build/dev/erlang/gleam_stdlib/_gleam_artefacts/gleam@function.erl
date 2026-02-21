@@ -1,5 +1,5 @@
 -module(gleam@function).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/function.gleam").
 -export([identity/1, tap/2]).
 
@@ -13,7 +13,7 @@
 
 -file("src/gleam/function.gleam", 3).
 ?DOC(" Takes a single argument and always returns its input value.\n").
--spec identity(COJ) -> COJ.
+-spec identity(CLB) -> CLB.
 identity(X) ->
     X.
 
@@ -24,7 +24,7 @@ identity(X) ->
     "\n"
     " Useful for running synchronous side effects in a pipeline.\n"
 ).
--spec tap(COK, fun((COK) -> any())) -> COK.
+-spec tap(CLC, fun((CLC) -> any())) -> CLC.
 tap(Arg, Effect) ->
     Effect(Arg),
     Arg.

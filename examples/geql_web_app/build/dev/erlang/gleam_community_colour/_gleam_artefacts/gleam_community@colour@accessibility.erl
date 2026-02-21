@@ -1,5 +1,5 @@
 -module(gleam_community@colour@accessibility).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam_community/colour/accessibility.gleam").
 -export([luminance/1, contrast_ratio/2, maximum_contrast/2]).
 

@@ -1,5 +1,5 @@
 -module(ranger).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/ranger.gleam").
 -export([create/4, create_infinite/3]).
 -export_type([direction/0]).
@@ -79,11 +79,11 @@
     " ```\n"
 ).
 -spec create(
-    fun((LBR) -> boolean()),
-    fun((LBS) -> LBS),
-    fun((LBR, LBS) -> LBR),
-    fun((LBR, LBR) -> gleam@order:order())
-) -> fun((LBR, LBR, LBS) -> {ok, gleam@yielder:yielder(LBR)} | {error, nil}).
+    fun((KWM) -> boolean()),
+    fun((KWN) -> KWN),
+    fun((KWM, KWN) -> KWM),
+    fun((KWM, KWM) -> gleam@order:order())
+) -> fun((KWM, KWM, KWN) -> {ok, gleam@yielder:yielder(KWM)} | {error, nil}).
 create(Validate, Negate_step, Add, Compare) ->
     Adjust_step = fun(A, B, Step) ->
         Negated_step = Negate_step(Step),
@@ -178,10 +178,10 @@ create(Validate, Negate_step, Add, Compare) ->
     " ```\n"
 ).
 -spec create_infinite(
-    fun((LBW) -> boolean()),
-    fun((LBW, LBX) -> LBW),
-    fun((LBW, LBW) -> gleam@order:order())
-) -> fun((LBW, LBX) -> {ok, gleam@yielder:yielder(LBW)} | {error, nil}).
+    fun((KWR) -> boolean()),
+    fun((KWR, KWS) -> KWR),
+    fun((KWR, KWR) -> gleam@order:order())
+) -> fun((KWR, KWS) -> {ok, gleam@yielder:yielder(KWR)} | {error, nil}).
 create_infinite(Validate, Add, Compare) ->
     Is_step_zero = fun(A, S) -> case Compare(A, Add(A, S)) of
             eq ->

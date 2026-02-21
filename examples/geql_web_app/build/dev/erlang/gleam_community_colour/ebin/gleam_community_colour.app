@@ -3,6 +3,7 @@
     {applications, [gleam_json,
                     gleam_stdlib]},
     {description, "Colour types, conversions, and other utilities"},
-    {modules, []},
+    {modules, [gleam_community@colour,
+               gleam_community@colour@accessibility]},
     {registered, []}
 ]}.

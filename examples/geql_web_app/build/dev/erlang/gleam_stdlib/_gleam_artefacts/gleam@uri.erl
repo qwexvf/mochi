@@ -1,5 +1,5 @@
 -module(gleam@uri).
--compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch]).
+-compile([no_auto_import, nowarn_unused_vars, nowarn_unused_function, nowarn_nomatch, inline]).
 -define(FILEPATH, "src/gleam/uri.gleam").
 -export([parse_query/1, percent_encode/1, query_to_string/1, percent_decode/1, path_segments/1, to_string/1, origin/1, merge/2, parse/1]).
 -export_type([uri/0]).
@@ -44,17 +44,14 @@ is_valid_host_within_brackets_char(Char) ->
 -spec parse_fragment(binary(), uri()) -> {ok, uri()} | {error, nil}.
 parse_fragment(Rest, Pieces) ->
     {ok,
-        begin
-            _record = Pieces,
-            {uri,
-                erlang:element(2, _record),
-                erlang:element(3, _record),
-                erlang:element(4, _record),
-                erlang:element(5, _record),
-                erlang:element(6, _record),
-                erlang:element(7, _record),
-                {some, Rest}}
-        end}.
+        {uri,
+            erlang:element(2, Pieces),
+            erlang:element(3, Pieces),
+            erlang:element(4, Pieces),
+            erlang:element(5, Pieces),
+            erlang:element(6, Pieces),
+            erlang:element(7, Pieces),
+            {some, Rest}}}.
 
 -file("src/gleam/uri.gleam", 475).
 -spec parse_query_with_question_mark_loop(binary(), binary(), uri(), integer()) -> {ok,
@@ -67,32 +64,26 @@ parse_query_with_question_mark_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"#"/utf8, Rest@1/binary>> ->
             Query = binary:part(Original, 0, Size),
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    erlang:element(2, _record),
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    {some, Query},
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                {some, Query},
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@1, Pieces@1);
 
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record@1 = Pieces,
-                    {uri,
-                        erlang:element(2, _record@1),
-                        erlang:element(3, _record@1),
-                        erlang:element(4, _record@1),
-                        erlang:element(5, _record@1),
-                        erlang:element(6, _record@1),
-                        {some, Original},
-                        erlang:element(8, _record@1)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    erlang:element(4, Pieces),
+                    erlang:element(5, Pieces),
+                    erlang:element(6, Pieces),
+                    {some, Original},
+                    erlang:element(8, Pieces)}};
 
         _ ->
             {_, Rest@2} = gleam_stdlib:string_pop_codeunit(Uri_string),
@@ -117,47 +108,38 @@ parse_path_loop(Original, Uri_string, Pieces, Size) ->
     case Uri_string of
         <<"?"/utf8, Rest/binary>> ->
             Path = binary:part(Original, 0, Size),
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    erlang:element(2, _record),
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    Path,
-                    erlang:element(7, _record),
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                Path,
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_query_with_question_mark(Rest, Pieces@1);
 
         <<"#"/utf8, Rest@1/binary>> ->
             Path@1 = binary:part(Original, 0, Size),
-            Pieces@2 = begin
-                _record@1 = Pieces,
-                {uri,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    erlang:element(4, _record@1),
-                    erlang:element(5, _record@1),
-                    Path@1,
-                    erlang:element(7, _record@1),
-                    erlang:element(8, _record@1)}
-            end,
+            Pieces@2 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                Path@1,
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@1, Pieces@2);
 
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record@2 = Pieces,
-                    {uri,
-                        erlang:element(2, _record@2),
-                        erlang:element(3, _record@2),
-                        erlang:element(4, _record@2),
-                        erlang:element(5, _record@2),
-                        Original,
-                        erlang:element(7, _record@2),
-                        erlang:element(8, _record@2)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    erlang:element(4, Pieces),
+                    erlang:element(5, Pieces),
+                    Original,
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         _ ->
             {_, Rest@2} = gleam_stdlib:string_pop_codeunit(Uri_string),
@@ -204,60 +186,48 @@ parse_port_loop(Uri_string, Pieces, Port) ->
             parse_port_loop(Rest@9, Pieces, (Port * 10) + 9);
 
         <<"?"/utf8, Rest@10/binary>> ->
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    erlang:element(2, _record),
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    {some, Port},
-                    erlang:element(6, _record),
-                    erlang:element(7, _record),
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                {some, Port},
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_query_with_question_mark(Rest@10, Pieces@1);
 
         <<"#"/utf8, Rest@11/binary>> ->
-            Pieces@2 = begin
-                _record@1 = Pieces,
-                {uri,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    erlang:element(4, _record@1),
-                    {some, Port},
-                    erlang:element(6, _record@1),
-                    erlang:element(7, _record@1),
-                    erlang:element(8, _record@1)}
-            end,
+            Pieces@2 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                {some, Port},
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@11, Pieces@2);
 
         <<"/"/utf8, _/binary>> ->
-            Pieces@3 = begin
-                _record@2 = Pieces,
-                {uri,
-                    erlang:element(2, _record@2),
-                    erlang:element(3, _record@2),
-                    erlang:element(4, _record@2),
-                    {some, Port},
-                    erlang:element(6, _record@2),
-                    erlang:element(7, _record@2),
-                    erlang:element(8, _record@2)}
-            end,
+            Pieces@3 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                {some, Port},
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_path(Uri_string, Pieces@3);
 
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record@3 = Pieces,
-                    {uri,
-                        erlang:element(2, _record@3),
-                        erlang:element(3, _record@3),
-                        erlang:element(4, _record@3),
-                        {some, Port},
-                        erlang:element(6, _record@3),
-                        erlang:element(7, _record@3),
-                        erlang:element(8, _record@3)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    erlang:element(4, Pieces),
+                    {some, Port},
+                    erlang:element(6, Pieces),
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         _ ->
             {error, nil}
@@ -324,76 +294,61 @@ parse_host_outside_of_brackets_loop(Original, Uri_string, Pieces, Size) ->
     case Uri_string of
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record = Pieces,
-                    {uri,
-                        erlang:element(2, _record),
-                        erlang:element(3, _record),
-                        {some, Original},
-                        erlang:element(5, _record),
-                        erlang:element(6, _record),
-                        erlang:element(7, _record),
-                        erlang:element(8, _record)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    {some, Original},
+                    erlang:element(5, Pieces),
+                    erlang:element(6, Pieces),
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         <<":"/utf8, _/binary>> ->
             Host = binary:part(Original, 0, Size),
-            Pieces@1 = begin
-                _record@1 = Pieces,
-                {uri,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    {some, Host},
-                    erlang:element(5, _record@1),
-                    erlang:element(6, _record@1),
-                    erlang:element(7, _record@1),
-                    erlang:element(8, _record@1)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_port(Uri_string, Pieces@1);
 
         <<"/"/utf8, _/binary>> ->
             Host@1 = binary:part(Original, 0, Size),
-            Pieces@2 = begin
-                _record@2 = Pieces,
-                {uri,
-                    erlang:element(2, _record@2),
-                    erlang:element(3, _record@2),
-                    {some, Host@1},
-                    erlang:element(5, _record@2),
-                    erlang:element(6, _record@2),
-                    erlang:element(7, _record@2),
-                    erlang:element(8, _record@2)}
-            end,
+            Pieces@2 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@1},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_path(Uri_string, Pieces@2);
 
         <<"?"/utf8, Rest/binary>> ->
             Host@2 = binary:part(Original, 0, Size),
-            Pieces@3 = begin
-                _record@3 = Pieces,
-                {uri,
-                    erlang:element(2, _record@3),
-                    erlang:element(3, _record@3),
-                    {some, Host@2},
-                    erlang:element(5, _record@3),
-                    erlang:element(6, _record@3),
-                    erlang:element(7, _record@3),
-                    erlang:element(8, _record@3)}
-            end,
+            Pieces@3 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@2},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_query_with_question_mark(Rest, Pieces@3);
 
         <<"#"/utf8, Rest@1/binary>> ->
             Host@3 = binary:part(Original, 0, Size),
-            Pieces@4 = begin
-                _record@4 = Pieces,
-                {uri,
-                    erlang:element(2, _record@4),
-                    erlang:element(3, _record@4),
-                    {some, Host@3},
-                    erlang:element(5, _record@4),
-                    erlang:element(6, _record@4),
-                    erlang:element(7, _record@4),
-                    erlang:element(8, _record@4)}
-            end,
+            Pieces@4 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@3},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@1, Pieces@4);
 
         _ ->
@@ -414,34 +369,28 @@ parse_host_within_brackets_loop(Original, Uri_string, Pieces, Size) ->
     case Uri_string of
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record = Pieces,
-                    {uri,
-                        erlang:element(2, _record),
-                        erlang:element(3, _record),
-                        {some, Uri_string},
-                        erlang:element(5, _record),
-                        erlang:element(6, _record),
-                        erlang:element(7, _record),
-                        erlang:element(8, _record)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    {some, Uri_string},
+                    erlang:element(5, Pieces),
+                    erlang:element(6, Pieces),
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         <<"]"/utf8, Rest/binary>> when Size =:= 0 ->
             parse_port(Rest, Pieces);
 
         <<"]"/utf8, Rest@1/binary>> ->
             Host = binary:part(Original, 0, Size + 1),
-            Pieces@1 = begin
-                _record@1 = Pieces,
-                {uri,
-                    erlang:element(2, _record@1),
-                    erlang:element(3, _record@1),
-                    {some, Host},
-                    erlang:element(5, _record@1),
-                    erlang:element(6, _record@1),
-                    erlang:element(7, _record@1),
-                    erlang:element(8, _record@1)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_port(Rest@1, Pieces@1);
 
         <<"/"/utf8, _/binary>> when Size =:= 0 ->
@@ -449,17 +398,14 @@ parse_host_within_brackets_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"/"/utf8, _/binary>> ->
             Host@1 = binary:part(Original, 0, Size),
-            Pieces@2 = begin
-                _record@2 = Pieces,
-                {uri,
-                    erlang:element(2, _record@2),
-                    erlang:element(3, _record@2),
-                    {some, Host@1},
-                    erlang:element(5, _record@2),
-                    erlang:element(6, _record@2),
-                    erlang:element(7, _record@2),
-                    erlang:element(8, _record@2)}
-            end,
+            Pieces@2 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@1},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_path(Uri_string, Pieces@2);
 
         <<"?"/utf8, Rest@2/binary>> when Size =:= 0 ->
@@ -467,17 +413,14 @@ parse_host_within_brackets_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"?"/utf8, Rest@3/binary>> ->
             Host@2 = binary:part(Original, 0, Size),
-            Pieces@3 = begin
-                _record@3 = Pieces,
-                {uri,
-                    erlang:element(2, _record@3),
-                    erlang:element(3, _record@3),
-                    {some, Host@2},
-                    erlang:element(5, _record@3),
-                    erlang:element(6, _record@3),
-                    erlang:element(7, _record@3),
-                    erlang:element(8, _record@3)}
-            end,
+            Pieces@3 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@2},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_query_with_question_mark(Rest@3, Pieces@3);
 
         <<"#"/utf8, Rest@4/binary>> when Size =:= 0 ->
@@ -485,17 +428,14 @@ parse_host_within_brackets_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"#"/utf8, Rest@5/binary>> ->
             Host@3 = binary:part(Original, 0, Size),
-            Pieces@4 = begin
-                _record@4 = Pieces,
-                {uri,
-                    erlang:element(2, _record@4),
-                    erlang:element(3, _record@4),
-                    {some, Host@3},
-                    erlang:element(5, _record@4),
-                    erlang:element(6, _record@4),
-                    erlang:element(7, _record@4),
-                    erlang:element(8, _record@4)}
-            end,
+            Pieces@4 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, Host@3},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@5, Pieces@4);
 
         _ ->
@@ -538,32 +478,26 @@ parse_host(Uri_string, Pieces) ->
             parse_host_within_brackets(Uri_string, Pieces);
 
         <<":"/utf8, _/binary>> ->
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    erlang:element(2, _record),
-                    erlang:element(3, _record),
-                    {some, <<""/utf8>>},
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    erlang:element(7, _record),
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                erlang:element(3, Pieces),
+                {some, <<""/utf8>>},
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_port(Uri_string, Pieces@1);
 
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record@1 = Pieces,
-                    {uri,
-                        erlang:element(2, _record@1),
-                        erlang:element(3, _record@1),
-                        {some, <<""/utf8>>},
-                        erlang:element(5, _record@1),
-                        erlang:element(6, _record@1),
-                        erlang:element(7, _record@1),
-                        erlang:element(8, _record@1)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    {some, <<""/utf8>>},
+                    erlang:element(5, Pieces),
+                    erlang:element(6, Pieces),
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         _ ->
             parse_host_outside_of_brackets(Uri_string, Pieces)
@@ -579,17 +513,14 @@ parse_userinfo_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"@"/utf8, Rest@1/binary>> ->
             Userinfo = binary:part(Original, 0, Size),
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    erlang:element(2, _record),
-                    {some, Userinfo},
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    erlang:element(7, _record),
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                erlang:element(2, Pieces),
+                {some, Userinfo},
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_host(Rest@1, Pieces@1);
 
         <<""/utf8>> ->
@@ -621,17 +552,14 @@ parse_authority_with_slashes(Uri_string, Pieces) ->
     case Uri_string of
         <<"//"/utf8>> ->
             {ok,
-                begin
-                    _record = Pieces,
-                    {uri,
-                        erlang:element(2, _record),
-                        erlang:element(3, _record),
-                        {some, <<""/utf8>>},
-                        erlang:element(5, _record),
-                        erlang:element(6, _record),
-                        erlang:element(7, _record),
-                        erlang:element(8, _record)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    {some, <<""/utf8>>},
+                    erlang:element(5, Pieces),
+                    erlang:element(6, Pieces),
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         <<"//"/utf8, Rest/binary>> ->
             parse_authority_pieces(Rest, Pieces);
@@ -650,17 +578,14 @@ parse_scheme_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"/"/utf8, _/binary>> ->
             Scheme = binary:part(Original, 0, Size),
-            Pieces@1 = begin
-                _record = Pieces,
-                {uri,
-                    {some, string:lowercase(Scheme)},
-                    erlang:element(3, _record),
-                    erlang:element(4, _record),
-                    erlang:element(5, _record),
-                    erlang:element(6, _record),
-                    erlang:element(7, _record),
-                    erlang:element(8, _record)}
-            end,
+            Pieces@1 = {uri,
+                {some, string:lowercase(Scheme)},
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_authority_with_slashes(Uri_string, Pieces@1);
 
         <<"?"/utf8, Rest/binary>> when Size =:= 0 ->
@@ -668,17 +593,14 @@ parse_scheme_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"?"/utf8, Rest@1/binary>> ->
             Scheme@1 = binary:part(Original, 0, Size),
-            Pieces@2 = begin
-                _record@1 = Pieces,
-                {uri,
-                    {some, string:lowercase(Scheme@1)},
-                    erlang:element(3, _record@1),
-                    erlang:element(4, _record@1),
-                    erlang:element(5, _record@1),
-                    erlang:element(6, _record@1),
-                    erlang:element(7, _record@1),
-                    erlang:element(8, _record@1)}
-            end,
+            Pieces@2 = {uri,
+                {some, string:lowercase(Scheme@1)},
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_query_with_question_mark(Rest@1, Pieces@2);
 
         <<"#"/utf8, Rest@2/binary>> when Size =:= 0 ->
@@ -686,17 +608,14 @@ parse_scheme_loop(Original, Uri_string, Pieces, Size) ->
 
         <<"#"/utf8, Rest@3/binary>> ->
             Scheme@2 = binary:part(Original, 0, Size),
-            Pieces@3 = begin
-                _record@2 = Pieces,
-                {uri,
-                    {some, string:lowercase(Scheme@2)},
-                    erlang:element(3, _record@2),
-                    erlang:element(4, _record@2),
-                    erlang:element(5, _record@2),
-                    erlang:element(6, _record@2),
-                    erlang:element(7, _record@2),
-                    erlang:element(8, _record@2)}
-            end,
+            Pieces@3 = {uri,
+                {some, string:lowercase(Scheme@2)},
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_fragment(Rest@3, Pieces@3);
 
         <<":"/utf8, _/binary>> when Size =:= 0 ->
@@ -704,32 +623,26 @@ parse_scheme_loop(Original, Uri_string, Pieces, Size) ->
 
         <<":"/utf8, Rest@4/binary>> ->
             Scheme@3 = binary:part(Original, 0, Size),
-            Pieces@4 = begin
-                _record@3 = Pieces,
-                {uri,
-                    {some, string:lowercase(Scheme@3)},
-                    erlang:element(3, _record@3),
-                    erlang:element(4, _record@3),
-                    erlang:element(5, _record@3),
-                    erlang:element(6, _record@3),
-                    erlang:element(7, _record@3),
-                    erlang:element(8, _record@3)}
-            end,
+            Pieces@4 = {uri,
+                {some, string:lowercase(Scheme@3)},
+                erlang:element(3, Pieces),
+                erlang:element(4, Pieces),
+                erlang:element(5, Pieces),
+                erlang:element(6, Pieces),
+                erlang:element(7, Pieces),
+                erlang:element(8, Pieces)},
             parse_authority_with_slashes(Rest@4, Pieces@4);
 
         <<""/utf8>> ->
             {ok,
-                begin
-                    _record@4 = Pieces,
-                    {uri,
-                        erlang:element(2, _record@4),
-                        erlang:element(3, _record@4),
-                        erlang:element(4, _record@4),
-                        erlang:element(5, _record@4),
-                        Original,
-                        erlang:element(7, _record@4),
-                        erlang:element(8, _record@4)}
-                end};
+                {uri,
+                    erlang:element(2, Pieces),
+                    erlang:element(3, Pieces),
+                    erlang:element(4, Pieces),
+                    erlang:element(5, Pieces),
+                    Original,
+                    erlang:element(7, Pieces),
+                    erlang:element(8, Pieces)}};
 
         _ ->
             {_, Rest@5} = gleam_stdlib:string_pop_codeunit(Uri_string),
@@ -985,7 +898,7 @@ origin(Uri) ->
     end.
 
 -file("src/gleam/uri.gleam", 759).
--spec drop_last(list(DHB)) -> list(DHB).
+-spec drop_last(list(DDP)) -> list(DDP).
 drop_last(Elements) ->
     gleam@list:take(Elements, erlang:length(Elements) - 1).
 

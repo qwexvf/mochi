@@ -1,4 +1,4 @@
 [packages]
-gleam_stdlib = "0.62.0"
-gleeunit = "1.6.1"
 geql = "1.0.0"
+gleeunit = "1.6.1"
+gleam_stdlib = "0.62.0"

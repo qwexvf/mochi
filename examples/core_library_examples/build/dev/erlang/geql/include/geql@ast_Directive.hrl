@@ -1,1 +1,0 @@
--record(directive, {name :: binary(), arguments :: list(geql@ast:argument())}).
