@@ -16,6 +16,7 @@ import mochi/parser
 import mochi/schema
 import mochi/telemetry
 import mochi/types
+import mochi/validation
 
 // ============================================================================
 // Types
@@ -109,14 +110,6 @@ fn resolver_error_at(
 
 fn type_error(msg: String, path: List(String)) -> ExecutionResult {
   error_result(TypeError(msg, path, location: None))
-}
-
-fn type_error_at(
-  msg: String,
-  path: List(String),
-  loc: Option(#(Int, Int)),
-) -> ExecutionResult {
-  error_result(TypeError(msg, path, location: loc))
 }
 
 fn null_value_error(msg: String, path: List(String)) -> ExecutionResult {
@@ -2739,6 +2732,79 @@ pub fn execute_query_with_variables(
     execute(schema_def, document, None, ctx, variables)
   })
   |> result.unwrap(validation_error("Failed to parse query", []))
+}
+
+/// Execute a query with a custom execution context (enables full telemetry).
+///
+/// Use this function when you need telemetry for parsing and validation phases.
+///
+/// ## Example
+///
+/// ```gleam
+/// let config = telemetry.with_handler(fn(event) { io.debug(event) })
+/// let ctx = schema.execution_context(user_data)
+///   |> schema.with_telemetry_fn(telemetry.to_schema_fn(config))
+///
+/// let result = executor.execute_query_with_context(
+///   my_schema,
+///   "{ users { name } }",
+///   dict.new(),
+///   ctx,
+/// )
+/// ```
+pub fn execute_query_with_context(
+  schema_def: schema.Schema,
+  query: String,
+  variables: Dict(String, Dynamic),
+  ctx: schema.ExecutionContext,
+) -> ExecutionResult {
+  // Emit parse start telemetry
+  emit_telemetry(ctx, schema.SchemaParseStart)
+  let parse_start = telemetry.get_timestamp_ns()
+
+  case parser.parse(query) {
+    Ok(document) -> {
+      let parse_duration = telemetry.get_timestamp_ns() - parse_start
+      emit_telemetry(ctx, schema.SchemaParseEnd(True, parse_duration))
+
+      // Emit validation start telemetry
+      emit_telemetry(ctx, schema.SchemaValidationStart)
+      let validation_start = telemetry.get_timestamp_ns()
+
+      case validation.validate(document, schema_def) {
+        Ok(_validated_doc) -> {
+          let validation_duration =
+            telemetry.get_timestamp_ns() - validation_start
+          emit_telemetry(
+            ctx,
+            schema.SchemaValidationEnd(True, 0, validation_duration),
+          )
+          execute(schema_def, document, None, ctx, variables)
+        }
+        Error(validation_errors) -> {
+          let validation_duration =
+            telemetry.get_timestamp_ns() - validation_start
+          let error_count = list.length(validation_errors)
+          emit_telemetry(
+            ctx,
+            schema.SchemaValidationEnd(False, error_count, validation_duration),
+          )
+          // Convert validation errors to execution errors
+          let errors =
+            list.map(validation_errors, fn(err) {
+              let msg = validation.format_error(err)
+              ValidationError(message: msg, path: [], location: None)
+            })
+          ExecutionResult(data: None, errors: errors)
+        }
+      }
+    }
+    Error(error) -> {
+      let parse_duration = telemetry.get_timestamp_ns() - parse_start
+      emit_telemetry(ctx, schema.SchemaParseEnd(False, parse_duration))
+      validation_error("Parse error: " <> format_parse_error(error), [])
+    }
+  }
 }
 
 // ============================================================================

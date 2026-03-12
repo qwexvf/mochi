@@ -561,13 +561,11 @@ Examples:
 "
 }
 
-// FFI stubs (these would be implemented via Erlang/JS FFI)
+// FFI for Erlang VM
 @external(erlang, "erlang", "halt")
-@external(javascript, "./mochi_ffi.mjs", "halt")
 fn halt(code: Int) -> Nil
 
 @external(erlang, "mochi_ffi", "get_args")
-@external(javascript, "./mochi_ffi.mjs", "getArgs")
 fn get_args() -> List(String)
 
 // For use from code (not CLI)

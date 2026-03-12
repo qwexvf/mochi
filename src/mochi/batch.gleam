@@ -16,7 +16,6 @@ import mochi/schema.{type ExecutionContext, type Schema}
 /// Execute a list of zero-argument functions in parallel using Erlang processes.
 /// Results are returned in the same order as the input functions.
 @external(erlang, "mochi_parallel_ffi", "parallel_map")
-@external(javascript, "../mochi_parallel_ffi.mjs", "parallel_map")
 fn do_parallel_map(fns: List(fn() -> a)) -> List(a)
 
 // ============================================================================

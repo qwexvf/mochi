@@ -320,5 +320,4 @@ pub fn from_dynamic(value: Dynamic) -> Result(UploadedFile, String) {
 }
 
 @external(erlang, "gleam_stdlib", "identity")
-@external(javascript, "./mochi_coerce_ffi.mjs", "identity")
 fn unsafe_coerce(value: Dynamic) -> UploadedFile

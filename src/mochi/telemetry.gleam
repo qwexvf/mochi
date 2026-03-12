@@ -106,9 +106,7 @@ pub type TelemetryContext {
 // ============================================================================
 
 /// Get current timestamp in nanoseconds (monotonic clock)
-/// Uses erlang:monotonic_time/1 on Erlang and performance.now() on JavaScript
 @external(erlang, "mochi_time_ffi", "monotonic_time_ns")
-@external(javascript, "./mochi_time_ffi.mjs", "monotonic_time_ns")
 pub fn get_timestamp_ns() -> Int
 
 // ============================================================================
@@ -606,6 +604,22 @@ pub fn to_schema_fn(config: TelemetryConfig) -> schema.TelemetryFn {
       False -> Nil
       True ->
         case event {
+          schema.SchemaParseStart -> {
+            config.handler(ParseStart(get_timestamp_ns()))
+          }
+          schema.SchemaParseEnd(success, _duration_ns) -> {
+            config.handler(ParseEnd(get_timestamp_ns(), success))
+          }
+          schema.SchemaValidationStart -> {
+            config.handler(ValidationStart(get_timestamp_ns()))
+          }
+          schema.SchemaValidationEnd(success, error_count, _duration_ns) -> {
+            config.handler(ValidationEnd(
+              get_timestamp_ns(),
+              success,
+              error_count,
+            ))
+          }
           schema.SchemaFieldStart(field_name, parent_type, path) -> {
             case config.track_fields {
               False -> Nil
@@ -652,6 +666,18 @@ pub fn to_schema_fn(config: TelemetryConfig) -> schema.TelemetryFn {
               success,
               error_count,
             ))
+          }
+          schema.SchemaDataLoaderBatch(loader_name, batch_size, duration_ns) -> {
+            case config.track_dataloaders {
+              False -> Nil
+              True ->
+                config.handler(DataLoaderBatch(
+                  get_timestamp_ns(),
+                  loader_name,
+                  batch_size,
+                  duration_ns,
+                ))
+            }
           }
         }
     }

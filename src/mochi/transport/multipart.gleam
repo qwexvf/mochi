@@ -648,5 +648,4 @@ fn get_string_list_raw(value: Dynamic) -> Result(List(String), Nil) {
 }
 
 @external(erlang, "mochi_random_ffi", "unique_positive_int")
-@external(javascript, "./mochi_random_ffi.mjs", "unique_positive_int")
 fn get_random_int() -> Int

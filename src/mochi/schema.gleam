@@ -36,6 +36,10 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import mochi/dataloader.{type DataLoader}
 
+// Direct FFI call to avoid import cycle with telemetry module
+@external(erlang, "mochi_time_ffi", "monotonic_time_ns")
+fn get_timestamp_ns() -> Int
+
 // Forward declarations for types defined in other modules
 // These are opaque references to avoid circular dependencies
 
@@ -49,6 +53,14 @@ pub type MiddlewareFn =
 /// Events emitted during GraphQL execution for telemetry/instrumentation.
 /// These are emitted by the executor and passed to the `telemetry_fn` if one is configured.
 pub type SchemaEvent {
+  /// Query parsing is about to start.
+  SchemaParseStart
+  /// Query parsing has completed.
+  SchemaParseEnd(success: Bool, duration_ns: Int)
+  /// Query validation is about to start.
+  SchemaValidationStart
+  /// Query validation has completed.
+  SchemaValidationEnd(success: Bool, error_count: Int, duration_ns: Int)
   /// A field resolver is about to be called.
   SchemaFieldStart(field_name: String, parent_type: String, path: List(String))
   /// A field resolver has completed.
@@ -66,6 +78,12 @@ pub type SchemaEvent {
     operation_name: Option(String),
     success: Bool,
     error_count: Int,
+  )
+  /// DataLoader batch was executed.
+  SchemaDataLoaderBatch(
+    loader_name: String,
+    batch_size: Int,
+    duration_ns: Int,
   )
 }
 
@@ -454,7 +472,17 @@ pub fn load(
 ) -> #(ExecutionContext, Result(Dynamic, String)) {
   case get_data_loader(context, loader_name) {
     Ok(loader) -> {
+      let start_ns = get_timestamp_ns()
       let #(new_loader, result) = dataloader.load(loader, key)
+      let duration_ns = get_timestamp_ns() - start_ns
+
+      // Emit DataLoader batch telemetry if configured
+      case context.telemetry_fn {
+        Some(fn_) ->
+          fn_(SchemaDataLoaderBatch(loader_name, 1, duration_ns))
+        None -> Nil
+      }
+
       let new_ctx = update_data_loader(context, loader_name, new_loader)
       #(new_ctx, result)
     }
@@ -477,7 +505,18 @@ pub fn load_many(
 ) -> #(ExecutionContext, List(Result(Dynamic, String))) {
   case get_data_loader(context, loader_name) {
     Ok(loader) -> {
+      let batch_size = list.length(keys)
+      let start_ns = get_timestamp_ns()
       let #(new_loader, results) = dataloader.load_many(loader, keys)
+      let duration_ns = get_timestamp_ns() - start_ns
+
+      // Emit DataLoader batch telemetry if configured
+      case context.telemetry_fn {
+        Some(fn_) ->
+          fn_(SchemaDataLoaderBatch(loader_name, batch_size, duration_ns))
+        None -> Nil
+      }
+
       let new_ctx = update_data_loader(context, loader_name, new_loader)
       #(new_ctx, results)
     }

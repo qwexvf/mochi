@@ -564,5 +564,4 @@ pub fn string_key(s: String) -> Dynamic {
 
 /// Internal: Convert any value to Dynamic (identity function)
 @external(erlang, "gleam_stdlib", "identity")
-@external(javascript, "../mochi/mochi_coerce_ffi.mjs", "identity")
 fn to_dynamic(value: a) -> Dynamic
