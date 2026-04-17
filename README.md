@@ -4,8 +4,10 @@ Code First GraphQL library for Gleam.
 
 ## Installation
 
-```sh
-gleam add mochi
+```toml
+# gleam.toml
+[dependencies]
+mochi = { git = "https://github.com/qwexvf/mochi", ref = "main" }
 ```
 
 ## Usage
