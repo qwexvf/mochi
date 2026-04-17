@@ -454,10 +454,21 @@ fn parse_field_definitions(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) ->
       Ok(#(list.reverse(acc), parser))
-    // Field can start with description, name, or string literal (for description)
+    // Field can start with description, name, string literal, or a contextual
+    // keyword used as a field name (e.g. `type`, `input`, `enum`).
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
     | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
-    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Interface, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Union, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Scalar, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Input, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Directive, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Schema, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Implements, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _)) -> {
       use #(field, parser) <- result.try(parse_field_definition(parser))
       parse_field_definitions(parser, [field, ..acc])
     }
@@ -779,7 +790,17 @@ fn parse_input_fields(
       Ok(#(list.reverse(acc), parser))
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _))
     | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Description(_), _))
-    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _)) -> {
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(_), _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Interface, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Union, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Scalar, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Input, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Directive, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Schema, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Implements, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _)) -> {
       use #(field, parser) <- result.try(parse_input_field_definition(parser))
       parse_input_fields(parser, [field, ..acc])
     }
