@@ -63,6 +63,9 @@ query.with_guard(q, guard_fn)
 // On mutations
 query.mutation_with_guard(m, guard_fn)
 
+// On subscriptions (guards the topic resolver)
+query.subscription_with_guard(s, guard_fn)
+
 // On field definitions
 query.field_with_guard(f, guard_fn)
 ```
@@ -180,6 +183,42 @@ schema.field_def("privateData", schema.string_type())
   |> schema.resolver(private_data_resolver)
   |> schema.guard(require_owner())
 ```
+
+## Guard combinators
+
+Combinators let you compose guards with boolean logic.
+
+### `all_of` — AND logic (all must pass)
+
+```gleam
+// High-level: checked in list order, fails on first error
+let admin_guard = query.all_of([require_auth, require_admin])
+
+|> query.with_guard(admin_guard)
+```
+
+### `any_of` — OR logic (at least one must pass)
+
+```gleam
+// Succeeds if any guard passes; fails with the last error if all fail
+let can_access = query.any_of([require_admin, require_owner])
+
+|> query.with_guard(can_access)
+```
+
+### Low-level combinators
+
+For guards that take `ResolverInfo`:
+
+```gleam
+// AND: all must pass
+schema.all_guards([guard_a, guard_b])
+
+// OR: at least one must pass
+schema.any_guard([guard_a, guard_b])
+```
+
+These return a single `Guard` that can be passed to `schema.guard()`.
 
 ## Best practices
 

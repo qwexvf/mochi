@@ -460,3 +460,155 @@ fn build_field_with_guard(
   |> query.add_type(user_type)
   |> query.build
 }
+
+// ============================================================================
+// subscription_with_guard Tests
+// ============================================================================
+
+pub fn subscription_guard_allows_test() {
+  let sub =
+    query.subscription(
+      "onMessage",
+      schema.named_type("User"),
+      "messages",
+      fn(u) { types.to_dynamic(u) },
+    )
+    |> query.subscription_with_guard(allow_guard)
+
+  let field_def = query.subscription_to_field_def(sub)
+  should.equal(field_def.name, "onMessage")
+}
+
+pub fn subscription_guard_blocks_test() {
+  let sub =
+    query.subscription(
+      "onMessage",
+      schema.named_type("User"),
+      "messages",
+      fn(u) { types.to_dynamic(u) },
+    )
+    |> query.subscription_with_guard(deny_guard)
+
+  let field_def = query.subscription_to_field_def(sub)
+  // The topic_fn should fail when guard blocks
+  case field_def.topic_fn {
+    option.Some(topic_fn) -> {
+      let result = topic_fn(dict.new(), default_ctx())
+      should.be_error(result)
+    }
+    option.None -> should.fail()
+  }
+}
+
+// ============================================================================
+// Guard Combinator Tests
+// ============================================================================
+
+pub fn all_guards_all_pass_test() {
+  let combined = schema.all_guards([low_level_allow, low_level_allow])
+  let info = make_resolver_info()
+  should.be_ok(combined(info))
+}
+
+pub fn all_guards_one_fails_test() {
+  let combined = schema.all_guards([low_level_allow, low_level_deny])
+  let info = make_resolver_info()
+  should.be_error(combined(info))
+}
+
+pub fn all_guards_first_fails_short_circuits_test() {
+  let guard_a = fn(_info: schema.ResolverInfo) -> Result(Nil, String) {
+    Error("A failed")
+  }
+  let guard_b = fn(_info: schema.ResolverInfo) -> Result(Nil, String) {
+    Error("B failed")
+  }
+  let combined = schema.all_guards([guard_a, guard_b])
+  let info = make_resolver_info()
+  let result = combined(info)
+  // Should fail with A's error (checked first)
+  should.equal(result, Error("A failed"))
+}
+
+pub fn any_guard_one_passes_test() {
+  let combined = schema.any_guard([low_level_deny, low_level_allow])
+  let info = make_resolver_info()
+  should.be_ok(combined(info))
+}
+
+pub fn any_guard_all_fail_test() {
+  let combined = schema.any_guard([low_level_deny, low_level_deny])
+  let info = make_resolver_info()
+  should.be_error(combined(info))
+}
+
+pub fn any_guard_first_passes_short_circuits_test() {
+  let combined = schema.any_guard([low_level_allow, low_level_deny])
+  let info = make_resolver_info()
+  should.be_ok(combined(info))
+}
+
+pub fn any_guard_empty_list_test() {
+  let combined = schema.any_guard([])
+  let info = make_resolver_info()
+  should.be_error(combined(info))
+}
+
+pub fn any_guard_returns_last_error_test() {
+  let guard_a = fn(_info: schema.ResolverInfo) -> Result(Nil, String) {
+    Error("A failed")
+  }
+  let guard_b = fn(_info: schema.ResolverInfo) -> Result(Nil, String) {
+    Error("B failed")
+  }
+  let combined = schema.any_guard([guard_a, guard_b])
+  let info = make_resolver_info()
+  should.equal(combined(info), Error("B failed"))
+}
+
+// High-level combinator tests
+
+pub fn high_level_all_of_test() {
+  let combined = query.all_of([allow_guard, allow_guard])
+  should.be_ok(combined(default_ctx()))
+}
+
+pub fn high_level_all_of_fails_test() {
+  let combined = query.all_of([allow_guard, deny_guard])
+  should.be_error(combined(default_ctx()))
+}
+
+pub fn high_level_any_of_test() {
+  let combined = query.any_of([deny_guard, allow_guard])
+  should.be_ok(combined(default_ctx()))
+}
+
+pub fn high_level_any_of_all_fail_test() {
+  let combined = query.any_of([deny_guard, deny_guard])
+  should.be_error(combined(default_ctx()))
+}
+
+pub fn any_of_used_as_guard_test() {
+  let test_schema =
+    build_query_with_guard(query.any_of([deny_guard, allow_guard]))
+
+  let result =
+    executor.execute_query_with_context(
+      test_schema,
+      "{ users { id name } }",
+      dict.new(),
+      default_ctx(),
+    )
+
+  should.equal(result.errors, [])
+  should.be_true(result.data |> option.is_some)
+}
+
+fn make_resolver_info() -> schema.ResolverInfo {
+  schema.ResolverInfo(
+    parent: option.None,
+    arguments: dict.new(),
+    context: default_ctx(),
+    info: types.to_dynamic(dict.new()),
+  )
+}
