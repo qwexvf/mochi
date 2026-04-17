@@ -296,6 +296,22 @@ pub fn subscription_description(
   SubscriptionDef(..s, description: Some(desc))
 }
 
+/// Add a guard to a subscription. The guard runs before the topic resolver —
+/// if it returns Error, the subscription is rejected.
+/// Multiple guards can be stacked by piping; the last guard added is checked first.
+pub fn subscription_with_guard(
+  s: SubscriptionDef(args, event),
+  guard_fn: fn(ExecutionContext) -> Result(Nil, String),
+) -> SubscriptionDef(args, event) {
+  let original = s.topic_resolver
+  SubscriptionDef(..s, topic_resolver: fn(args, ctx) {
+    case guard_fn(ctx) {
+      Ok(Nil) -> original(args, ctx)
+      Error(msg) -> Error(msg)
+    }
+  })
+}
+
 // ============================================================================
 // Field Builders (for extending types)
 // ============================================================================
@@ -377,6 +393,45 @@ pub fn field_with_guard(
       Error(msg) -> Error(msg)
     }
   })
+}
+
+// ============================================================================
+// Guard Combinators
+// ============================================================================
+
+/// High-level guard type for the Code First API.
+pub type HighLevelGuard =
+  fn(ExecutionContext) -> Result(Nil, String)
+
+/// Combine guards with AND logic — all must pass (checked in list order).
+pub fn all_of(guard_fns: List(HighLevelGuard)) -> HighLevelGuard {
+  fn(ctx) { list.try_each(guard_fns, fn(g) { g(ctx) }) }
+}
+
+/// Combine guards with OR logic — at least one must pass.
+/// Fails with the last error if all fail.
+pub fn any_of(guard_fns: List(HighLevelGuard)) -> HighLevelGuard {
+  fn(ctx) {
+    case guard_fns {
+      [] -> Error("No guards provided")
+      _ -> try_any(guard_fns, ctx, "No guards passed")
+    }
+  }
+}
+
+fn try_any(
+  guards: List(HighLevelGuard),
+  ctx: ExecutionContext,
+  last_error: String,
+) -> Result(Nil, String) {
+  case guards {
+    [] -> Error(last_error)
+    [g, ..rest] ->
+      case g(ctx) {
+        Ok(Nil) -> Ok(Nil)
+        Error(e) -> try_any(rest, ctx, e)
+      }
+  }
 }
 
 // ============================================================================

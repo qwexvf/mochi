@@ -699,6 +699,39 @@ pub fn guards(field: FieldDefinition, guard_fns: List(Guard)) -> FieldDefinition
   list.fold(list.reverse(guard_fns), field, fn(f, g) { guard(f, g) })
 }
 
+/// Combine guards with AND logic — all must pass (checked in list order).
+/// Returns a single guard that fails with the first error encountered.
+pub fn all_guards(guard_fns: List(Guard)) -> Guard {
+  fn(info: ResolverInfo) { list.try_each(guard_fns, fn(g) { g(info) }) }
+}
+
+/// Combine guards with OR logic — at least one must pass.
+/// Returns a single guard that succeeds if any guard passes,
+/// or fails with the last error if all fail.
+pub fn any_guard(guard_fns: List(Guard)) -> Guard {
+  fn(info: ResolverInfo) {
+    case guard_fns {
+      [] -> Error("No guards provided")
+      _ -> try_any_guard(guard_fns, info, "No guards passed")
+    }
+  }
+}
+
+fn try_any_guard(
+  guards: List(Guard),
+  info: ResolverInfo,
+  last_error: String,
+) -> Result(Nil, String) {
+  case guards {
+    [] -> Error(last_error)
+    [g, ..rest] ->
+      case g(info) {
+        Ok(Nil) -> Ok(Nil)
+        Error(e) -> try_any_guard(rest, info, e)
+      }
+  }
+}
+
 // ============================================================================
 // Simple Field Helpers
 // ============================================================================
