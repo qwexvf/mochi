@@ -1,0 +1,14 @@
+name = "mochi"
+version = "0.3.0"
+description = "Code First GraphQL library for Gleam"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "qwexvf", repo = "mochi" }
+links = [{ title = "Documentation", href = "https://hexdocs.pm/mochi/" }]
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
+birdie = ">= 1.3.2 and < 2.0.0"

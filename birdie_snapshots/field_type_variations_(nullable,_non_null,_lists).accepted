@@ -1,0 +1,5 @@
+---
+version: 1.5.4
+title: Field type variations (nullable, non-null, lists)
+---
+ObjectType("TestType", None, dict.from_list([#("list_of_strings", FieldDefinition("list_of_strings", None, List(Named("String")), dict.from_list([]), None, False, None, None)), #("non_null_list_of_non_null_strings", FieldDefinition("non_null_list_of_non_null_strings", None, NonNull(List(NonNull(Named("String")))), dict.from_list([]), None, False, None, None)), #("non_null_string", FieldDefinition("non_null_string", None, NonNull(Named("String")), dict.from_list([]), None, False, None, None)), #("nullable_string", FieldDefinition("nullable_string", None, Named("String"), dict.from_list([]), None, False, None, None))]), [])

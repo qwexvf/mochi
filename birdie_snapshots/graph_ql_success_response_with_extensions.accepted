@@ -1,0 +1,17 @@
+---
+version: 1.5.4
+title: GraphQL success response with extensions
+file: ./test/mochi_snapshot_test.gleam
+test_name: response_success_test
+---
+{
+  "data": {
+    "user": {
+      "id": "123",
+      "name": "Alice"
+    }
+  },
+  "extensions": {
+    "requestId": "req-abc-123"
+  }
+}
