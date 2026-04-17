@@ -1,5 +1,8 @@
 //// A reference implementation of the structured mutation payload pattern.
 ////
+//// Inspired by [absinthe_error_payload](https://github.com/mirego/absinthe_error_payload)
+//// by Mirego.
+////
 //// GraphQL has two ways to signal failure from a mutation:
 ////
 //// 1. **Top-level errors** — raised as `Error(msg)` from a resolver. These are
