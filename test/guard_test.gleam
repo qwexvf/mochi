@@ -496,7 +496,7 @@ pub fn subscription_guard_blocks_test() {
       let result = topic_fn(dict.new(), default_ctx())
       should.be_error(result)
     }
-    option.None -> should.fail()
+    option.None -> panic as "expected topic_fn to be Some"
   }
 }
 
