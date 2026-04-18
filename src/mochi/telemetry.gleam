@@ -594,7 +594,7 @@ pub fn format_metrics_summary(summary: MetricsSummary) -> String {
 /// Use this with `schema.with_telemetry_fn/2` to enable instrumentation:
 ///
 /// ```gleam
-/// let config = telemetry.with_handler(fn(event) { io.debug(event) })
+/// let config = telemetry.with_handler(fn(event) { echo event })
 /// let ctx = schema.execution_context(user_data)
 ///   |> schema.with_telemetry_fn(telemetry.to_schema_fn(config))
 /// ```

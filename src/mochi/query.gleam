@@ -460,7 +460,7 @@ pub fn arg_with_desc(
 /// Create an argument with a default value
 ///
 /// ```gleam
-/// query.arg_with_default("limit", schema.int_type(), dynamic.from(10))
+/// query.arg_with_default("limit", schema.int_type(), types.to_dynamic(10))
 /// ```
 pub fn arg_with_default(
   name: String,
@@ -478,7 +478,7 @@ pub fn arg_with_default(
 /// Create an argument with default value and description
 ///
 /// ```gleam
-/// query.arg_with_default_desc("limit", schema.int_type(), dynamic.from(10), "Maximum items to return")
+/// query.arg_with_default_desc("limit", schema.int_type(), types.to_dynamic(10), "Maximum items to return")
 /// ```
 pub fn arg_with_default_desc(
   name: String,

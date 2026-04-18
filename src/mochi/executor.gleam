@@ -2740,7 +2740,7 @@ pub fn execute_query_with_variables(
 /// ## Example
 ///
 /// ```gleam
-/// let config = telemetry.with_handler(fn(event) { io.debug(event) })
+/// let config = telemetry.with_handler(fn(event) { echo event })
 /// let ctx = schema.execution_context(user_data)
 ///   |> schema.with_telemetry_fn(telemetry.to_schema_fn(config))
 ///
