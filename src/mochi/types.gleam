@@ -343,6 +343,78 @@ pub fn list_int(
   })
 }
 
+pub fn list_float(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(Float),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.list_type(schema.float_type()), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn list_bool(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(Bool),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.list_type(schema.boolean_type()), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn list_id(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.list_type(schema.id_type()), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn non_null_list_string(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(String),
+) -> TypeBuilder(a) {
+  add_field(
+    builder,
+    name,
+    None,
+    schema.non_null(schema.list_type(schema.string_type())),
+    fn(a) { to_dynamic(extractor(a)) },
+  )
+}
+
+pub fn non_null_list_int(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(Int),
+) -> TypeBuilder(a) {
+  add_field(
+    builder,
+    name,
+    None,
+    schema.non_null(schema.list_type(schema.int_type())),
+    fn(a) { to_dynamic(extractor(a)) },
+  )
+}
+
+pub fn non_null_list_float(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> List(Float),
+) -> TypeBuilder(a) {
+  add_field(
+    builder,
+    name,
+    None,
+    schema.non_null(schema.list_type(schema.float_type())),
+    fn(a) { to_dynamic(extractor(a)) },
+  )
+}
+
 /// Add a related object field
 pub fn object_field(
   builder: TypeBuilder(a),

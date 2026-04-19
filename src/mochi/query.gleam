@@ -7,6 +7,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/string
 import gleam/result
 import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,
@@ -659,6 +660,35 @@ pub fn get_int_list(
   fetch_required(args, key, decode.list(decode.int), "[Int]")
 }
 
+pub fn decode_input(
+  args: Dict(String, Dynamic),
+  key: String,
+  decoder: decode.Decoder(a),
+) -> Result(a, String) {
+  case dict.get(args, key) {
+    Error(_) -> Error("Missing required argument: " <> key)
+    Ok(value) ->
+      decode.run(value, decoder)
+      |> result.map_error(fn(_) { "Invalid input for '" <> key <> "'" })
+  }
+}
+
+pub fn get_dynamic(
+  args: Dict(String, Dynamic),
+  key: String,
+) -> Result(Dynamic, String) {
+  dict.get(args, key)
+  |> result.map_error(fn(_) { "Missing required argument: " <> key })
+}
+
+pub fn get_optional_dynamic(
+  args: Dict(String, Dynamic),
+  key: String,
+) -> Option(Dynamic) {
+  dict.get(args, key)
+  |> option.from_result
+}
+
 // ============================================================================
 // Argument Parsing Helpers with Defaults
 // ============================================================================
@@ -1014,8 +1044,39 @@ pub fn add_inputs(
   list.fold(inputs, builder, fn(b, i) { add_input(b, i) })
 }
 
-/// Merge two schema builders together
+fn check_duplicates(
+  label: String,
+  a_items: List(a),
+  b_items: List(a),
+  name_fn: fn(a) -> String,
+) -> Nil {
+  let a_names = list.map(a_items, name_fn)
+  let conflicts =
+    list.filter(b_items, fn(item) { list.contains(a_names, name_fn(item)) })
+  case conflicts {
+    [] -> Nil
+    _ ->
+      panic as {
+        "Schema merge conflict: duplicate "
+        <> label
+        <> " name(s): "
+        <> string.join(list.map(conflicts, name_fn), ", ")
+      }
+  }
+}
+
 pub fn merge(a: SchemaBuilder, b: SchemaBuilder) -> SchemaBuilder {
+  check_duplicates("query", a.queries, b.queries, fn(f) { f.name })
+  check_duplicates("mutation", a.mutations, b.mutations, fn(f) { f.name })
+  check_duplicates("subscription", a.subscriptions, b.subscriptions, fn(f) {
+    f.name
+  })
+  check_duplicates("type", a.types, b.types, fn(t) { t.name })
+  check_duplicates("enum", a.enums, b.enums, fn(e) { e.name })
+  check_duplicates("interface", a.interfaces, b.interfaces, fn(i) { i.name })
+  check_duplicates("union", a.unions, b.unions, fn(u) { u.name })
+  check_duplicates("scalar", a.scalars, b.scalars, fn(s) { s.name })
+  check_duplicates("input", a.inputs, b.inputs, fn(i) { i.name })
   SchemaBuilder(
     queries: list.append(a.queries, b.queries),
     mutations: list.append(a.mutations, b.mutations),
