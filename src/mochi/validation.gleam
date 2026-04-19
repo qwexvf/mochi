@@ -490,10 +490,13 @@ fn validate_field_selection_set(
     False, None ->
       add_error(ctx, SelectionSetRequired(field.name, inner_type_name))
     False, Some(ss) -> {
+      let outer_type = ctx.current_type
       let inner_type = get_object_type(ctx.schema, inner_type_name)
-      ctx
-      |> set_current_type(inner_type)
-      |> validate_selection_set(ss)
+      let nested_ctx =
+        ctx
+        |> set_current_type(inner_type)
+        |> validate_selection_set(ss)
+      set_current_type(nested_ctx, outer_type)
     }
   }
 }
