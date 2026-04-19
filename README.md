@@ -129,6 +129,7 @@ docker compose up -d --build
 - **Code First Schema Definition** - Define GraphQL schemas using Gleam types with type-safe field extractors
 - **TypeScript Codegen** - Generate `.d.ts` type definitions from your schema
 - **SDL Generation** - Generate `.graphql` schema files
+- **Operation Resolver Codegen** - Generate mochi resolver boilerplate from `.gql` client operation files
 - **Query Validation** - Validate GraphQL queries against your schema
 - **Custom Directives** - Define and execute custom directives with handlers
 - **@deprecated Support** - Mark fields and enum values as deprecated
@@ -483,13 +484,33 @@ let #(ctx, result) = schema.load_by_id(ctx, "pokemon", 25)
 
 ### Codegen (`mochi_codegen`)
 
-Generate TypeScript types, GraphQL SDL, and serve playground UIs. Requires the `mochi_codegen` package.
+Generate TypeScript types, GraphQL SDL, Gleam resolver stubs, and serve playground UIs. Requires the `mochi_codegen` package.
 
 ```gleam
 import mochi_codegen
 
 let ts_code = mochi_codegen.to_typescript(schema)
 let graphql_code = mochi_codegen.to_sdl(schema)
+```
+
+**CLI** — generate everything from a config file:
+
+```sh
+gleam run -m mochi_codegen/cli -- init      # create mochi.config.yaml
+gleam run -m mochi_codegen/cli -- generate  # generate from config
+```
+
+**Operation resolver generation** — point the CLI at your `.gql` client operation files and it emits complete mochi field-builder boilerplate (decode blocks, resolve stubs, encoder stubs, and a `register()` function). Only fill in the `resolve:` body.
+
+```yaml
+# mochi.config.yaml
+schema: "graphql/schema.graphql"
+operations_input: "src/graphql/**/*.gql"
+output:
+  gleam_types: "src/api/domain/"
+  resolvers: "src/api/schema/"
+  operations: "src/api/schema/"
+  typescript: "apps/web/src/generated/types.ts"
 ```
 
 ## Examples
@@ -602,7 +623,7 @@ mochi/                       # Core GraphQL engine
 mochi_relay/                 # Relay cursor pagination
 mochi_websocket/             # graphql-ws WebSocket transport + PubSub
 mochi_upload/                # GraphQL multipart file uploads
-mochi_codegen/               # SDL + TypeScript codegen + GraphiQL + CLI
+mochi_codegen/               # SDL + TypeScript + Gleam codegen + GraphiQL + CLI
 mochi_apq/                   # Automatic Persisted Queries (standalone)
 ```
 
