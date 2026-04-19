@@ -12,6 +12,7 @@ import gleam/result
 import gleam/string
 import mochi/ast
 import mochi/input_coercion
+import mochi/lexer
 import mochi/parser
 import mochi/schema
 import mochi/telemetry
@@ -2725,12 +2726,19 @@ pub fn execute_query_with_variables(
   query: String,
   variables: Dict(String, Dynamic),
 ) -> ExecutionResult {
-  parser.parse(query)
-  |> result.map(fn(document) {
-    let ctx = schema.execution_context(types.to_dynamic(dict.new()))
-    execute(schema_def, document, None, ctx, variables)
-  })
-  |> result.unwrap(validation_error("Failed to parse query", []))
+  case parser.parse(query) {
+    Ok(document) -> {
+      let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+      execute(schema_def, document, None, ctx, variables)
+    }
+    Error(error) -> {
+      let loc = case error {
+        parser.UnexpectedToken(_, _, pos) -> Some(#(pos.line, pos.column))
+        _ -> None
+      }
+      validation_error_at("Parse error: " <> format_parse_error(error), [], loc)
+    }
+  }
 }
 
 /// Execute a query with a custom execution context (enables full telemetry).
@@ -2770,7 +2778,7 @@ pub fn execute_query_with_context(
       emit_telemetry(ctx, schema.SchemaValidationStart)
       let validation_start = telemetry.get_timestamp_ns()
 
-      case validation.validate(document, schema_def) {
+      case validation.validate_located(document, schema_def) {
         Ok(_validated_doc) -> {
           let validation_duration =
             telemetry.get_timestamp_ns() - validation_start
@@ -2788,11 +2796,10 @@ pub fn execute_query_with_context(
             ctx,
             schema.SchemaValidationEnd(False, error_count, validation_duration),
           )
-          // Convert validation errors to execution errors
           let errors =
-            list.map(validation_errors, fn(err) {
-              let msg = validation.format_error(err)
-              ValidationError(message: msg, path: [], location: None)
+            list.map(validation_errors, fn(le) {
+              let #(err, loc) = le
+              ValidationError(message: validation.format_error(err), path: [], location: loc)
             })
           ExecutionResult(data: None, errors: errors)
         }
@@ -2801,7 +2808,11 @@ pub fn execute_query_with_context(
     Error(error) -> {
       let parse_duration = telemetry.get_timestamp_ns() - parse_start
       emit_telemetry(ctx, schema.SchemaParseEnd(False, parse_duration))
-      validation_error("Parse error: " <> format_parse_error(error), [])
+      let loc = case error {
+        parser.UnexpectedToken(_, _, pos) -> Some(#(pos.line, pos.column))
+        _ -> None
+      }
+      validation_error_at("Parse error: " <> format_parse_error(error), [], loc)
     }
   }
 }
@@ -2857,7 +2868,11 @@ pub fn execute_query_debug_with_variables(
     }
     Error(error) -> {
       log_error(debug, "Parse failed: " <> format_parse_error(error))
-      validation_error("Parse error: " <> format_parse_error(error), [])
+      let loc = case error {
+        parser.UnexpectedToken(_, _, pos) -> Some(#(pos.line, pos.column))
+        _ -> None
+      }
+      validation_error_at("Parse error: " <> format_parse_error(error), [], loc)
     }
   }
 }
@@ -2890,10 +2905,43 @@ fn log_error(debug: DebugContext, msg: String) -> Nil {
   }
 }
 
+fn format_token(token: lexer.Token) -> String {
+  case token {
+    lexer.Name(v) -> "\"" <> v <> "\""
+    lexer.IntValue(v) -> int.to_string(v)
+    lexer.FloatValue(_) -> "Float"
+    lexer.StringValue(_) -> "String"
+    lexer.EOF -> "end of document"
+    lexer.Bang -> "!"
+    lexer.Dollar -> "$"
+    lexer.LeftParen -> "("
+    lexer.RightParen -> ")"
+    lexer.LeftBrace -> "{"
+    lexer.RightBrace -> "}"
+    lexer.LeftBracket -> "["
+    lexer.RightBracket -> "]"
+    lexer.Colon -> ":"
+    lexer.Equals -> "="
+    lexer.Spread -> "..."
+    lexer.Pipe -> "|"
+    lexer.At -> "@"
+    lexer.Amp -> "&"
+    lexer.Query -> "query"
+    lexer.Mutation -> "mutation"
+    lexer.Subscription -> "subscription"
+    lexer.Fragment -> "fragment"
+    lexer.On -> "on"
+    lexer.TrueKeyword -> "true"
+    lexer.FalseKeyword -> "false"
+    lexer.NullKeyword -> "null"
+  }
+}
+
 fn format_parse_error(error: parser.ParseError) -> String {
   case error {
     parser.LexError(_) -> "Lexer error"
-    parser.UnexpectedToken(expected, _, _) -> "Expected " <> expected
-    parser.UnexpectedEOF(expected) -> "Unexpected EOF, expected " <> expected
+    parser.UnexpectedToken(expected, got, _) ->
+      "Expected " <> expected <> ", got " <> format_token(got)
+    parser.UnexpectedEOF(expected) -> "Unexpected end of document, expected " <> expected
   }
 }

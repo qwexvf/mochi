@@ -14,6 +14,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/set.{type Set}
 import gleam/string
 import mochi/ast.{type Document}
+import mochi/lexer
 import mochi/parser.{type ParseError}
 import mochi/schema.{type FieldDefinition, type ObjectType, type Schema}
 
@@ -78,6 +79,9 @@ pub type ValidationError {
   FieldsCannotMerge(field_name: String, reason: String)
 }
 
+pub type LocatedError =
+  #(ValidationError, Option(#(Int, Int)))
+
 /// Validation context tracks state during validation
 pub type ValidationContext {
   ValidationContext(
@@ -86,9 +90,10 @@ pub type ValidationContext {
     defined_variables: Set(String),
     used_variables: Set(String),
     used_fragments: Set(String),
-    errors: List(ValidationError),
+    errors: List(LocatedError),
     current_type: Option(ObjectType),
     fragment_spread_path: List(String),
+    current_location: Option(#(Int, Int)),
   )
 }
 
@@ -96,14 +101,11 @@ pub type ValidationContext {
 // Main Validation Functions
 // ============================================================================
 
-/// Validate a document against a schema
-pub fn validate(
+fn run_validation(
   document: Document,
   schema: Schema,
-) -> Result(Document, List(ValidationError)) {
+) -> Result(Document, List(LocatedError)) {
   let ctx = init_context(schema, document)
-
-  // Collect all validation errors
   let ctx = validate_unique_operation_names(ctx, document)
   let ctx = validate_lone_anonymous_operation(ctx, document)
   let ctx = validate_unique_fragment_names(ctx, document)
@@ -111,11 +113,29 @@ pub fn validate(
   let ctx = validate_fragment_definitions(ctx, document)
   let ctx = validate_fragment_cycles(ctx, document)
   let ctx = validate_unused_fragments(ctx)
-
   case ctx.errors {
     [] -> Ok(document)
     errors -> Error(list.reverse(errors))
   }
+}
+
+/// Validate a document against a schema
+pub fn validate(
+  document: Document,
+  schema: Schema,
+) -> Result(Document, List(ValidationError)) {
+  case run_validation(document, schema) {
+    Ok(doc) -> Ok(doc)
+    Error(located) -> Error(list.map(located, fn(le) { le.0 }))
+  }
+}
+
+/// Like validate, but preserves source locations for each error
+pub fn validate_located(
+  document: Document,
+  schema: Schema,
+) -> Result(Document, List(LocatedError)) {
+  run_validation(document, schema)
 }
 
 /// Validate a single query string against a schema (convenience function)
@@ -146,6 +166,7 @@ fn init_context(schema: Schema, document: Document) -> ValidationContext {
     errors: [],
     current_type: schema.query,
     fragment_spread_path: [],
+    current_location: None,
   )
 }
 
@@ -163,7 +184,7 @@ fn add_error(
   ctx: ValidationContext,
   error: ValidationError,
 ) -> ValidationContext {
-  ValidationContext(..ctx, errors: [error, ..ctx.errors])
+  ValidationContext(..ctx, errors: [#(error, ctx.current_location), ..ctx.errors])
 }
 
 // ============================================================================
@@ -354,6 +375,11 @@ fn validate_selection(
 }
 
 fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext {
+  let ctx = case field.location {
+    Some(lexer.Position(line, column)) ->
+      ValidationContext(..ctx, current_location: Some(#(line, column)))
+    None -> ctx
+  }
   // Validate directives on field
   let ctx = validate_directives(ctx, field.directives, "FIELD")
 
