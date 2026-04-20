@@ -7,19 +7,15 @@ pub opaque type DocumentCache {
 type CacheInner
 
 @external(erlang, "document_cache_ffi", "new")
-@external(javascript, "./document_cache_ffi.mjs", "new_")
 fn ffi_new(max_size: Int) -> CacheInner
 
 @external(erlang, "document_cache_ffi", "get")
-@external(javascript, "./document_cache_ffi.mjs", "get")
 fn ffi_get(inner: CacheInner, key: String) -> Result(ast.Document, Nil)
 
 @external(erlang, "document_cache_ffi", "put")
-@external(javascript, "./document_cache_ffi.mjs", "put")
 fn ffi_put(inner: CacheInner, key: String, value: ast.Document) -> Nil
 
 @external(erlang, "document_cache_ffi", "size")
-@external(javascript, "./document_cache_ffi.mjs", "size")
 fn ffi_size(inner: CacheInner) -> Int
 
 const default_max_size = 1000
