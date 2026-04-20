@@ -1,7 +1,6 @@
 // Tests for mochi/dataloader.gleam - DataLoader for N+1 prevention
 import gleam/dynamic.{type Dynamic}
 import gleam/list
-import gleam/result
 import gleeunit/should
 import mochi/dataloader
 import mochi/types
@@ -236,7 +235,7 @@ pub fn int_loader_success_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.int_key(1))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn int_loader_not_found_test() {
@@ -249,7 +248,7 @@ pub fn int_loader_not_found_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.int_key(999))
-  should.be_true(result.is_error(result))
+  should.be_error(result)
 }
 
 // ============================================================================
@@ -266,7 +265,7 @@ pub fn string_loader_success_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.string_key("a"))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn string_loader_not_found_test() {
@@ -279,7 +278,7 @@ pub fn string_loader_not_found_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.string_key("zzz"))
-  should.be_true(result.is_error(result))
+  should.be_error(result)
 }
 
 // ============================================================================
@@ -293,7 +292,7 @@ pub fn int_batch_loader_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.int_key(5))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn string_batch_loader_test() {
@@ -304,7 +303,7 @@ pub fn string_batch_loader_test() {
 
   let #(_loader, result) =
     dataloader.load(loader, dataloader.string_key("test"))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn batch_loader_error_test() {
@@ -314,7 +313,7 @@ pub fn batch_loader_error_test() {
     })
 
   let #(_loader, result) = dataloader.load(loader, dataloader.int_key(1))
-  should.be_true(result.is_error(result))
+  should.be_error(result)
 }
 
 // ============================================================================
@@ -326,7 +325,7 @@ pub fn int_loader_result_success_test() {
     dataloader.int_loader_result(find_by_id, to_dynamic, "Item not found")
 
   let #(_loader, result) = dataloader.load(loader, dataloader.int_key(1))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn int_loader_result_not_found_test() {
@@ -342,7 +341,7 @@ pub fn string_loader_result_success_test() {
     dataloader.string_loader_result(find_by_key, to_dynamic, "Key not found")
 
   let #(_loader, result) = dataloader.load(loader, dataloader.string_key("a"))
-  should.be_true(result.is_ok(result))
+  should.be_ok(result)
 }
 
 pub fn string_loader_result_not_found_test() {
@@ -397,7 +396,37 @@ pub fn cache_disabled_test() {
 
   let #(loader2, result1) = dataloader.load(loader, 5)
   let #(_loader3, result2) = dataloader.load(loader2, 5)
-  // Both should succeed even without cache
   should.equal(result1, Ok(50))
   should.equal(result2, Ok(50))
 }
+
+// ============================================================================
+// Batching correctness
+// ============================================================================
+
+pub fn load_many_makes_single_batch_call_test() {
+  let loader =
+    dataloader.new(fn(keys: List(Int)) {
+      should.equal(keys, [1, 2, 3])
+      Ok(list.map(keys, fn(k) { Ok(k * 10) }))
+    })
+
+  let #(_loader, results) = dataloader.load_many(loader, [1, 2, 3])
+  should.equal(results, [Ok(10), Ok(20), Ok(30)])
+}
+
+pub fn load_many_skips_cached_keys_test() {
+  let loader =
+    dataloader.new_with_options(
+      fn(keys: List(Int)) {
+        should.be_false(list.contains(keys, 2))
+        Ok(list.map(keys, fn(k) { Ok(k * 10) }))
+      },
+      dataloader.DataLoaderOptions(max_batch_size: 100, cache_enabled: True),
+    )
+
+  let loader2 = dataloader.prime(loader, 2, 20)
+  let #(_final, results) = dataloader.load_many(loader2, [1, 2, 3])
+  should.equal(results, [Ok(10), Ok(20), Ok(30)])
+}
+
