@@ -568,33 +568,37 @@ fn execute_selection_set(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  // Single-pass collection: gather data, errors, and null-check simultaneously
-  let #(data_acc, errors_acc, has_none) =
-    list.fold(selection_set.selections, #([], [], False), fn(acc, selection) {
-      let #(data_list, errors_list, none_found) = acc
-      let result =
-        execute_selection(context, selection, object_type, field_context)
+  let #(data_dict, errors_acc, has_none) =
+    list.fold(
+      selection_set.selections,
+      #(dict.new(), [], False),
+      fn(acc, selection) {
+        let #(data_map, errors_list, none_found) = acc
+        let result =
+          execute_selection(context, selection, object_type, field_context)
 
-      let new_data = case result.data {
-        Some(d) -> [d, ..data_list]
-        None -> data_list
-      }
-      let new_none = none_found || option.is_none(result.data)
+        let new_map = case result.data {
+          Some(d) ->
+            case decode.run(d, decode.dict(decode.string, decode.dynamic)) {
+              Ok(field_dict) -> dict.merge(data_map, field_dict)
+              Error(_) -> data_map
+            }
+          None -> data_map
+        }
+        let new_none = none_found || option.is_none(result.data)
 
-      #(new_data, list.append(result.errors, errors_list), new_none)
-    })
+        #(new_map, [result.errors, ..errors_list], new_none)
+      },
+    )
 
-  // Reverse accumulated lists to preserve order
-  let data_list = list.reverse(data_acc)
-  let errors = list.reverse(errors_acc)
+  let errors = list.reverse(errors_acc) |> list.flatten
 
-  // If any child propagated null (returned None data), this selection set is null
-  case has_none, data_list, errors {
+  case has_none, dict.is_empty(data_dict), errors {
     True, _, _ -> ExecutionResult(data: None, errors: errors)
-    False, [], [] -> ok_result(types.to_dynamic(dict.new()))
-    False, [], _ -> ExecutionResult(data: None, errors: errors)
-    False, _, _ ->
-      ExecutionResult(data: Some(merge_results(data_list)), errors: errors)
+    False, True, [] -> ok_result(types.to_dynamic(dict.new()))
+    False, True, _ -> ExecutionResult(data: None, errors: errors)
+    False, False, _ ->
+      ExecutionResult(data: Some(types.to_dynamic(data_dict)), errors: errors)
   }
 }
 
@@ -1363,10 +1367,10 @@ fn aggregate_list_results(
             _ -> False
           }
         })
-      #(new_data, list.append(result.errors, error_list), new_null)
+      #(new_data, [result.errors, ..error_list], new_null)
     })
 
-  let errors = list.reverse(errors_acc)
+  let errors = list.reverse(errors_acc) |> list.flatten
   let data_list = list.reverse(data_acc)
 
   case has_null_error, errors {
@@ -2701,16 +2705,6 @@ fn make_field(name: String, value: Dynamic) -> Dynamic {
   types.to_dynamic(dict.from_list([#(name, value)]))
 }
 
-fn merge_results(results: List(Dynamic)) -> Dynamic {
-  list.fold(results, dict.new(), fn(acc, item) {
-    case decode.run(item, decode.dict(decode.string, decode.dynamic)) {
-      Ok(d) -> dict.merge(acc, d)
-      Error(_) -> acc
-    }
-  })
-  |> types.to_dynamic
-}
-
 // ============================================================================
 // Public API
 // ============================================================================
@@ -2808,41 +2802,47 @@ pub fn execute_query_with_context(
       let parse_duration = telemetry.get_timestamp_ns() - parse_start
       emit_telemetry(ctx, schema.SchemaParseEnd(True, parse_duration))
 
-      emit_telemetry(ctx, schema.SchemaValidationStart)
-      let validation_start = telemetry.get_timestamp_ns()
+      case was_cached {
+        True -> execute(schema_def, document, None, ctx, variables)
+        False -> {
+          emit_telemetry(ctx, schema.SchemaValidationStart)
+          let validation_start = telemetry.get_timestamp_ns()
 
-      case validation.validate_located(document, schema_def) {
-        Ok(_validated_doc) -> {
-          let validation_duration =
-            telemetry.get_timestamp_ns() - validation_start
-          emit_telemetry(
-            ctx,
-            schema.SchemaValidationEnd(True, 0, validation_duration),
-          )
-          case was_cached {
-            False -> cache_put(schema_def, query, document)
-            True -> Nil
-          }
-          execute(schema_def, document, None, ctx, variables)
-        }
-        Error(validation_errors) -> {
-          let validation_duration =
-            telemetry.get_timestamp_ns() - validation_start
-          let error_count = list.length(validation_errors)
-          emit_telemetry(
-            ctx,
-            schema.SchemaValidationEnd(False, error_count, validation_duration),
-          )
-          let errors =
-            list.map(validation_errors, fn(le) {
-              let #(err, loc) = le
-              ValidationError(
-                message: validation.format_error(err),
-                path: [],
-                location: loc,
+          case validation.validate_located(document, schema_def) {
+            Ok(_validated_doc) -> {
+              let validation_duration =
+                telemetry.get_timestamp_ns() - validation_start
+              emit_telemetry(
+                ctx,
+                schema.SchemaValidationEnd(True, 0, validation_duration),
               )
-            })
-          ExecutionResult(data: None, errors: errors)
+              cache_put(schema_def, query, document)
+              execute(schema_def, document, None, ctx, variables)
+            }
+            Error(validation_errors) -> {
+              let validation_duration =
+                telemetry.get_timestamp_ns() - validation_start
+              let error_count = list.length(validation_errors)
+              emit_telemetry(
+                ctx,
+                schema.SchemaValidationEnd(
+                  False,
+                  error_count,
+                  validation_duration,
+                ),
+              )
+              let errors =
+                list.map(validation_errors, fn(le) {
+                  let #(err, loc) = le
+                  ValidationError(
+                    message: validation.format_error(err),
+                    path: [],
+                    location: loc,
+                  )
+                })
+              ExecutionResult(data: None, errors: errors)
+            }
+          }
         }
       }
     }

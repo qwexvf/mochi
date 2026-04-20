@@ -1099,6 +1099,10 @@ pub fn with_cache(builder: SchemaBuilder) -> SchemaBuilder {
   SchemaBuilder(..builder, cache: True)
 }
 
+pub fn build_without_cache(builder: SchemaBuilder) -> Schema {
+  build(SchemaBuilder(..builder, cache: False))
+}
+
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
     list.fold(builder.queries, schema.object("Query"), fn(obj, field) {
@@ -1168,12 +1172,8 @@ pub fn build(builder: SchemaBuilder) -> Schema {
       schema.add_directive(s, directive)
     })
 
-  case builder.cache {
-    False -> with_directives
-    True ->
-      schema.Schema(
-        ..with_directives,
-        document_cache: option.Some(document_cache.new()),
-      )
-  }
+  schema.Schema(
+    ..with_directives,
+    document_cache: option.Some(document_cache.new()),
+  )
 }

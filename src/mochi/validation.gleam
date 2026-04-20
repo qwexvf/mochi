@@ -92,7 +92,7 @@ pub type ValidationContext {
     used_fragments: Set(String),
     errors: List(LocatedError),
     current_type: Option(ObjectType),
-    fragment_spread_path: List(String),
+    fragment_spread_visited: Set(String),
     current_location: Option(#(Int, Int)),
   )
 }
@@ -165,7 +165,7 @@ fn init_context(schema: Schema, document: Document) -> ValidationContext {
     used_fragments: set.new(),
     errors: [],
     current_type: schema.query,
-    fragment_spread_path: [],
+    fragment_spread_visited: set.new(),
     current_location: None,
   )
 }
@@ -670,7 +670,7 @@ fn validate_fragment_spread(
 ) -> ValidationContext {
   let ctx = validate_directives(ctx, spread.directives, "FRAGMENT_SPREAD")
   let fragment_result = dict.get(ctx.fragments, spread.name)
-  let is_cycle = list.contains(ctx.fragment_spread_path, spread.name)
+  let is_cycle = set.contains(ctx.fragment_spread_visited, spread.name)
 
   // Track fragment usage
   let ctx =
@@ -690,15 +690,21 @@ fn validate_fragment_spread(
       let fragment_type = get_object_type(ctx.schema, fragment.type_condition)
       let ctx = set_current_type(ctx, fragment_type)
       let ctx =
-        ValidationContext(..ctx, fragment_spread_path: [
-          spread.name,
-          ..ctx.fragment_spread_path
-        ])
+        ValidationContext(
+          ..ctx,
+          fragment_spread_visited: set.insert(
+            ctx.fragment_spread_visited,
+            spread.name,
+          ),
+        )
       let ctx = validate_selection_set(ctx, fragment.selection_set)
       let ctx =
         ValidationContext(
           ..ctx,
-          fragment_spread_path: list.drop(ctx.fragment_spread_path, 1),
+          fragment_spread_visited: set.delete(
+            ctx.fragment_spread_visited,
+            spread.name,
+          ),
         )
       set_current_type(ctx, outer_type)
     }
@@ -730,9 +736,8 @@ fn validate_fragment_cycles(
   ctx: ValidationContext,
   _document: Document,
 ) -> ValidationContext {
-  // Check each fragment for cycles
   dict.fold(ctx.fragments, ctx, fn(ctx, name, _fragment) {
-    check_fragment_cycle(ctx, name, [])
+    check_fragment_cycle(ctx, name, [], set.new())
   })
 }
 
@@ -740,16 +745,18 @@ fn check_fragment_cycle(
   ctx: ValidationContext,
   fragment_name: String,
   path: List(String),
+  visited: set.Set(String),
 ) -> ValidationContext {
-  case list.contains(path, fragment_name) {
+  case set.contains(visited, fragment_name) {
     True -> add_error(ctx, CircularFragmentReference(fragment_name, path))
     False -> {
       case dict.get(ctx.fragments, fragment_name) {
         Ok(fragment) -> {
           let new_path = [fragment_name, ..path]
+          let new_visited = set.insert(visited, fragment_name)
           let spread_names = get_fragment_spreads(fragment.selection_set)
           list.fold(spread_names, ctx, fn(ctx, spread_name) {
-            check_fragment_cycle(ctx, spread_name, new_path)
+            check_fragment_cycle(ctx, spread_name, new_path, new_visited)
           })
         }
         Error(_) -> ctx

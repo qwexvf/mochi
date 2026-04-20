@@ -33,48 +33,24 @@ pub fn encode_pretty(value: Dynamic, indent: Int) -> String {
 // ============================================================================
 
 fn dynamic_to_json(value: Dynamic) -> json.Json {
-  // Try bool
-  case decode.run(value, decode.bool) {
-    Ok(b) -> json.bool(b)
-    Error(_) ->
-      // Try int
-      case decode.run(value, decode.int) {
-        Ok(i) -> json.int(i)
-        Error(_) ->
-          // Try float
-          case decode.run(value, decode.float) {
-            Ok(f) -> json.float(f)
-            Error(_) ->
-              // Try string
-              case decode.run(value, decode.string) {
-                Ok(s) -> json.string(s)
-                Error(_) ->
-                  // Try list
-                  case decode.run(value, decode.list(decode.dynamic)) {
-                    Ok(items) -> json.array(items, dynamic_to_json)
-                    Error(_) ->
-                      // Try dict
-                      case
-                        decode.run(
-                          value,
-                          decode.dict(decode.string, decode.dynamic),
-                        )
-                      {
-                        Ok(d) -> {
-                          let entries =
-                            dict.to_list(d)
-                            |> list.map(fn(kv) {
-                              #(kv.0, dynamic_to_json(kv.1))
-                            })
-                          json.object(entries)
-                        }
-                        // Unknown type -> null
-                        Error(_) -> json.null()
-                      }
-                  }
-              }
-          }
-      }
+  case
+    decode.run(value, decode.bool),
+    decode.run(value, decode.int),
+    decode.run(value, decode.float),
+    decode.run(value, decode.string),
+    decode.run(value, decode.list(decode.dynamic)),
+    decode.run(value, decode.dict(decode.string, decode.dynamic))
+  {
+    Ok(b), _, _, _, _, _ -> json.bool(b)
+    _, Ok(i), _, _, _, _ -> json.int(i)
+    _, _, Ok(f), _, _, _ -> json.float(f)
+    _, _, _, Ok(s), _, _ -> json.string(s)
+    _, _, _, _, Ok(items), _ -> json.array(items, dynamic_to_json)
+    _, _, _, _, _, Ok(d) ->
+      dict.to_list(d)
+      |> list.map(fn(kv) { #(kv.0, dynamic_to_json(kv.1)) })
+      |> json.object
+    _, _, _, _, _, _ -> json.null()
   }
 }
 
