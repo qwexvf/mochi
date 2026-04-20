@@ -16,9 +16,12 @@ flowchart TD
         B1 --> B2[Extract query + variables]
     end
 
-    subgraph "2. Parser"
+    subgraph "2. Parse Cache + Parser"
+        C0[mochi/document_cache.gleam]
         C[mochi/parser.gleam]
         C1[Lexer] --> C2[Tokens] --> C3[Parser] --> C4[AST]
+        C0 -->|cache hit| C4
+        C0 -->|miss| C
     end
 
     subgraph "3. Validation"
@@ -47,7 +50,7 @@ flowchart TD
     end
 
     A --> B
-    B2 --> C
+    B2 --> C0
     C4 --> D
     D --> D1
     D1 -->|Yes| D2
@@ -317,6 +320,8 @@ mochi/                          # Core GraphQL engine
     ├── parser.gleam            # GraphQL query parser
     ├── executor.gleam          # Query execution engine
     ├── validation.gleam        # Query validation
+    ├── document_cache.gleam    # ETS/Map-backed parse cache
+    ├── batch.gleam             # Batch query execution
     ├── dataloader.gleam        # N+1 query prevention
     ├── error.gleam             # GraphQL-spec errors
     ├── response.gleam          # Response serialization

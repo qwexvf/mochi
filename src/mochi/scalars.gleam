@@ -32,7 +32,9 @@ pub fn date_time() -> ScalarType {
       let valid =
         string.length(s) > 0
         && { string.contains(s, "T") || string.length(s) == 10 }
-        && { string.first(s) |> result.map(is_digit_char) |> result.unwrap(False) }
+        && {
+          string.first(s) |> result.map(is_digit_char) |> result.unwrap(False)
+        }
       case valid {
         True -> Ok(s)
         False -> Error("DateTime must be a valid ISO 8601 string")
@@ -123,7 +125,9 @@ pub fn email() -> ScalarType {
 pub fn url() -> ScalarType {
   let validate = fn(value: Dynamic) -> Result(Dynamic, String) {
     validate_string(value, fn(s) {
-      case string.starts_with(s, "http://") || string.starts_with(s, "https://") {
+      case
+        string.starts_with(s, "http://") || string.starts_with(s, "https://")
+      {
         True -> Ok(s)
         False -> Error("URL must start with http:// or https://")
       }
@@ -158,7 +162,10 @@ pub fn uuid() -> ScalarType {
       }
       case string.length(s) == 36 && d8 && d13 && d18 && d23 {
         True -> Ok(s)
-        False -> Error("UUID must be 36 characters with dashes at positions 8, 13, 18, 23")
+        False ->
+          Error(
+            "UUID must be 36 characters with dashes at positions 8, 13, 18, 23",
+          )
       }
     })
   }

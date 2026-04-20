@@ -7,8 +7,9 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/string
 import gleam/result
+import gleam/string
+import mochi/document_cache
 import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,
   type Resolver, type ResolverInfo, type Schema,
@@ -888,6 +889,7 @@ pub type SchemaBuilder {
     unions: List(schema.UnionType),
     scalars: List(schema.ScalarType),
     inputs: List(schema.InputObjectType),
+    cache: Bool,
   )
 }
 
@@ -903,6 +905,7 @@ pub fn new() -> SchemaBuilder {
     unions: [],
     scalars: [],
     inputs: [],
+    cache: False,
   )
 }
 
@@ -1087,10 +1090,15 @@ pub fn merge(a: SchemaBuilder, b: SchemaBuilder) -> SchemaBuilder {
     unions: list.append(a.unions, b.unions),
     scalars: list.append(a.scalars, b.scalars),
     inputs: list.append(a.inputs, b.inputs),
+    cache: a.cache || b.cache,
   )
 }
 
 /// Build the final schema
+pub fn with_cache(builder: SchemaBuilder) -> SchemaBuilder {
+  SchemaBuilder(..builder, cache: True)
+}
+
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
     list.fold(builder.queries, schema.object("Query"), fn(obj, field) {
@@ -1155,8 +1163,17 @@ pub fn build(builder: SchemaBuilder) -> Schema {
       schema.add_type(s, schema.InputObjectTypeDef(input))
     })
 
-  // Always include built-in directives (@skip, @include, @deprecated)
-  list.fold(schema.builtin_directives(), with_inputs, fn(s, directive) {
-    schema.add_directive(s, directive)
-  })
+  let with_directives =
+    list.fold(schema.builtin_directives(), with_inputs, fn(s, directive) {
+      schema.add_directive(s, directive)
+    })
+
+  case builder.cache {
+    False -> with_directives
+    True ->
+      schema.Schema(
+        ..with_directives,
+        document_cache: option.Some(document_cache.new()),
+      )
+  }
 }

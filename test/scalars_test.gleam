@@ -139,7 +139,9 @@ pub fn url_invalid_no_scheme_test() {
 
 pub fn uuid_valid_test() {
   let scalar = scalars.uuid()
-  case scalar.parse_value(types.to_dynamic("550e8400-e29b-41d4-a716-446655440000")) {
+  case
+    scalar.parse_value(types.to_dynamic("550e8400-e29b-41d4-a716-446655440000"))
+  {
     Ok(_) -> Nil
     Error(e) -> panic as { "Should parse valid UUID: " <> e }
   }
@@ -155,7 +157,9 @@ pub fn uuid_invalid_length_test() {
 
 pub fn uuid_invalid_no_dashes_test() {
   let scalar = scalars.uuid()
-  case scalar.parse_value(types.to_dynamic("550e8400e29b41d4a716446655440000")) {
+  case
+    scalar.parse_value(types.to_dynamic("550e8400e29b41d4a716446655440000"))
+  {
     Ok(_) -> panic as "Should reject UUID without dashes"
     Error(_) -> Nil
   }

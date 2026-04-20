@@ -36,6 +36,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import mochi/dataloader.{type DataLoader}
+import mochi/document_cache
 
 // Direct FFI call to avoid import cycle with telemetry module
 @external(erlang, "mochi_time_ffi", "monotonic_time_ns")
@@ -97,6 +98,7 @@ pub type Schema {
     subscription: Option(ObjectType),
     types: Dict(String, TypeDefinition),
     directives: Dict(String, DirectiveDefinition),
+    document_cache: Option(document_cache.DocumentCache),
   )
 }
 
@@ -561,6 +563,7 @@ pub fn schema() -> Schema {
     subscription: None,
     types: dict.new(),
     directives: dict.new(),
+    document_cache: None,
   )
 }
 

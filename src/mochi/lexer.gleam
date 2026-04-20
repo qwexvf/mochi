@@ -115,6 +115,7 @@ pub fn next_token(
         "|" -> Ok(#(TokenWithPosition(Pipe, position), advance_char(lexer)))
         "." -> read_spread(lexer, position)
         "\"" -> read_string(lexer, position)
+        "-" -> read_negative_number(lexer, position)
         "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ->
           read_number(lexer, position)
         "a"
@@ -180,7 +181,15 @@ fn skip_whitespace(lexer: LexerState) -> LexerState {
   case peek_char(lexer) {
     Ok(" ") | Ok("\t") | Ok("\n") | Ok("\r") | Ok(",") ->
       skip_whitespace(advance_char(lexer))
+    Ok("#") -> skip_whitespace(skip_comment(advance_char(lexer)))
     _ -> lexer
+  }
+}
+
+fn skip_comment(lexer: LexerState) -> LexerState {
+  case peek_char(lexer) {
+    Ok("\n") | Error(_) -> lexer
+    Ok(_) -> skip_comment(advance_char(lexer))
   }
 }
 
@@ -228,7 +237,15 @@ fn read_string(
   lexer: LexerState,
   position: Position,
 ) -> Result(#(TokenWithPosition, LexerState), LexerError) {
-  read_string_loop(advance_char(lexer), position, "")
+  case string.slice(lexer.input, lexer.position, 3) {
+    "\"\"\"" ->
+      read_block_string(
+        advance_char(advance_char(advance_char(lexer))),
+        position,
+        "",
+      )
+    _ -> read_string_loop(advance_char(lexer), position, "")
+  }
 }
 
 fn read_string_loop(
@@ -253,6 +270,7 @@ fn read_string_loop(
         Ok("n") -> read_string_loop(advance_char(lexer), position, acc <> "\n")
         Ok("r") -> read_string_loop(advance_char(lexer), position, acc <> "\r")
         Ok("t") -> read_string_loop(advance_char(lexer), position, acc <> "\t")
+        Ok("u") -> read_unicode_escape(advance_char(lexer), position, acc)
         Ok(char) -> read_string_loop(advance_char(lexer), position, acc <> char)
         Error(_) -> Error(UnterminatedString(position))
       }
@@ -261,32 +279,262 @@ fn read_string_loop(
   }
 }
 
-fn read_number(
+fn read_unicode_escape(
   lexer: LexerState,
   position: Position,
+  acc: String,
 ) -> Result(#(TokenWithPosition, LexerState), LexerError) {
-  let #(number_str, new_lexer) = read_while(lexer, is_digit_or_dot)
+  case read_hex_digit(lexer, position) {
+    Error(e) -> Error(e)
+    Ok(#(h1, lexer)) ->
+      case read_hex_digit(lexer, position) {
+        Error(e) -> Error(e)
+        Ok(#(h2, lexer)) ->
+          case read_hex_digit(lexer, position) {
+            Error(e) -> Error(e)
+            Ok(#(h3, lexer)) ->
+              case read_hex_digit(lexer, position) {
+                Error(e) -> Error(e)
+                Ok(#(h4, lexer)) -> {
+                  let codepoint = h1 * 4096 + h2 * 256 + h3 * 16 + h4
+                  case string.utf_codepoint(codepoint) {
+                    Ok(cp) ->
+                      read_string_loop(
+                        lexer,
+                        position,
+                        acc <> string.from_utf_codepoints([cp]),
+                      )
+                    Error(_) -> Error(InvalidNumber("\\uXXXX", position))
+                  }
+                }
+              }
+          }
+      }
+  }
+}
 
-  case string.contains(number_str, ".") {
-    True -> {
-      case float.parse(number_str) {
-        Ok(value) ->
-          Ok(#(TokenWithPosition(FloatValue(value), position), new_lexer))
-        Error(_) -> Error(InvalidNumber(number_str, position))
+fn read_hex_digit(
+  lexer: LexerState,
+  position: Position,
+) -> Result(#(Int, LexerState), LexerError) {
+  case peek_char(lexer) {
+    Ok("0") -> Ok(#(0, advance_char(lexer)))
+    Ok("1") -> Ok(#(1, advance_char(lexer)))
+    Ok("2") -> Ok(#(2, advance_char(lexer)))
+    Ok("3") -> Ok(#(3, advance_char(lexer)))
+    Ok("4") -> Ok(#(4, advance_char(lexer)))
+    Ok("5") -> Ok(#(5, advance_char(lexer)))
+    Ok("6") -> Ok(#(6, advance_char(lexer)))
+    Ok("7") -> Ok(#(7, advance_char(lexer)))
+    Ok("8") -> Ok(#(8, advance_char(lexer)))
+    Ok("9") -> Ok(#(9, advance_char(lexer)))
+    Ok("a") | Ok("A") -> Ok(#(10, advance_char(lexer)))
+    Ok("b") | Ok("B") -> Ok(#(11, advance_char(lexer)))
+    Ok("c") | Ok("C") -> Ok(#(12, advance_char(lexer)))
+    Ok("d") | Ok("D") -> Ok(#(13, advance_char(lexer)))
+    Ok("e") | Ok("E") -> Ok(#(14, advance_char(lexer)))
+    Ok("f") | Ok("F") -> Ok(#(15, advance_char(lexer)))
+    Ok(c) -> Error(UnexpectedCharacter(c, position))
+    Error(_) -> Error(UnterminatedString(position))
+  }
+}
+
+fn read_block_string(
+  lexer: LexerState,
+  position: Position,
+  acc: String,
+) -> Result(#(TokenWithPosition, LexerState), LexerError) {
+  case string.slice(lexer.input, lexer.position, 4) {
+    "\\\"\"\"" -> {
+      let lexer = advance_char(advance_char(advance_char(advance_char(lexer))))
+      read_block_string(lexer, position, acc <> "\"\"\"")
+    }
+    _ ->
+      case string.slice(lexer.input, lexer.position, 3) {
+        "\"\"\"" -> {
+          let lexer = advance_char(advance_char(advance_char(lexer)))
+          Ok(#(
+            TokenWithPosition(StringValue(block_string_value(acc)), position),
+            lexer,
+          ))
+        }
+        _ ->
+          case peek_char(lexer) {
+            Error(_) -> Error(UnterminatedString(position))
+            Ok(char) ->
+              read_block_string(advance_char(lexer), position, acc <> char)
+          }
+      }
+  }
+}
+
+fn block_string_value(raw: String) -> String {
+  let lines = string.split(raw, "\n")
+  let lines = list.map(lines, fn(l) { string.replace(l, "\r", "") })
+
+  let common_indent = find_common_indent(lines)
+
+  let lines =
+    list.index_map(lines, fn(line, i) {
+      case i == 0 {
+        True -> line
+        False -> string.drop_start(line, common_indent)
+      }
+    })
+
+  let lines = drop_leading_blank(lines)
+  let lines = drop_trailing_blank(list.reverse(lines)) |> list.reverse
+
+  string.join(lines, "\n")
+}
+
+fn find_common_indent(lines: List(String)) -> Int {
+  list.fold(lines, -1, fn(acc, line) {
+    case list.is_empty(lines) {
+      True -> acc
+      False -> {
+        let indent = count_leading_whitespace(line)
+        let is_blank = indent == string.length(line)
+        case is_blank {
+          True -> acc
+          False ->
+            case acc == -1 || indent < acc {
+              True -> indent
+              False -> acc
+            }
+        }
       }
     }
-    False -> {
-      case int.parse(number_str) {
-        Ok(value) ->
-          Ok(#(TokenWithPosition(IntValue(value), position), new_lexer))
-        Error(_) -> Error(InvalidNumber(number_str, position))
-      }
+  })
+  |> fn(n) {
+    case n == -1 {
+      True -> 0
+      False -> n
     }
   }
 }
 
-fn is_digit_or_dot(c: String) -> Bool {
-  is_digit(c) || c == "."
+fn count_leading_whitespace(s: String) -> Int {
+  count_leading_whitespace_loop(s, 0)
+}
+
+fn count_leading_whitespace_loop(s: String, count: Int) -> Int {
+  case string.slice(s, count, 1) {
+    " " | "\t" -> count_leading_whitespace_loop(s, count + 1)
+    _ -> count
+  }
+}
+
+fn drop_leading_blank(lines: List(String)) -> List(String) {
+  case lines {
+    [] -> []
+    [first, ..rest] ->
+      case string.trim(first) == "" {
+        True -> drop_leading_blank(rest)
+        False -> lines
+      }
+  }
+}
+
+fn drop_trailing_blank(lines: List(String)) -> List(String) {
+  drop_leading_blank(lines)
+}
+
+fn read_negative_number(
+  lexer: LexerState,
+  position: Position,
+) -> Result(#(TokenWithPosition, LexerState), LexerError) {
+  let lexer = advance_char(lexer)
+  case peek_char(lexer) {
+    Ok("0")
+    | Ok("1")
+    | Ok("2")
+    | Ok("3")
+    | Ok("4")
+    | Ok("5")
+    | Ok("6")
+    | Ok("7")
+    | Ok("8")
+    | Ok("9") -> read_number_with_prefix(lexer, position, "-")
+    _ -> Error(UnexpectedCharacter("-", position))
+  }
+}
+
+fn read_number(
+  lexer: LexerState,
+  position: Position,
+) -> Result(#(TokenWithPosition, LexerState), LexerError) {
+  read_number_with_prefix(lexer, position, "")
+}
+
+fn read_number_with_prefix(
+  lexer: LexerState,
+  position: Position,
+  prefix: String,
+) -> Result(#(TokenWithPosition, LexerState), LexerError) {
+  let #(int_part, lexer) = read_while(lexer, is_digit)
+
+  let #(frac_part, lexer) = case peek_char(lexer) {
+    Ok(".") -> {
+      let lexer = advance_char(lexer)
+      let #(digits, lexer) = read_while(lexer, is_digit)
+      #("." <> digits, lexer)
+    }
+    _ -> #("", lexer)
+  }
+
+  let #(exp_part, lexer) = case peek_char(lexer) {
+    Ok("e") | Ok("E") -> {
+      let e_char = case peek_char(lexer) {
+        Ok(c) -> c
+        _ -> "e"
+      }
+      let lexer = advance_char(lexer)
+      let #(sign, lexer) = case peek_char(lexer) {
+        Ok("+") | Ok("-") -> {
+          let s = case peek_char(lexer) {
+            Ok(c) -> c
+            _ -> ""
+          }
+          #(s, advance_char(lexer))
+        }
+        _ -> #("", lexer)
+      }
+      let #(exp_digits, lexer) = read_while(lexer, is_digit)
+      #(e_char <> sign <> exp_digits, lexer)
+    }
+    _ -> #("", lexer)
+  }
+
+  let number_str = prefix <> int_part <> frac_part <> exp_part
+  let is_float = frac_part != "" || exp_part != ""
+
+  case is_float {
+    True -> {
+      let parse_str = case string.contains(number_str, ".") {
+        True -> number_str
+        False ->
+          case string.split_once(number_str, "e") {
+            Ok(#(base, exp)) -> base <> ".0e" <> exp
+            Error(_) ->
+              case string.split_once(number_str, "E") {
+                Ok(#(base, exp)) -> base <> ".0E" <> exp
+                Error(_) -> number_str
+              }
+          }
+      }
+      case float.parse(parse_str) {
+        Ok(value) ->
+          Ok(#(TokenWithPosition(FloatValue(value), position), lexer))
+        Error(_) -> Error(InvalidNumber(number_str, position))
+      }
+    }
+    False ->
+      case int.parse(number_str) {
+        Ok(value) -> Ok(#(TokenWithPosition(IntValue(value), position), lexer))
+        Error(_) -> Error(InvalidNumber(number_str, position))
+      }
+  }
 }
 
 fn read_name(

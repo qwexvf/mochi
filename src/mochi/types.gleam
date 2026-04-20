@@ -59,6 +59,9 @@ import mochi/schema.{
 @external(erlang, "gleam_stdlib", "identity")
 pub fn to_dynamic(value: a) -> Dynamic
 
+@external(erlang, "gleam_stdlib", "identity")
+fn unsafe_coerce(value: Dynamic) -> a
+
 /// Build a Dynamic dict from a list of field tuples
 ///
 /// This is a convenience helper for creating DataLoader encoders.
@@ -680,6 +683,76 @@ pub fn build_with_encoder(
 /// // user_encoder(User("1", "Alice")) produces:
 /// // {"id": "1", "name": "Alice"}
 /// ```
+/// Build the TypeBuilder into an ObjectType using identity coerce instead of a
+/// decoder. This eliminates the encode/decode roundtrip — no Dict is built per
+/// object and no Dict lookups are done per field. The encoder is just
+/// `to_dynamic` (a BEAM no-op).
+///
+/// Safe as long as the resolver returns values of type `a` and the extractors
+/// are defined for the same type `a`. Do not use when resolvers return
+/// pre-encoded Dicts.
+pub fn build_direct(builder: TypeBuilder(a)) -> #(ObjectType, fn(a) -> Dynamic) {
+  let schema_fields =
+    list.map(list.reverse(builder.fields), fn(f) { to_field_def_direct(f) })
+
+  let base_obj = schema.object(builder.name)
+
+  let with_desc = case builder.description {
+    Some(d) -> schema.description(base_obj, d)
+    None -> base_obj
+  }
+
+  let object_type =
+    list.fold(schema_fields, with_desc, fn(obj, field) {
+      schema.field(obj, field)
+    })
+
+  #(object_type, to_dynamic)
+}
+
+fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
+  case f {
+    TypeField(name, description, field_type, extractor) -> {
+      let resolver = fn(info: ResolverInfo) {
+        case info.parent {
+          Some(parent_dyn) -> Ok(extractor(unsafe_coerce(parent_dyn)))
+          None -> Error("No parent value")
+        }
+      }
+      let base =
+        schema.field_def(name, field_type)
+        |> schema.resolver(resolver)
+      case description {
+        Some(desc) -> schema.field_description(base, desc)
+        None -> base
+      }
+    }
+
+    TypeFieldWithArgs(name, description, field_type, args, field_resolver) -> {
+      let resolver = fn(info: ResolverInfo) {
+        case info.parent {
+          Some(parent_dyn) ->
+            field_resolver(
+              unsafe_coerce(parent_dyn),
+              info.arguments,
+              info.context,
+            )
+          None -> Error("No parent value")
+        }
+      }
+      let base =
+        schema.field_def(name, field_type)
+        |> schema.resolver(resolver)
+      let with_args =
+        list.fold(args, base, fn(field, arg) { schema.argument(field, arg) })
+      case description {
+        Some(desc) -> schema.field_description(with_args, desc)
+        None -> with_args
+      }
+    }
+  }
+}
+
 pub fn encoder(builder: TypeBuilder(a)) -> fn(a) -> Dynamic {
   fn(value: a) -> Dynamic {
     let field_pairs =
