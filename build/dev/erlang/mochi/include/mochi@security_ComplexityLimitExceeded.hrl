@@ -1,1 +1,0 @@
--record(complexity_limit_exceeded, {complexity :: integer(), max :: integer()}).

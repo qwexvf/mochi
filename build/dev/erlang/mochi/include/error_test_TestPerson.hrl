@@ -1,1 +1,0 @@
--record(test_person, {id :: binary(), name :: binary()}).

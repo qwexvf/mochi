@@ -1,1 +1,0 @@
--record(unterminated_description, {position :: mochi@sdl_lexer:position()}).

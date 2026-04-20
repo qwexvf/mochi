@@ -1,1 +1,0 @@
--record(fragment_definition, {fragment :: mochi@ast:fragment()}).

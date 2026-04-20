@@ -1,1 +1,0 @@
--record(null_not_allowed, {path :: list(binary())}).

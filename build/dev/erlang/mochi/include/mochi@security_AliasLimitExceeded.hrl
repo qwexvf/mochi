@@ -1,1 +1,0 @@
--record(alias_limit_exceeded, {count :: integer(), max :: integer()}).

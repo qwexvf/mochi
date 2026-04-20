@@ -1,1 +1,0 @@
--record(message, {id :: binary(), text :: binary(), count :: integer()}).

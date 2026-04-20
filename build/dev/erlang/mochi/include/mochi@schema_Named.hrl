@@ -1,1 +1,0 @@
--record(named, {name :: binary()}).

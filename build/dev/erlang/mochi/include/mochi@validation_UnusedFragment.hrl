@@ -1,1 +1,0 @@
--record(unused_fragment, {fragment_name :: binary()}).

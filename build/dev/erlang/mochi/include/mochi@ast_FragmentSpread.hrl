@@ -1,1 +1,0 @@
--record(fragment_spread, {fragment_spread :: mochi@ast:fragment_spread_value()}).

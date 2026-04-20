@@ -1,1 +1,0 @@
--record(employee, {id :: binary(), name :: binary(), role :: binary()}).

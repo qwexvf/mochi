@@ -1,1 +1,0 @@
--record(directive_not_allowed, {directive_name :: binary(), location :: binary()}).

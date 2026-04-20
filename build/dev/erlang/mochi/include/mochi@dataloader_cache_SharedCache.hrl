@@ -1,1 +1,0 @@
--record(shared_cache, {inner :: mochi@dataloader_cache:cache_inner()}).

@@ -1,1 +1,0 @@
--record(cat, {id :: binary(), name :: binary(), meows :: boolean()}).

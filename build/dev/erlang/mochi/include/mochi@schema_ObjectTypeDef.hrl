@@ -1,1 +1,0 @@
--record(object_type_def, {object_type :: mochi@schema:object_type()}).

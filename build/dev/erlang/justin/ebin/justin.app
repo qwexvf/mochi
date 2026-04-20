@@ -1,7 +1,0 @@
-{application, justin, [
-    {vsn, "1.1.0"},
-    {applications, [gleam_stdlib]},
-    {description, "Convert between snake_case, camelCase, and other cases in Gleam"},
-    {modules, []},
-    {registered, []}
-]}.

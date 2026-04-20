@@ -1,1 +1,0 @@
--record(contact_info, {email :: binary(), phone :: binary()}).

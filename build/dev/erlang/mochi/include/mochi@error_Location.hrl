@@ -1,1 +1,0 @@
--record(location, {line :: integer(), column :: integer()}).

@@ -1,1 +1,0 @@
--record(position, {byte_offset :: integer()}).

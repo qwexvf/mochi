@@ -1,1 +1,0 @@
--record(validation_start, {timestamp :: integer()}).

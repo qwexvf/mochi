@@ -1,1 +1,0 @@
--record(cannot_read_test_directory, {reason :: simplifile:file_error()}).

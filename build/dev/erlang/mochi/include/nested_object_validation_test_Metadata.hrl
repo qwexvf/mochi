@@ -1,1 +1,0 @@
--record(metadata, {version :: binary(), tags :: binary()}).

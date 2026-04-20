@@ -1,1 +1,0 @@
--record(extension, {version :: integer(), sha256_hash :: binary()}).

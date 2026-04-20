@@ -1,1 +1,0 @@
--record(enum_value, {value :: binary()}).

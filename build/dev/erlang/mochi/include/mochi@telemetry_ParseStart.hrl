@@ -1,1 +1,0 @@
--record(parse_start, {timestamp :: integer()}).

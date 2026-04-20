@@ -1,1 +1,0 @@
--record(field_selection, {field :: mochi@ast:field()}).

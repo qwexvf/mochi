@@ -1,1 +1,0 @@
--record(schema_parse_end, {success :: boolean(), duration_ns :: integer()}).

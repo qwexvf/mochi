@@ -1,1 +1,0 @@
--record(item, {id :: binary(), name :: binary()}).

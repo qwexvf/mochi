@@ -1,1 +1,0 @@
--record(dog, {id :: binary(), name :: binary(), barks :: boolean()}).

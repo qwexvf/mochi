@@ -1,1 +1,0 @@
--record(unknown_type, {path :: list(binary()), type_name :: binary()}).

@@ -1,1 +1,0 @@
--record(duplicate_variable, {variable_name :: binary()}).

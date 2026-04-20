@@ -1,1 +1,0 @@
--record(fields_cannot_merge, {field_name :: binary(), reason :: binary()}).

@@ -1,1 +1,0 @@
--record(argument, {name :: binary(), value :: mochi@ast:value()}).

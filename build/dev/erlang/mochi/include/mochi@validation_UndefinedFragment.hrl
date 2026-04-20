@@ -1,1 +1,0 @@
--record(undefined_fragment, {fragment_name :: binary()}).
