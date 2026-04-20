@@ -184,7 +184,10 @@ fn add_error(
   ctx: ValidationContext,
   error: ValidationError,
 ) -> ValidationContext {
-  ValidationContext(..ctx, errors: [#(error, ctx.current_location), ..ctx.errors])
+  ValidationContext(..ctx, errors: [
+    #(error, ctx.current_location),
+    ..ctx.errors
+  ])
 }
 
 // ============================================================================
@@ -317,7 +320,8 @@ fn track_defined_variables(
       let type_name = get_ast_base_type_name(var_def.type_)
       let ctx = case is_input_type(ctx.schema, type_name) {
         True -> ctx
-        False -> add_error(ctx, VariableNotInputType(var_def.variable, type_name))
+        False ->
+          add_error(ctx, VariableNotInputType(var_def.variable, type_name))
       }
       #(set.insert(seen, var_def.variable), ctx)
     })
@@ -904,7 +908,8 @@ fn validate_skip_include_args(
       }
     })
   case list.find(directive.arguments, fn(a) { a.name == "if" }) {
-    Error(_) -> add_error(ctx, MissingRequiredArgument("@" <> directive.name, "if"))
+    Error(_) ->
+      add_error(ctx, MissingRequiredArgument("@" <> directive.name, "if"))
     Ok(_) -> ctx
   }
 }

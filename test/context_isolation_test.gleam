@@ -71,7 +71,15 @@ fn build_schema() {
     query.query(
       "user",
       schema.named_type("User"),
-      fn(_ctx) { Ok(User("1", "Alice", "alice@example.com", 42, Profile("dev", "example.com"))) },
+      fn(_ctx) {
+        Ok(User(
+          "1",
+          "Alice",
+          "alice@example.com",
+          42,
+          Profile("dev", "example.com"),
+        ))
+      },
       types.to_dynamic,
     )
 
@@ -227,9 +235,7 @@ pub fn inline_fragment_with_nested_object_followed_by_sibling_test() {
 }
 
 pub fn inline_fragment_then_nested_object_then_sibling_test() {
-  assert_valid(
-    "{ user { ... on User { id } profile { bio website } score } }",
-  )
+  assert_valid("{ user { ... on User { id } profile { bio website } score } }")
 }
 
 pub fn alternating_inline_fragments_and_plain_fields_test() {

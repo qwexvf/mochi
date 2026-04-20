@@ -15,12 +15,9 @@ fn build_schema() {
     |> types.id("id", fn(u: U) { u.id })
     |> types.build(fn(_) { Ok(U("1")) })
   let q =
-    query.query(
-      "u",
-      schema.named_type("U"),
-      fn(_) { Ok(U("1")) },
-      fn(v) { types.to_dynamic(v) },
-    )
+    query.query("u", schema.named_type("U"), fn(_) { Ok(U("1")) }, fn(v) {
+      types.to_dynamic(v)
+    })
   query.new()
   |> query.add_query(q)
   |> query.add_type(ut)

@@ -703,7 +703,9 @@ pub fn build_direct(builder: TypeBuilder(a)) -> #(ObjectType, fn(a) -> Dynamic) 
   }
 
   let object_type =
-    list.fold(schema_fields, with_desc, fn(obj, field) { schema.field(obj, field) })
+    list.fold(schema_fields, with_desc, fn(obj, field) {
+      schema.field(obj, field)
+    })
 
   #(object_type, to_dynamic)
 }
@@ -730,7 +732,11 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) ->
-            field_resolver(unsafe_coerce(parent_dyn), info.arguments, info.context)
+            field_resolver(
+              unsafe_coerce(parent_dyn),
+              info.arguments,
+              info.context,
+            )
           None -> Error("No parent value")
         }
       }

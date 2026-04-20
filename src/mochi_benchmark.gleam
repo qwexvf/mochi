@@ -24,9 +24,7 @@ pub fn main() {
   let n = 5000
 
   io.println(
-    "Parse (no cache)                   "
-    <> int.to_string(n)
-    <> " iters",
+    "Parse (no cache)                   " <> int.to_string(n) <> " iters",
   )
   io.println(string.repeat("-", 44))
   timed("simple ", fn() { bench_parse(simple, n) })
@@ -35,9 +33,7 @@ pub fn main() {
 
   io.println("")
   io.println(
-    "Parse (document cache)             "
-    <> int.to_string(n)
-    <> " iters",
+    "Parse (document cache)             " <> int.to_string(n) <> " iters",
   )
   io.println(string.repeat("-", 44))
   timed("simple ", fn() { bench_cache(simple, n) })
@@ -46,9 +42,7 @@ pub fn main() {
 
   io.println("")
   io.println(
-    "Execute (schema cache enabled)     "
-    <> int.to_string(n)
-    <> " iters",
+    "Execute (schema cache enabled)     " <> int.to_string(n) <> " iters",
   )
   io.println(string.repeat("-", 44))
   timed("simple ", fn() { bench_execute(simple, schema_def, n) })

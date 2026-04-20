@@ -504,10 +504,14 @@ pub fn block_string_preserves_newlines_test() {
 }
 
 pub fn block_string_strips_common_indent_test() {
-  case tokens("\"\"\"
+  case
+    tokens(
+      "\"\"\"
     hello
     world
-    \"\"\"") {
+    \"\"\"",
+    )
+  {
     Ok([lexer.StringValue(v), lexer.EOF]) ->
       case v == "hello\nworld" {
         True -> Nil

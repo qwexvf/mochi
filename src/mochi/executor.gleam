@@ -2764,11 +2764,7 @@ fn get_cached(
   }
 }
 
-fn cache_put(
-  schema_def: schema.Schema,
-  query: String,
-  doc: ast.Document,
-) -> Nil {
+fn cache_put(schema_def: schema.Schema, query: String, doc: ast.Document) -> Nil {
   case schema_def.document_cache {
     None -> Nil
     Some(cache) -> document_cache.put(cache, query, doc)
@@ -2804,8 +2800,7 @@ pub fn execute_query_with_context(
 
   let parse_result = case get_cached(schema_def, query) {
     Ok(doc) -> Ok(#(doc, True))
-    Error(_) ->
-      result.map(parser.parse(query), fn(doc) { #(doc, False) })
+    Error(_) -> result.map(parser.parse(query), fn(doc) { #(doc, False) })
   }
 
   case parse_result {
@@ -2988,6 +2983,7 @@ fn format_parse_error(error: parser.ParseError) -> String {
     parser.LexError(_) -> "Lexer error"
     parser.UnexpectedToken(expected, got, _) ->
       "Expected " <> expected <> ", got " <> format_token(got)
-    parser.UnexpectedEOF(expected) -> "Unexpected end of document, expected " <> expected
+    parser.UnexpectedEOF(expected) ->
+      "Unexpected end of document, expected " <> expected
   }
 }

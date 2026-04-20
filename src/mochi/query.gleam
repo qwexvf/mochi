@@ -7,8 +7,8 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/string
 import gleam/result
+import gleam/string
 import mochi/document_cache
 import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,

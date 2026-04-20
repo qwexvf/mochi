@@ -35,12 +35,7 @@ pub type User {
 }
 
 pub type EquityByStreet {
-  EquityByStreet(
-    preflop: Float,
-    flop: Float,
-    turn: Float,
-    river: Float,
-  )
+  EquityByStreet(preflop: Float, flop: Float, turn: Float, river: Float)
 }
 
 pub type DetectedHand {
@@ -119,7 +114,14 @@ fn hand_type() {
   |> types.float("gtoDeviation", fn(h: DetectedHand) { h.gto_deviation })
   |> types.bool("accepted", fn(h: DetectedHand) { h.accepted })
   |> types.build(fn(_) {
-    Ok(DetectedHand("1", "As Kh", "Qd Jc Ts", EquityByStreet(0.6, 0.55, 0.7, 0.9), 0.05, False))
+    Ok(DetectedHand(
+      "1",
+      "As Kh",
+      "Qd Jc Ts",
+      EquityByStreet(0.6, 0.55, 0.7, 0.9),
+      0.05,
+      False,
+    ))
   })
 }
 
@@ -134,14 +136,7 @@ fn comment_type() {
     Ok(Comment(
       "1",
       "Nice post",
-      User(
-        "2",
-        "Bob",
-        Address("", "", ""),
-        ContactInfo("", ""),
-        0,
-        True,
-      ),
+      User("2", "Bob", Address("", "", ""), ContactInfo("", ""), 0, True),
     ))
   })
 }
@@ -244,38 +239,33 @@ pub fn sibling_field_after_nested_object_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
 
 pub fn sibling_field_before_nested_object_is_valid_test() {
   let s = hand_schema()
-  let q =
-    "{ hand { id gtoDeviation equity { preflop flop } accepted } }"
+  let q = "{ hand { id gtoDeviation equity { preflop flop } accepted } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
 
 pub fn multiple_sibling_fields_after_nested_object_are_valid_test() {
   let s = user_schema()
-  let q =
-    "{ user { id address { street city zip } score active name } }"
+  let q = "{ user { id address { street city zip } score active name } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -289,8 +279,7 @@ pub fn two_nested_objects_then_sibling_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -303,8 +292,7 @@ pub fn nested_object_only_no_siblings_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -365,8 +353,7 @@ pub fn deeply_nested_object_with_sibling_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -381,8 +368,7 @@ pub fn sibling_after_nested_at_depth_two_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -397,8 +383,7 @@ pub fn equity_and_gto_deviation_both_resolve_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
   case result.data {
@@ -415,8 +400,7 @@ pub fn user_siblings_after_nested_address_resolve_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
   case result.data {
@@ -507,10 +491,10 @@ fn order_type() {
                   #("name", types.to_dynamic(li.product.category.name)),
                   #("slug", types.to_dynamic(li.product.category.slug)),
                 ])
-                |> types.to_dynamic,
+                  |> types.to_dynamic,
               ),
             ])
-            |> types.to_dynamic,
+              |> types.to_dynamic,
           ),
           #("quantity", types.to_dynamic(li.quantity)),
           #("unitPrice", types.to_dynamic(li.unit_price)),
@@ -577,8 +561,7 @@ pub fn product_nested_category_then_scalar_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
   case result.data {
@@ -595,8 +578,7 @@ pub fn scalar_then_nested_category_then_more_scalars_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -610,8 +592,7 @@ pub fn order_list_object_then_scalar_siblings_validation_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -625,8 +606,7 @@ pub fn order_scalars_before_and_after_list_object_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -725,7 +705,7 @@ fn organization_type() {
               ])
               |> types.to_dynamic
             })
-            |> types.to_dynamic,
+              |> types.to_dynamic,
           ),
         ])
         |> types.to_dynamic
@@ -743,8 +723,7 @@ fn org_schema() {
   let eng = Employee("e1", "Alice", "ENGINEER")
   let des = Employee("e2", "Bob", "DESIGNER")
   let ceo = Employee("e0", "Carol", "CEO")
-  let dept =
-    Department("d1", "Product", [eng, des], 2)
+  let dept = Department("d1", "Product", [eng, des], 2)
   let org = Organization("org-1", "Acme Corp", [dept], ceo, 2010)
 
   let org_query =
@@ -772,8 +751,7 @@ pub fn three_level_deep_nesting_with_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
   case result.data {
@@ -791,8 +769,7 @@ pub fn siblings_after_nested_object_at_depth_two_org_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -802,7 +779,8 @@ pub fn field_from_nested_level_on_org_root_is_rejected_test() {
   let q = "{ org { headCount } }"
   let result = executor.execute_query(s, q)
   case result.errors {
-    [] -> panic as "Expected error: headCount is on Department, not Organization"
+    [] ->
+      panic as "Expected error: headCount is on Department, not Organization"
     _ -> Nil
   }
 }
@@ -818,8 +796,7 @@ pub fn alias_on_nested_object_and_sibling_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -833,8 +810,7 @@ pub fn multiple_aliases_on_different_fields_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -843,30 +819,26 @@ pub fn multiple_aliases_on_different_fields_test() {
 
 pub fn typename_inside_nested_object_then_parent_sibling_test() {
   let s = user_schema()
-  let q =
-    "{ user { address { __typename city zip } name score } }"
+  let q = "{ user { address { __typename city zip } name score } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
 
 pub fn typename_on_parent_and_in_nested_object_test() {
   let s = user_schema()
-  let q =
-    "{ user { __typename id address { __typename street } active } }"
+  let q = "{ user { __typename id address { __typename street } active } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -895,8 +867,7 @@ pub fn named_fragment_with_nested_and_scalar_fields_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -927,8 +898,7 @@ pub fn named_fragment_on_nested_type_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -953,8 +923,7 @@ pub fn named_fragment_sibling_after_spread_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -970,23 +939,20 @@ pub fn inline_fragment_on_nested_type_then_sibling_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
 
 pub fn inline_fragment_without_type_condition_in_nested_test() {
   let s = user_schema()
-  let q =
-    "{ user { address { ... { city } street } name score } }"
+  let q = "{ user { address { ... { city } street } name score } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
@@ -994,14 +960,15 @@ pub fn inline_fragment_without_type_condition_in_nested_test() {
 // ── Mutation returning nested type with scalar siblings ───────────────────────
 
 pub fn mutation_returning_nested_type_with_siblings_test() {
-  let prod = Product(
-    "new-1",
-    "Wireless Mouse",
-    Category("cat-2", "Peripherals", "peripherals"),
-    39.99,
-    True,
-    "MS-WL-002",
-  )
+  let prod =
+    Product(
+      "new-1",
+      "Wireless Mouse",
+      Category("cat-2", "Peripherals", "peripherals"),
+      39.99,
+      True,
+      "MS-WL-002",
+    )
 
   let create_product =
     query.mutation(
@@ -1027,8 +994,7 @@ pub fn mutation_returning_nested_type_with_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
   case result.data {
@@ -1048,23 +1014,20 @@ pub fn same_nested_type_reused_with_siblings_between_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }
 
 pub fn interleaved_nested_and_scalar_fields_test() {
   let s = user_schema()
-  let q =
-    "{ user { id address { city } name contact { email } score active } }"
+  let q = "{ user { id address { city } name contact { email } score active } }"
   let result = executor.execute_query(s, q)
   case result.errors {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: "
-        <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
       }
   }
 }

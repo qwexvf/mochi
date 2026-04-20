@@ -881,7 +881,9 @@ pub fn variable_object_type_is_rejected_test() {
 
 pub fn variable_scalar_type_is_accepted_test() {
   let s = build_test_schema()
-  case validation.validate_query("query ($id: ID!) { user(id: $id) { name } }", s) {
+  case
+    validation.validate_query("query ($id: ID!) { user(id: $id) { name } }", s)
+  {
     Ok(_) -> Nil
     Error(errors) ->
       panic as {
@@ -921,10 +923,7 @@ pub fn variable_string_type_is_accepted_test() {
 pub fn fragment_on_scalar_is_rejected_test() {
   let s = build_test_schema()
   case
-    validation.validate_query(
-      "{ users { id } } fragment F on String { id }",
-      s,
-    )
+    validation.validate_query("{ users { id } } fragment F on String { id }", s)
   {
     Error(errors) -> {
       let has_error =

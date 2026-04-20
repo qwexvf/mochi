@@ -304,8 +304,7 @@ fn read_unicode_escape(
                         position,
                         acc <> string.from_utf_codepoints([cp]),
                       )
-                    Error(_) ->
-                      Error(InvalidNumber("\\uXXXX", position))
+                    Error(_) -> Error(InvalidNumber("\\uXXXX", position))
                   }
                 }
               }
@@ -347,8 +346,7 @@ fn read_block_string(
 ) -> Result(#(TokenWithPosition, LexerState), LexerError) {
   case string.slice(lexer.input, lexer.position, 4) {
     "\\\"\"\"" -> {
-      let lexer =
-        advance_char(advance_char(advance_char(advance_char(lexer))))
+      let lexer = advance_char(advance_char(advance_char(advance_char(lexer))))
       read_block_string(lexer, position, acc <> "\"\"\"")
     }
     _ ->
@@ -356,10 +354,7 @@ fn read_block_string(
         "\"\"\"" -> {
           let lexer = advance_char(advance_char(advance_char(lexer)))
           Ok(#(
-            TokenWithPosition(
-              StringValue(block_string_value(acc)),
-              position,
-            ),
+            TokenWithPosition(StringValue(block_string_value(acc)), position),
             lexer,
           ))
         }
@@ -451,8 +446,16 @@ fn read_negative_number(
 ) -> Result(#(TokenWithPosition, LexerState), LexerError) {
   let lexer = advance_char(lexer)
   case peek_char(lexer) {
-    Ok("0") | Ok("1") | Ok("2") | Ok("3") | Ok("4") | Ok("5") | Ok("6") | Ok("7") | Ok("8") | Ok("9") ->
-      read_number_with_prefix(lexer, position, "-")
+    Ok("0")
+    | Ok("1")
+    | Ok("2")
+    | Ok("3")
+    | Ok("4")
+    | Ok("5")
+    | Ok("6")
+    | Ok("7")
+    | Ok("8")
+    | Ok("9") -> read_number_with_prefix(lexer, position, "-")
     _ -> Error(UnexpectedCharacter("-", position))
   }
 }
@@ -528,8 +531,7 @@ fn read_number_with_prefix(
     }
     False ->
       case int.parse(number_str) {
-        Ok(value) ->
-          Ok(#(TokenWithPosition(IntValue(value), position), lexer))
+        Ok(value) -> Ok(#(TokenWithPosition(IntValue(value), position), lexer))
         Error(_) -> Error(InvalidNumber(number_str, position))
       }
   }
