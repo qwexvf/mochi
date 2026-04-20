@@ -500,29 +500,54 @@ case security.validate(document, security.default_config()) {
 }
 ```
 
-### Persisted Queries (`mochi/apq`)
+### Automatic Persisted Queries (`mochi/apq`)
 
-Automatic Persisted Queries (APQ) are built into the core. Clients send a SHA256 hash instead of the full query string — useful for reducing bandwidth on mobile or high-latency networks.
+APQ is built into the core — no extra package needed. Clients send a SHA256 hash instead of the full query string on repeat requests, reducing bandwidth on mobile or high-latency networks.
+
+The protocol works in two passes:
+
+1. **First request** — client sends `{ "extensions": { "persistedQuery": { "version": 1, "sha256Hash": "<hash>" } } }` with no `query` field. Server responds with `PersistedQueryNotFound`.
+2. **Second request** — client resends with both `query` and `extensions`. Server verifies the hash, stores the query, and executes it.
+3. **All subsequent requests** — client sends hash only. Server looks it up and executes directly.
+
+Wire it into your HTTP handler by holding an `apq.Store` in your server state:
 
 ```gleam
+import gleam/dict
+import gleam/option.{None, Some}
 import mochi/apq
+import mochi/executor
 
+// Server state — hold this across requests (e.g. in an Agent or ETS)
 let store = apq.new()
 
-// Client sends hash + full query on first request
-case apq.process(store, Some("{ users { id name } }"), hash) {
-  Ok(#(store, query)) -> execute(query)
-  Error(apq.NotFound) -> error_response("PersistedQueryNotFound")
-  Error(apq.HashMismatch(..)) -> error_response("InvalidHash")
-}
+// In your request handler:
+fn handle_graphql(body: String, store: apq.Store) -> #(apq.Store, String) {
+  let #(query_opt, extensions) = parse_request(body)
 
-// Client sends only hash on subsequent requests
-case apq.process(store, None, hash) {
-  Ok(#(store, query)) -> execute(query)
-  Error(apq.NotFound) -> error_response("PersistedQueryNotFound")
-  Error(_) -> error_response("InvalidHash")
+  case apq.parse_extension(extensions) {
+    None -> {
+      // Normal request — no APQ
+      let result = executor.execute_query_with_context(schema, query_opt, ...)
+      #(store, respond(result))
+    }
+    Some(ext) -> {
+      case apq.process(store, query_opt, ext.sha256_hash) {
+        Ok(#(store, query)) -> {
+          let result = executor.execute_query_with_context(schema, query, ...)
+          #(store, respond(result))
+        }
+        Error(apq.NotFound) ->
+          #(store, persisted_query_not_found_response())
+        Error(apq.HashMismatch(..)) ->
+          #(store, bad_request_response("hash mismatch"))
+      }
+    }
+  }
 }
 ```
+
+The `apq.Store` is an immutable dict — you get a new one back from `apq.process` whenever a query is registered. Store it in an Erlang `Agent` or ETS table to share it across the process pool.
 
 ### GraphQL Playgrounds (`mochi_codegen`)
 
@@ -689,7 +714,7 @@ mochi_relay = { git = "https://github.com/qwexvf/mochi_relay", ref = "main" }   
 mochi_websocket = { git = "https://github.com/qwexvf/mochi_websocket", ref = "main" } # WebSocket subscriptions (graphql-ws)
 mochi_upload = { git = "https://github.com/qwexvf/mochi_upload", ref = "main" }      # Multipart file uploads
 mochi_codegen = { git = "https://github.com/qwexvf/mochi_codegen", ref = "main" }    # SDL + TypeScript codegen + GraphiQL
-mochi_apq = { git = "https://github.com/qwexvf/mochi_apq", ref = "main" }            # Automatic Persisted Queries (deprecated — now built into mochi core as mochi/apq)
+# mochi/apq is built into the core — no separate package needed
 ```
 
 ```
