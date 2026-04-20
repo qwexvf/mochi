@@ -11,6 +11,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import mochi/ast
+import mochi/document_cache
 import mochi/input_coercion
 import mochi/lexer
 import mochi/parser
@@ -2726,11 +2727,9 @@ pub fn execute_query_with_variables(
   query: String,
   variables: Dict(String, Dynamic),
 ) -> ExecutionResult {
-  case parser.parse(query) {
-    Ok(document) -> {
-      let ctx = schema.execution_context(types.to_dynamic(dict.new()))
-      execute(schema_def, document, None, ctx, variables)
-    }
+  let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+  case get_or_parse(schema_def, query) {
+    Ok(document) -> execute(schema_def, document, None, ctx, variables)
     Error(error) -> {
       let loc = case error {
         parser.UnexpectedToken(_, _, pos) -> Some(#(pos.line, pos.column))
@@ -2738,6 +2737,41 @@ pub fn execute_query_with_variables(
       }
       validation_error_at("Parse error: " <> format_parse_error(error), [], loc)
     }
+  }
+}
+
+pub fn get_or_parse(
+  schema_def: schema.Schema,
+  query: String,
+) -> Result(ast.Document, parser.ParseError) {
+  case get_cached(schema_def, query) {
+    Ok(doc) -> Ok(doc)
+    Error(_) -> {
+      use doc <- result.map(parser.parse(query))
+      cache_put(schema_def, query, doc)
+      doc
+    }
+  }
+}
+
+fn get_cached(
+  schema_def: schema.Schema,
+  query: String,
+) -> Result(ast.Document, Nil) {
+  case schema_def.document_cache {
+    None -> Error(Nil)
+    Some(cache) -> document_cache.get(cache, query)
+  }
+}
+
+fn cache_put(
+  schema_def: schema.Schema,
+  query: String,
+  doc: ast.Document,
+) -> Nil {
+  case schema_def.document_cache {
+    None -> Nil
+    Some(cache) -> document_cache.put(cache, query, doc)
   }
 }
 
@@ -2765,16 +2799,20 @@ pub fn execute_query_with_context(
   variables: Dict(String, Dynamic),
   ctx: schema.ExecutionContext,
 ) -> ExecutionResult {
-  // Emit parse start telemetry
   emit_telemetry(ctx, schema.SchemaParseStart)
   let parse_start = telemetry.get_timestamp_ns()
 
-  case parser.parse(query) {
-    Ok(document) -> {
+  let parse_result = case get_cached(schema_def, query) {
+    Ok(doc) -> Ok(#(doc, True))
+    Error(_) ->
+      result.map(parser.parse(query), fn(doc) { #(doc, False) })
+  }
+
+  case parse_result {
+    Ok(#(document, was_cached)) -> {
       let parse_duration = telemetry.get_timestamp_ns() - parse_start
       emit_telemetry(ctx, schema.SchemaParseEnd(True, parse_duration))
 
-      // Emit validation start telemetry
       emit_telemetry(ctx, schema.SchemaValidationStart)
       let validation_start = telemetry.get_timestamp_ns()
 
@@ -2786,6 +2824,10 @@ pub fn execute_query_with_context(
             ctx,
             schema.SchemaValidationEnd(True, 0, validation_duration),
           )
+          case was_cached {
+            False -> cache_put(schema_def, query, document)
+            True -> Nil
+          }
           execute(schema_def, document, None, ctx, variables)
         }
         Error(validation_errors) -> {
@@ -2799,7 +2841,11 @@ pub fn execute_query_with_context(
           let errors =
             list.map(validation_errors, fn(le) {
               let #(err, loc) = le
-              ValidationError(message: validation.format_error(err), path: [], location: loc)
+              ValidationError(
+                message: validation.format_error(err),
+                path: [],
+                location: loc,
+              )
             })
           ExecutionResult(data: None, errors: errors)
         }

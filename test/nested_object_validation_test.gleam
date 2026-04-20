@@ -5,6 +5,8 @@
 // type, causing valid queries to be rejected with "Cannot query field X on
 // type Y" errors.
 
+import gleam/dict
+import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
 import mochi/executor
 import mochi/query
@@ -423,6 +425,650 @@ pub fn user_siblings_after_nested_address_resolve_test() {
   }
 }
 
+// ── E-commerce: nested object + list of objects + scalar siblings ─────────────
+
+pub type Category {
+  Category(id: String, name: String, slug: String)
+}
+
+pub type Product {
+  Product(
+    id: String,
+    name: String,
+    category: Category,
+    price: Float,
+    in_stock: Bool,
+    sku: String,
+  )
+}
+
+pub type LineItem {
+  LineItem(product: Product, quantity: Int, unit_price: Float)
+}
+
+pub type Order {
+  Order(id: String, items: List(LineItem), total: Float, status: String)
+}
+
+fn category_type() {
+  types.object("Category")
+  |> types.id("id", fn(c: Category) { c.id })
+  |> types.string("name", fn(c: Category) { c.name })
+  |> types.string("slug", fn(c: Category) { c.slug })
+  |> types.build(fn(_) { Ok(Category("", "", "")) })
+}
+
+fn product_type() {
+  types.object("Product")
+  |> types.id("id", fn(p: Product) { p.id })
+  |> types.string("name", fn(p: Product) { p.name })
+  |> types.object_field("category", "Category", fn(p: Product) {
+    types.to_dynamic(p.category)
+  })
+  |> types.float("price", fn(p: Product) { p.price })
+  |> types.bool("inStock", fn(p: Product) { p.in_stock })
+  |> types.string("sku", fn(p: Product) { p.sku })
+  |> types.build(fn(_) {
+    Ok(Product("", "", Category("", "", ""), 0.0, False, ""))
+  })
+}
+
+fn line_item_type() {
+  types.object("LineItem")
+  |> types.object_field("product", "Product", fn(li: LineItem) {
+    types.to_dynamic(li.product)
+  })
+  |> types.int("quantity", fn(li: LineItem) { li.quantity })
+  |> types.float("unitPrice", fn(li: LineItem) { li.unit_price })
+  |> types.build(fn(_) {
+    Ok(LineItem(Product("", "", Category("", "", ""), 0.0, False, ""), 0, 0.0))
+  })
+}
+
+fn order_type() {
+  types.object("Order")
+  |> types.id("id", fn(o: Order) { o.id })
+  |> types.list_object("items", "LineItem", fn(o: Order) {
+    types.to_dynamic(
+      list_to_dynamic(o.items, fn(li: LineItem) {
+        dict.from_list([
+          #(
+            "product",
+            dict.from_list([
+              #("id", types.to_dynamic(li.product.id)),
+              #("name", types.to_dynamic(li.product.name)),
+              #("price", types.to_dynamic(li.product.price)),
+              #("inStock", types.to_dynamic(li.product.in_stock)),
+              #("sku", types.to_dynamic(li.product.sku)),
+              #(
+                "category",
+                dict.from_list([
+                  #("id", types.to_dynamic(li.product.category.id)),
+                  #("name", types.to_dynamic(li.product.category.name)),
+                  #("slug", types.to_dynamic(li.product.category.slug)),
+                ])
+                |> types.to_dynamic,
+              ),
+            ])
+            |> types.to_dynamic,
+          ),
+          #("quantity", types.to_dynamic(li.quantity)),
+          #("unitPrice", types.to_dynamic(li.unit_price)),
+        ])
+        |> types.to_dynamic
+      }),
+    )
+  })
+  |> types.float("total", fn(o: Order) { o.total })
+  |> types.string("status", fn(o: Order) { o.status })
+  |> types.build(fn(_) { Ok(Order("", [], 0.0, "")) })
+}
+
+fn the_order() {
+  let cat = Category("cat-1", "Electronics", "electronics")
+  let prod =
+    Product("prod-1", "Mechanical Keyboard", cat, 149.99, True, "KB-MX-001")
+  Order("ord-1", [LineItem(prod, 2, 149.99)], 299.98, "PENDING")
+}
+
+fn order_schema() {
+  let order_query =
+    query.query(
+      "order",
+      schema.named_type("Order"),
+      fn(_ctx) { Ok(the_order()) },
+      types.to_dynamic,
+    )
+
+  query.new()
+  |> query.add_query(order_query)
+  |> query.add_type(order_type())
+  |> query.add_type(line_item_type())
+  |> query.add_type(product_type())
+  |> query.add_type(category_type())
+  |> query.build
+}
+
+fn product_schema() {
+  let cat = Category("cat-1", "Electronics", "electronics")
+  let prod =
+    Product("prod-1", "Mechanical Keyboard", cat, 149.99, True, "KB-MX-001")
+
+  let product_query =
+    query.query(
+      "product",
+      schema.named_type("Product"),
+      fn(_ctx) { Ok(prod) },
+      types.to_dynamic,
+    )
+
+  query.new()
+  |> query.add_query(product_query)
+  |> query.add_type(product_type())
+  |> query.add_type(category_type())
+  |> query.build
+}
+
+pub fn product_nested_category_then_scalar_siblings_test() {
+  let s = product_schema()
+  let q = "{ product { id name category { id name slug } price inStock sku } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+  case result.data {
+    None -> panic as "Expected data"
+    Some(_) -> Nil
+  }
+}
+
+pub fn scalar_then_nested_category_then_more_scalars_test() {
+  let s = product_schema()
+  let q = "{ product { sku name category { slug name } price inStock id } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn order_list_object_then_scalar_siblings_validation_test() {
+  let s = order_schema()
+  let q =
+    "{ order { id items { quantity unitPrice product { name price } } total status } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn order_scalars_before_and_after_list_object_test() {
+  let s = order_schema()
+  let q =
+    "{ order { status items { quantity product { name category { name } } } total id } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn invalid_field_after_list_object_is_rejected_test() {
+  let s = order_schema()
+  let q = "{ order { items { quantity } bogusField } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> panic as "Expected validation error for bogusField on Order"
+    _ -> Nil
+  }
+}
+
+pub fn field_from_list_item_type_on_parent_is_rejected_test() {
+  let s = order_schema()
+  let q = "{ order { quantity } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> panic as "Expected error: quantity is on LineItem, not Order"
+    _ -> Nil
+  }
+}
+
+// ── 3-level deep nesting: Organization > Department > Employee ────────────────
+
+pub type Employee {
+  Employee(id: String, name: String, role: String)
+}
+
+pub type Department {
+  Department(
+    id: String,
+    name: String,
+    employees: List(Employee),
+    head_count: Int,
+  )
+}
+
+pub type Organization {
+  Organization(
+    id: String,
+    name: String,
+    departments: List(Department),
+    ceo: Employee,
+    founded: Int,
+  )
+}
+
+fn employee_type() {
+  types.object("Employee")
+  |> types.id("id", fn(e: Employee) { e.id })
+  |> types.string("name", fn(e: Employee) { e.name })
+  |> types.string("role", fn(e: Employee) { e.role })
+  |> types.build(fn(_) { Ok(Employee("", "", "")) })
+}
+
+fn department_type() {
+  types.object("Department")
+  |> types.id("id", fn(d: Department) { d.id })
+  |> types.string("name", fn(d: Department) { d.name })
+  |> types.list_object("employees", "Employee", fn(d: Department) {
+    types.to_dynamic(
+      list_to_dynamic(d.employees, fn(e: Employee) {
+        dict.from_list([
+          #("id", types.to_dynamic(e.id)),
+          #("name", types.to_dynamic(e.name)),
+          #("role", types.to_dynamic(e.role)),
+        ])
+        |> types.to_dynamic
+      }),
+    )
+  })
+  |> types.int("headCount", fn(d: Department) { d.head_count })
+  |> types.build(fn(_) { Ok(Department("", "", [], 0)) })
+}
+
+fn organization_type() {
+  types.object("Organization")
+  |> types.id("id", fn(o: Organization) { o.id })
+  |> types.string("name", fn(o: Organization) { o.name })
+  |> types.list_object("departments", "Department", fn(o: Organization) {
+    types.to_dynamic(
+      list_to_dynamic(o.departments, fn(d: Department) {
+        dict.from_list([
+          #("id", types.to_dynamic(d.id)),
+          #("name", types.to_dynamic(d.name)),
+          #("headCount", types.to_dynamic(d.head_count)),
+          #(
+            "employees",
+            list_to_dynamic(d.employees, fn(e: Employee) {
+              dict.from_list([
+                #("id", types.to_dynamic(e.id)),
+                #("name", types.to_dynamic(e.name)),
+                #("role", types.to_dynamic(e.role)),
+              ])
+              |> types.to_dynamic
+            })
+            |> types.to_dynamic,
+          ),
+        ])
+        |> types.to_dynamic
+      }),
+    )
+  })
+  |> types.object_field("ceo", "Employee", fn(o: Organization) {
+    types.to_dynamic(o.ceo)
+  })
+  |> types.int("founded", fn(o: Organization) { o.founded })
+  |> types.build(fn(_) { Ok(Organization("", "", [], Employee("", "", ""), 0)) })
+}
+
+fn org_schema() {
+  let eng = Employee("e1", "Alice", "ENGINEER")
+  let des = Employee("e2", "Bob", "DESIGNER")
+  let ceo = Employee("e0", "Carol", "CEO")
+  let dept =
+    Department("d1", "Product", [eng, des], 2)
+  let org = Organization("org-1", "Acme Corp", [dept], ceo, 2010)
+
+  let org_query =
+    query.query(
+      "org",
+      schema.named_type("Organization"),
+      fn(_ctx) { Ok(org) },
+      types.to_dynamic,
+    )
+
+  query.new()
+  |> query.add_query(org_query)
+  |> query.add_type(organization_type())
+  |> query.add_type(department_type())
+  |> query.add_type(employee_type())
+  |> query.build
+}
+
+pub fn three_level_deep_nesting_with_siblings_test() {
+  let s = org_schema()
+  let q =
+    "{ org { id departments { name employees { id name role } headCount } ceo { name role } founded } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+  case result.data {
+    None -> panic as "Expected data"
+    Some(_) -> Nil
+  }
+}
+
+pub fn siblings_after_nested_object_at_depth_two_org_test() {
+  let s = org_schema()
+  let q =
+    "{ org { departments { employees { name } headCount id name } name founded } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn field_from_nested_level_on_org_root_is_rejected_test() {
+  let s = org_schema()
+  let q = "{ org { headCount } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> panic as "Expected error: headCount is on Department, not Organization"
+    _ -> Nil
+  }
+}
+
+// ── Aliases on nested and sibling fields ─────────────────────────────────────
+
+pub fn alias_on_nested_object_and_sibling_test() {
+  let s = user_schema()
+  let q =
+    "{ user { homeAddress: address { city zip } fullName: name score active } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn multiple_aliases_on_different_fields_test() {
+  let s = user_schema()
+  let q =
+    "{ user { addr: address { street city } info: contact { email phone } points: score } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+// ── __typename in nested and parent contexts ──────────────────────────────────
+
+pub fn typename_inside_nested_object_then_parent_sibling_test() {
+  let s = user_schema()
+  let q =
+    "{ user { address { __typename city zip } name score } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn typename_on_parent_and_in_nested_object_test() {
+  let s = user_schema()
+  let q =
+    "{ user { __typename id address { __typename street } active } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+// ── Named fragment containing both nested and scalar fields ───────────────────
+
+pub fn named_fragment_with_nested_and_scalar_fields_test() {
+  let s = user_schema()
+  let q =
+    "
+    {
+      user {
+        ...UserProfile
+      }
+    }
+    fragment UserProfile on User {
+      id
+      address { street city zip }
+      name
+      score
+      active
+    }
+    "
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn named_fragment_on_nested_type_test() {
+  let s = comment_schema()
+  let q =
+    "
+    {
+      comment {
+        id
+        author {
+          ...AuthorDetails
+          score
+          active
+        }
+        body
+      }
+    }
+    fragment AuthorDetails on User {
+      id
+      name
+      address { street city }
+    }
+    "
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn named_fragment_sibling_after_spread_test() {
+  let s = comment_schema()
+  let q =
+    "
+    {
+      comment {
+        ...CommentCore
+        body
+      }
+    }
+    fragment CommentCore on Comment {
+      id
+      author { name address { city } score }
+    }
+    "
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+// ── Inline fragment on a nested type ─────────────────────────────────────────
+
+pub fn inline_fragment_on_nested_type_then_sibling_test() {
+  let s = user_schema()
+  let q =
+    "{ user { address { ... on Address { city zip } street } name score } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn inline_fragment_without_type_condition_in_nested_test() {
+  let s = user_schema()
+  let q =
+    "{ user { address { ... { city } street } name score } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+// ── Mutation returning nested type with scalar siblings ───────────────────────
+
+pub fn mutation_returning_nested_type_with_siblings_test() {
+  let prod = Product(
+    "new-1",
+    "Wireless Mouse",
+    Category("cat-2", "Peripherals", "peripherals"),
+    39.99,
+    True,
+    "MS-WL-002",
+  )
+
+  let create_product =
+    query.mutation(
+      name: "createProduct",
+      args: [query.arg("name", schema.non_null(schema.string_type()))],
+      returns: schema.named_type("Product"),
+      decode: fn(args) { query.get_string(args, "name") },
+      resolve: fn(_name, _ctx) { Ok(prod) },
+      encode: types.to_dynamic,
+    )
+
+  let s =
+    query.new()
+    |> query.add_mutation(create_product)
+    |> query.add_type(product_type())
+    |> query.add_type(category_type())
+    |> query.build
+
+  let q =
+    "mutation { createProduct(name: \"Wireless Mouse\") { id name category { id name slug } price inStock sku } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+  case result.data {
+    None -> panic as "Expected data"
+    Some(_) -> Nil
+  }
+}
+
+// ── Same nested type reused in multiple fields, with siblings between ─────────
+
+pub fn same_nested_type_reused_with_siblings_between_test() {
+  let s = user_schema()
+  let q =
+    "{ user { id address { street city } score contact { email phone } active name } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
+pub fn interleaved_nested_and_scalar_fields_test() {
+  let s = user_schema()
+  let q =
+    "{ user { id address { city } name contact { email } score active } }"
+  let result = executor.execute_query(s, q)
+  case result.errors {
+    [] -> Nil
+    errs ->
+      panic as {
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { e.message })
+      }
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn string_join(items: List(a), f: fn(a) -> String) -> String {
@@ -430,5 +1076,12 @@ fn string_join(items: List(a), f: fn(a) -> String) -> String {
     [] -> ""
     [x] -> f(x)
     [x, ..rest] -> f(x) <> ", " <> string_join(rest, f)
+  }
+}
+
+fn list_to_dynamic(items: List(a), f: fn(a) -> Dynamic) -> List(Dynamic) {
+  case items {
+    [] -> []
+    [x, ..rest] -> [f(x), ..list_to_dynamic(rest, f)]
   }
 }

@@ -315,7 +315,7 @@ fn execute_single_request(
 ) -> ExecutionResult {
   let variables = option.unwrap(req.variables, dict.new())
 
-  case parser.parse(req.query) {
+  case executor.get_or_parse(schema_def, req.query) {
     Ok(document) ->
       execute_with_operation_name(
         schema_def,

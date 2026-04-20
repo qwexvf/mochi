@@ -850,3 +850,233 @@ pub fn subscription_fragment_spread_parses_test() {
     Error(_) -> panic as "Parse failed"
   }
 }
+
+// ============================================================================
+// Variable type input validation tests
+// ============================================================================
+
+pub fn variable_object_type_is_rejected_test() {
+  let s = build_test_schema()
+  case validation.validate_query("query ($u: User) { users { id } }", s) {
+    Error(errors) -> {
+      let has_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.VariableNotInputType("u", "User") -> True
+            _ -> False
+          }
+        })
+      case has_error {
+        True -> Nil
+        False ->
+          panic as {
+            "Expected VariableNotInputType but got: "
+            <> validation.format_errors(errors)
+          }
+      }
+    }
+    Ok(_) -> panic as "Expected validation error for object-type variable"
+  }
+}
+
+pub fn variable_scalar_type_is_accepted_test() {
+  let s = build_test_schema()
+  case validation.validate_query("query ($id: ID!) { user(id: $id) { name } }", s) {
+    Ok(_) -> Nil
+    Error(errors) ->
+      panic as {
+        "Expected valid query but got: " <> validation.format_errors(errors)
+      }
+  }
+}
+
+pub fn variable_string_type_is_accepted_test() {
+  let s = build_test_schema()
+  case validation.validate_query("query ($n: String) { users { id } }", s) {
+    Ok(_) -> Nil
+    Error(errors) -> {
+      let has_input_type_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.VariableNotInputType(_, _) -> True
+            _ -> False
+          }
+        })
+      case has_input_type_error {
+        True ->
+          panic as {
+            "String should be accepted as input type but got: "
+            <> validation.format_errors(errors)
+          }
+        False -> Nil
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Fragment on non-composite type tests
+// ============================================================================
+
+pub fn fragment_on_scalar_is_rejected_test() {
+  let s = build_test_schema()
+  case
+    validation.validate_query(
+      "{ users { id } } fragment F on String { id }",
+      s,
+    )
+  {
+    Error(errors) -> {
+      let has_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.FragmentOnNonCompositeType("F", "String") -> True
+            _ -> False
+          }
+        })
+      case has_error {
+        True -> Nil
+        False ->
+          panic as {
+            "Expected FragmentOnNonCompositeType but got: "
+            <> validation.format_errors(errors)
+          }
+      }
+    }
+    Ok(_) -> panic as "Expected validation error for fragment on scalar"
+  }
+}
+
+pub fn fragment_on_object_type_is_accepted_test() {
+  let s = build_test_schema()
+  case
+    validation.validate_query(
+      "{ users { ...F } } fragment F on User { id name }",
+      s,
+    )
+  {
+    Ok(_) -> Nil
+    Error(errors) -> {
+      let has_composite_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.FragmentOnNonCompositeType(_, _) -> True
+            _ -> False
+          }
+        })
+      case has_composite_error {
+        True ->
+          panic as {
+            "User should be accepted as composite type but got: "
+            <> validation.format_errors(errors)
+          }
+        False -> Nil
+      }
+    }
+  }
+}
+
+// ============================================================================
+// @skip / @include argument validation tests
+// ============================================================================
+
+pub fn skip_without_if_is_rejected_test() {
+  let s = build_test_schema()
+  case validation.validate_query("{ users { id @skip } }", s) {
+    Error(errors) -> {
+      let has_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.MissingRequiredArgument("@skip", "if") -> True
+            _ -> False
+          }
+        })
+      case has_error {
+        True -> Nil
+        False ->
+          panic as {
+            "Expected MissingRequiredArgument for @skip but got: "
+            <> validation.format_errors(errors)
+          }
+      }
+    }
+    Ok(_) -> panic as "Expected validation error for @skip without if"
+  }
+}
+
+pub fn include_without_if_is_rejected_test() {
+  let s = build_test_schema()
+  case validation.validate_query("{ users { id @include } }", s) {
+    Error(errors) -> {
+      let has_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.MissingRequiredArgument("@include", "if") -> True
+            _ -> False
+          }
+        })
+      case has_error {
+        True -> Nil
+        False ->
+          panic as {
+            "Expected MissingRequiredArgument for @include but got: "
+            <> validation.format_errors(errors)
+          }
+      }
+    }
+    Ok(_) -> panic as "Expected validation error for @include without if"
+  }
+}
+
+pub fn skip_with_boolean_if_is_accepted_test() {
+  let s = build_test_schema()
+  case validation.validate_query("{ users { id @skip(if: true) } }", s) {
+    Ok(_) -> Nil
+    Error(errors) ->
+      panic as {
+        "Expected valid query but got: " <> validation.format_errors(errors)
+      }
+  }
+}
+
+pub fn include_with_variable_if_tracks_variable_test() {
+  let s = build_test_schema()
+  case
+    validation.validate_query(
+      "query ($show: Boolean!) { users { id @include(if: $show) } }",
+      s,
+    )
+  {
+    Ok(_) -> Nil
+    Error(errors) ->
+      panic as {
+        "Expected valid query but got: " <> validation.format_errors(errors)
+      }
+  }
+}
+
+pub fn skip_unknown_argument_is_rejected_test() {
+  let s = build_test_schema()
+  case
+    validation.validate_query("{ users { id @skip(if: true, extra: 1) } }", s)
+  {
+    Error(errors) -> {
+      let has_error =
+        list.any(errors, fn(e) {
+          case e {
+            validation.UnknownArgument("@skip", "extra") -> True
+            _ -> False
+          }
+        })
+      case has_error {
+        True -> Nil
+        False ->
+          panic as {
+            "Expected UnknownArgument for extra arg on @skip but got: "
+            <> validation.format_errors(errors)
+          }
+      }
+    }
+    Ok(_) -> panic as "Expected validation error for unknown @skip argument"
+  }
+}

@@ -371,27 +371,43 @@ fn parse_optional_selection_set(
   }
 }
 
+fn token_as_name(token: lexer.Token) -> Result(String, Nil) {
+  case token {
+    lexer.Name(name) -> Ok(name)
+    lexer.Query -> Ok("query")
+    lexer.Mutation -> Ok("mutation")
+    lexer.Subscription -> Ok("subscription")
+    lexer.Fragment -> Ok("fragment")
+    lexer.On -> Ok("on")
+    lexer.TrueKeyword -> Ok("true")
+    lexer.FalseKeyword -> Ok("false")
+    lexer.NullKeyword -> Ok("null")
+    _ -> Error(Nil)
+  }
+}
+
 fn parse_name_from_parser(
   parser: Parser,
 ) -> Result(#(String, Parser), ParseError) {
   case consume_token(parser) {
-    Ok(#(lexer.TokenWithPosition(lexer.Name(name), _), parser)) ->
-      Ok(#(name, parser))
-    Ok(#(lexer.TokenWithPosition(token, position), _)) ->
-      Error(UnexpectedToken("name", token, position))
+    Ok(#(lexer.TokenWithPosition(token, position), parser)) ->
+      case token_as_name(token) {
+        Ok(name) -> Ok(#(name, parser))
+        Error(_) -> Error(UnexpectedToken("name", token, position))
+      }
     Error(_) -> Error(UnexpectedEOF("name"))
   }
 }
 
-/// Like parse_name_from_parser but also returns the token's source position.
 fn parse_name_with_position(
   parser: Parser,
 ) -> Result(#(String, lexer.Position, Parser), ParseError) {
   case consume_token(parser) {
-    Ok(#(lexer.TokenWithPosition(lexer.Name(name), position), parser)) ->
-      Ok(#(name, position, parser))
-    Ok(#(lexer.TokenWithPosition(token, position), _)) ->
-      Error(UnexpectedToken("name", token, position))
+    Ok(#(lexer.TokenWithPosition(token, position), parser)) ->
+      case token_as_name(token) {
+        Ok(name) -> Ok(#(name, position, parser))
+        Error(_) -> Error(UnexpectedToken("name", token, position))
+      }
     Error(_) -> Error(UnexpectedEOF("name"))
   }
 }

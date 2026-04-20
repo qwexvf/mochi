@@ -307,20 +307,46 @@ fn track_defined_variables(
   ctx: ValidationContext,
   var_defs: List(ast.VariableDefinition),
 ) -> ValidationContext {
-  // Check for duplicate variable definitions
   let #(defined, ctx) =
     list.fold(var_defs, #(set.new(), ctx), fn(acc, var_def) {
       let #(seen, ctx) = acc
-      case set.contains(seen, var_def.variable) {
-        True -> #(seen, add_error(ctx, DuplicateVariable(var_def.variable)))
-        False -> #(set.insert(seen, var_def.variable), ctx)
+      let ctx = case set.contains(seen, var_def.variable) {
+        True -> add_error(ctx, DuplicateVariable(var_def.variable))
+        False -> ctx
       }
+      let type_name = get_ast_base_type_name(var_def.type_)
+      let ctx = case is_input_type(ctx.schema, type_name) {
+        True -> ctx
+        False -> add_error(ctx, VariableNotInputType(var_def.variable, type_name))
+      }
+      #(set.insert(seen, var_def.variable), ctx)
     })
   ValidationContext(
     ..ctx,
     defined_variables: defined,
     used_variables: set.new(),
   )
+}
+
+fn get_ast_base_type_name(t: ast.Type) -> String {
+  case t {
+    ast.NamedType(name) -> name
+    ast.ListType(inner) -> get_ast_base_type_name(inner)
+    ast.NonNullType(inner) -> get_ast_base_type_name(inner)
+  }
+}
+
+fn is_input_type(schema: Schema, type_name: String) -> Bool {
+  case type_name {
+    "String" | "Int" | "Float" | "Boolean" | "ID" -> True
+    _ ->
+      case dict.get(schema.types, type_name) {
+        Ok(schema.ScalarTypeDef(_))
+        | Ok(schema.EnumTypeDef(_))
+        | Ok(schema.InputObjectTypeDef(_)) -> True
+        _ -> False
+      }
+  }
 }
 
 fn validate_unused_variables(ctx: ValidationContext) -> ValidationContext {
@@ -599,20 +625,39 @@ fn validate_fragment_def(
 ) -> ValidationContext {
   let type_name = fragment.type_condition
 
-  // Check if the type exists in the schema
-  let type_exists =
-    type_name == "Query"
+  let is_builtin_scalar = case type_name {
+    "String" | "Int" | "Float" | "Boolean" | "ID" -> True
+    _ -> False
+  }
+  let is_known =
+    is_builtin_scalar
+    || type_name == "Query"
     || type_name == "Mutation"
     || type_name == "Subscription"
     || dict.has_key(ctx.schema.types, type_name)
 
-  let ctx = case type_exists {
+  let ctx = case is_known {
     True -> ctx
     False -> add_error(ctx, InvalidTypeCondition(fragment.name, type_name))
   }
 
-  // Validate directives on the fragment definition
+  let ctx = case is_known && !is_composite_type(ctx.schema, type_name) {
+    True -> add_error(ctx, FragmentOnNonCompositeType(fragment.name, type_name))
+    False -> ctx
+  }
+
   validate_directives(ctx, fragment.directives, "FRAGMENT_DEFINITION")
+}
+
+fn is_composite_type(schema: Schema, type_name: String) -> Bool {
+  case type_name {
+    "Query" | "Mutation" | "Subscription" -> True
+    _ ->
+      case dict.get(schema.types, type_name) {
+        Ok(schema.ObjectTypeDef(_)) -> True
+        _ -> False
+      }
+  }
 }
 
 fn validate_fragment_spread(
@@ -637,6 +682,7 @@ fn validate_fragment_spread(
     Error(_), _ -> add_error(ctx, UndefinedFragment(spread.name))
     Ok(_), True -> ctx
     Ok(fragment), False -> {
+      let outer_type = ctx.current_type
       let fragment_type = get_object_type(ctx.schema, fragment.type_condition)
       let ctx = set_current_type(ctx, fragment_type)
       let ctx =
@@ -645,10 +691,12 @@ fn validate_fragment_spread(
           ..ctx.fragment_spread_path
         ])
       let ctx = validate_selection_set(ctx, fragment.selection_set)
-      ValidationContext(
-        ..ctx,
-        fragment_spread_path: list.drop(ctx.fragment_spread_path, 1),
-      )
+      let ctx =
+        ValidationContext(
+          ..ctx,
+          fragment_spread_path: list.drop(ctx.fragment_spread_path, 1),
+        )
+      set_current_type(ctx, outer_type)
     }
   }
 }
@@ -662,9 +710,13 @@ fn validate_inline_fragment(
 
   case inline.type_condition {
     Some(type_name) -> {
+      let outer_type = ctx.current_type
       let inner_type = get_object_type(ctx.schema, type_name)
-      let ctx = set_current_type(ctx, inner_type)
-      validate_selection_set(ctx, inline.selection_set)
+      let nested_ctx =
+        ctx
+        |> set_current_type(inner_type)
+        |> validate_selection_set(inline.selection_set)
+      set_current_type(nested_ctx, outer_type)
     }
     None -> validate_selection_set(ctx, inline.selection_set)
   }
@@ -773,9 +825,9 @@ fn validate_single_directive(
   // Built-in directives: skip, include, deprecated, specifiedBy
   case directive.name {
     "skip" | "include" ->
-      // These are valid on FIELD, FRAGMENT_SPREAD, INLINE_FRAGMENT
       case location {
-        "FIELD" | "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" -> ctx
+        "FIELD" | "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" ->
+          validate_skip_include_args(ctx, directive)
         _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     "deprecated" ->
@@ -837,6 +889,23 @@ fn is_repeatable_directive(schema: Schema, directive_name: String) -> Bool {
         Ok(directive_def) -> directive_def.is_repeatable
         Error(_) -> False
       }
+  }
+}
+
+fn validate_skip_include_args(
+  ctx: ValidationContext,
+  directive: ast.Directive,
+) -> ValidationContext {
+  let ctx =
+    list.fold(directive.arguments, ctx, fn(ctx, arg) {
+      case arg.name {
+        "if" -> track_value_variables(ctx, arg.value)
+        _ -> add_error(ctx, UnknownArgument("@" <> directive.name, arg.name))
+      }
+    })
+  case list.find(directive.arguments, fn(a) { a.name == "if" }) {
+    Error(_) -> add_error(ctx, MissingRequiredArgument("@" <> directive.name, "if"))
+    Ok(_) -> ctx
   }
 }
 

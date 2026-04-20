@@ -83,6 +83,7 @@ fn test_schema() -> schema.Schema {
       #("CreateUserInput", schema.InputObjectTypeDef(create_user_input)),
     ]),
     directives: dict.new(),
+    document_cache: None,
   )
 }
 
