@@ -429,4 +429,3 @@ pub fn load_many_skips_cached_keys_test() {
   let #(_final, results) = dataloader.load_many(loader2, [1, 2, 3])
   should.equal(results, [Ok(10), Ok(20), Ok(30)])
 }
-
