@@ -1,0 +1,1 @@
+-record(named, {name :: binary()}).

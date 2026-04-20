@@ -1,0 +1,1 @@
+-record(document_cache, {inner :: mochi@document_cache:cache_inner()}).

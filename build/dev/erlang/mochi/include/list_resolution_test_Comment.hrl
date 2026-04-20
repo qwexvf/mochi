@@ -1,0 +1,1 @@
+-record(comment, {id :: binary(), body :: binary()}).

@@ -1,0 +1,7 @@
+{application, rank, [
+    {vsn, "1.0.0"},
+    {applications, [gleam_stdlib]},
+    {description, "Ordinals for numbers, e.g. 1st, 2nd, 3rd"},
+    {modules, []},
+    {registered, []}
+]}.

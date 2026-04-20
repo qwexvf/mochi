@@ -1,0 +1,1 @@
+-record(book, {id :: binary(), title :: binary(), author_id :: binary()}).

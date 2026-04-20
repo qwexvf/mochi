@@ -1,0 +1,1 @@
+-record(dog, {name :: binary()}).

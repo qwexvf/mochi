@@ -1,0 +1,1 @@
+-record(author, {id :: binary(), name :: binary()}).

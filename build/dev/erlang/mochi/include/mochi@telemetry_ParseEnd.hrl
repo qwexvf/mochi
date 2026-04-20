@@ -1,0 +1,1 @@
+-record(parse_end, {timestamp :: integer(), success :: boolean()}).

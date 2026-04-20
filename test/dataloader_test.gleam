@@ -429,3 +429,33 @@ pub fn load_many_skips_cached_keys_test() {
   let #(_final, results) = dataloader.load_many(loader2, [1, 2, 3])
   should.equal(results, [Ok(10), Ok(20), Ok(30)])
 }
+
+pub fn load_many_duplicate_keys_test() {
+  let loader =
+    dataloader.new(fn(keys: List(Int)) {
+      // Duplicate keys must be deduplicated — batch gets [1, 2], not [1, 1, 2]
+      should.equal(keys, [1, 2])
+      Ok(list.map(keys, fn(k) { Ok(k * 10) }))
+    })
+
+  let #(_loader, results) = dataloader.load_many(loader, [1, 1, 2])
+  should.equal(results, [Ok(10), Ok(10), Ok(20)])
+}
+
+pub fn load_many_respects_max_batch_size_test() {
+  // With max_batch_size: 2 and 4 keys, the batch function must be called twice
+  let call_count = types.to_dynamic(0)
+  let _ = call_count
+  let opts =
+    dataloader.DataLoaderOptions(max_batch_size: 2, cache_enabled: True)
+  let loader =
+    dataloader.new_with_options(
+      fn(keys: List(Int)) {
+        should.be_true(list.length(keys) <= 2)
+        Ok(list.map(keys, fn(k) { Ok(k) }))
+      },
+      opts,
+    )
+  let #(_loader, results) = dataloader.load_many(loader, [1, 2, 3, 4])
+  should.equal(results, [Ok(1), Ok(2), Ok(3), Ok(4)])
+}

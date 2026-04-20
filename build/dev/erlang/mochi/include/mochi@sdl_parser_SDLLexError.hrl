@@ -1,0 +1,1 @@
+-record(s_d_l_lex_error, {error :: mochi@sdl_lexer:s_d_l_lexer_error()}).

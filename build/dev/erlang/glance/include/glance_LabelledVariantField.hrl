@@ -1,0 +1,1 @@
+-record(labelled_variant_field, {item :: glance:type(), label :: binary()}).

@@ -1,0 +1,1 @@
+-record(position, {line :: integer(), column :: integer()}).

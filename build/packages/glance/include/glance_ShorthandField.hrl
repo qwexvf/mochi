@@ -1,0 +1,1 @@
+-record(shorthand_field, {label :: binary(), location :: glance:span()}).

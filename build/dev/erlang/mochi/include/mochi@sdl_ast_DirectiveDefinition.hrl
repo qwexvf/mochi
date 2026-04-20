@@ -1,0 +1,1 @@
+-record(directive_definition, {directive_def :: mochi@sdl_ast:directive_def()}).

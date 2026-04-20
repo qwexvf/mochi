@@ -1,0 +1,1 @@
+-record(category, {id :: binary(), name :: binary(), slug :: binary()}).

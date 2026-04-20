@@ -1,0 +1,1 @@
+-record(duplicate_argument, {field_name :: binary(), argument_name :: binary()}).

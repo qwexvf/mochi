@@ -1,0 +1,1 @@
+-record(cannot_find_project_root, {reason :: simplifile:file_error()}).

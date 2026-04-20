@@ -1,0 +1,1 @@
+-record(enum_type_def, {enum_type :: mochi@schema:enum_type()}).

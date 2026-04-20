@@ -14,7 +14,7 @@ pub fn default_options() -> DataLoaderOptions {
   DataLoaderOptions(max_batch_size: 100, cache_enabled: True)
 }
 
-pub type DataLoaderState(key, value) {
+type DataLoaderState(key, value) {
   DataLoaderState(
     batch_load_fn: BatchLoadFn(key, value),
     options: DataLoaderOptions,
@@ -83,49 +83,50 @@ pub fn load_many(
             })
           #(loader, results)
         }
-        _ ->
-          case state.batch_load_fn(unique_uncached) {
-            Error(e) -> {
-              let err = Error("Batch load failed: " <> e)
+        _ -> {
+          let chunks =
+            list.sized_chunk(unique_uncached, state.options.max_batch_size)
+          case
+            list.try_map(chunks, fn(chunk) {
+              case state.batch_load_fn(chunk) {
+                Error(e) -> Error("Batch load failed: " <> e)
+                Ok(results) ->
+                  case list.length(results) == list.length(chunk) {
+                    False -> Error("Batch returned wrong number of results")
+                    True -> Ok(list.zip(chunk, results))
+                  }
+              }
+            })
+          {
+            Error(e) -> #(
+              loader,
+              list.map(keys, fn(k) {
+                case dict.get(result_map, k) {
+                  Ok(r) -> r
+                  Error(_) -> Error(e)
+                }
+              }),
+            )
+            Ok(pairs_per_chunk) -> {
+              let fresh = dict.from_list(list.flatten(pairs_per_chunk))
+              let new_cache = case state.options.cache_enabled {
+                True -> dict.merge(state.cache, fresh)
+                False -> state.cache
+              }
+              let new_loader =
+                DataLoader(DataLoaderState(..state, cache: new_cache))
+              let all_results = dict.merge(result_map, fresh)
               let results =
                 list.map(keys, fn(k) {
-                  case dict.get(result_map, k) {
+                  case dict.get(all_results, k) {
                     Ok(r) -> r
-                    Error(_) -> err
+                    Error(_) -> Error("Key not found in batch results")
                   }
                 })
-              #(loader, results)
+              #(new_loader, results)
             }
-            Ok(batch_results) ->
-              case list.length(batch_results) == list.length(unique_uncached) {
-                False -> #(
-                  loader,
-                  list.repeat(
-                    Error("Batch returned wrong number of results"),
-                    list.length(keys),
-                  ),
-                )
-                True -> {
-                  let fresh =
-                    dict.from_list(list.zip(unique_uncached, batch_results))
-                  let new_cache = case state.options.cache_enabled {
-                    True -> dict.merge(state.cache, fresh)
-                    False -> state.cache
-                  }
-                  let new_loader =
-                    DataLoader(DataLoaderState(..state, cache: new_cache))
-                  let all_results = dict.merge(result_map, fresh)
-                  let results =
-                    list.map(keys, fn(k) {
-                      case dict.get(all_results, k) {
-                        Ok(r) -> r
-                        Error(_) -> Error("Key not found in batch results")
-                      }
-                    })
-                  #(new_loader, results)
-                }
-              }
           }
+        }
       }
     }
   }
@@ -232,16 +233,13 @@ pub fn int_batch_loader(
   batch_lookup: fn(List(Int)) -> Result(List(Dynamic), String),
 ) -> DataLoader(Dynamic, Dynamic) {
   new(fn(keys: List(Dynamic)) {
-    let int_keys =
-      list.filter_map(keys, fn(key) {
-        case decode.run(key, decode.int) {
-          Ok(id) -> Ok(id)
-          Error(_) -> Error(Nil)
+    case list.try_map(keys, fn(key) { decode.run(key, decode.int) }) {
+      Error(_) -> Error("int_batch_loader: key is not an integer")
+      Ok(int_keys) ->
+        case batch_lookup(int_keys) {
+          Ok(results) -> Ok(list.map(results, Ok))
+          Error(e) -> Error(e)
         }
-      })
-    case batch_lookup(int_keys) {
-      Ok(results) -> Ok(list.map(results, Ok))
-      Error(e) -> Error(e)
     }
   })
 }
@@ -250,16 +248,13 @@ pub fn string_batch_loader(
   batch_lookup: fn(List(String)) -> Result(List(Dynamic), String),
 ) -> DataLoader(Dynamic, Dynamic) {
   new(fn(keys: List(Dynamic)) {
-    let string_keys =
-      list.filter_map(keys, fn(key) {
-        case decode.run(key, decode.string) {
-          Ok(s) -> Ok(s)
-          Error(_) -> Error(Nil)
+    case list.try_map(keys, fn(key) { decode.run(key, decode.string) }) {
+      Error(_) -> Error("string_batch_loader: key is not a string")
+      Ok(string_keys) ->
+        case batch_lookup(string_keys) {
+          Ok(results) -> Ok(list.map(results, Ok))
+          Error(e) -> Error(e)
         }
-      })
-    case batch_lookup(string_keys) {
-      Ok(results) -> Ok(list.map(results, Ok))
-      Error(e) -> Error(e)
     }
   })
 }

@@ -1,0 +1,21 @@
+{application, birdie, [
+    {vsn, "1.5.5"},
+    {applications, [argv,
+                    edit_distance,
+                    envoy,
+                    filepath,
+                    glance,
+                    gleam_community_ansi,
+                    gleam_json,
+                    gleam_stdlib,
+                    global_value,
+                    justin,
+                    rank,
+                    simplifile,
+                    term_size,
+                    tom,
+                    trie_again]},
+    {description, "🐦‍⬛ Snapshot testing in Gleam"},
+    {modules, []},
+    {registered, []}
+]}.

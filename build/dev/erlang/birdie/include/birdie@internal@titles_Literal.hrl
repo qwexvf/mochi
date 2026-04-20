@@ -1,0 +1,1 @@
+-record(literal, {info :: birdie@internal@titles:test_info()}).

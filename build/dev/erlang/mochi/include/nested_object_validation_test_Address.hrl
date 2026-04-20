@@ -1,0 +1,1 @@
+-record(address, {street :: binary(), city :: binary(), zip :: binary()}).

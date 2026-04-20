@@ -1,0 +1,1 @@
+-record(object_type_definition, {object_def :: mochi@sdl_ast:object_type_def()}).

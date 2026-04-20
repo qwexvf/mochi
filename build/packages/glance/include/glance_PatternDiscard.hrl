@@ -1,0 +1,1 @@
+-record(pattern_discard, {location :: glance:span(), name :: binary()}).

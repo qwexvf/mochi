@@ -1,0 +1,1 @@
+-record(test_user, {id :: binary(), name :: binary(), age :: integer()}).

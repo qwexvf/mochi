@@ -1,0 +1,1 @@
+-record(definition, {attributes :: list(glance:attribute()), definition :: any()}).

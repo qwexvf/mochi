@@ -1,0 +1,1 @@
+-record(negate_bool, {location :: glance:span(), value :: glance:expression()}).

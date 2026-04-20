@@ -1,0 +1,1 @@
+-record(schema_operation_start, {operation_name :: gleam@option:option(binary())}).

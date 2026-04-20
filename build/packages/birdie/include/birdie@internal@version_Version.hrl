@@ -1,0 +1,1 @@
+-record(version, {major :: integer(), minor :: integer(), patch :: integer()}).

@@ -1,0 +1,1 @@
+-record(duplicate_fragment_name, {name :: binary()}).

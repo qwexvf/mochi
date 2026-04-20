@@ -1,0 +1,1 @@
+-record(profile, {bio :: binary(), website :: binary()}).

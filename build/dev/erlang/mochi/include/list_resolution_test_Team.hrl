@@ -1,0 +1,1 @@
+-record(team, {id :: binary(), name :: binary()}).

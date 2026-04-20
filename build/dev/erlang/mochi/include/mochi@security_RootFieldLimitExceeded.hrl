@@ -1,0 +1,1 @@
+-record(root_field_limit_exceeded, {count :: integer(), max :: integer()}).

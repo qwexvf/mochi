@@ -1,0 +1,1 @@
+-record(depth_limit_exceeded, {depth :: integer(), max :: integer()}).
