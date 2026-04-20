@@ -86,41 +86,72 @@ pub fn main() {
 
 Mochi is built for performance on the BEAM VM.
 
-**Test System:** AMD Ryzen 7 PRO 7840U (8 cores, 16 threads) | 64GB RAM | 4 threads / 100 connections / 10s | Docker containers for competitors
+**Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · Docker containers for JS competitors
 
-### Simple Query: `{ users { id name } }`
+The benchmark runs two rounds so the comparison is fair: once with **no document cache** on any framework, and once with **document cache enabled** on all frameworks (Apollo and Mercurius cache by default; Yoga gets `documentStore: new Map()`; mochi uses ETS).
 
-| Server | Runtime | Req/sec | Latency (avg) |
-|--------|---------|---------|---------------|
-| **Mochi** | Gleam/Erlang | **105,182** | **1.09ms** |
-| **Bun + Yoga** | Bun | 16,059 | 6.21ms |
-| **Mercurius** | Node.js + Fastify | 12,733 | 8.31ms |
-| **GraphQL Yoga** | Node.js | 11,308 | 9.50ms |
-| **Apollo Server** | Node.js | 8,381 | 13.11ms |
+### No document cache — parse + validate + execute every request
 
-### Medium Query: `{ users { id name email posts { id title } } }`
+#### Simple query: `{ users { id name } }`
 
-| Server | Runtime | Req/sec | Latency (avg) |
-|--------|---------|---------|---------------|
-| **Mochi** | Gleam/Erlang | **29,395** | **3.53ms** |
-| **Bun + Yoga** | Bun | 7,827 | 12.76ms |
-| **GraphQL Yoga** | Node.js | 5,744 | 27.23ms |
-| **Mercurius** | Node.js + Fastify | 5,358 | 27.21ms |
-| **Apollo Server** | Node.js | 3,080 | 57.13ms |
+| Server | Runtime | Req/sec | Latency |
+|--------|---------|---------|---------|
+| **mochi** | Gleam / BEAM | **75,690** | **1.38ms** |
+| bun + yoga | Bun | 14,365 | 6.95ms |
+| yoga (node) | Node.js | 11,709 | 9.06ms |
+| mercurius | Node.js + Fastify | 5,494 | 21.09ms |
+| apollo | Node.js | 4,021 | 30.32ms |
 
-Mochi is **6.5× faster than bun+yoga** (fastest JS competitor) and **12.5× faster than Apollo** on a simple query. The gap widens on complex queries due to the ETS-backed parse cache — repeated queries are parsed once and served from memory on every subsequent request.
+#### Medium query: `{ users { id name email posts { id title } } }`
 
-Key reasons:
-- **Parse caching** — ETS-backed document cache avoids re-parsing identical queries
-- **BEAM concurrency** — lightweight processes handle 100 connections with no thread overhead
-- **Type safety** — full compile-time guarantees from Gleam
-- **Zero N+1** — built-in DataLoader support
+| Server | Runtime | Req/sec | Latency |
+|--------|---------|---------|---------|
+| **mochi** | Gleam / BEAM | **20,554** | **4.98ms** |
+| bun + yoga | Bun | 8,263 | 12.08ms |
+| yoga (node) | Node.js | 5,366 | 20.40ms |
+| mercurius | Node.js + Fastify | 3,103 | 44.17ms |
+| apollo | Node.js | 2,132 | 78.53ms |
 
-Run benchmarks yourself:
+### With document cache — skip parse + validate on repeated queries
+
+#### Simple query: `{ users { id name } }`
+
+| Server | Runtime | Req/sec | Latency |
+|--------|---------|---------|---------|
+| **mochi** | Gleam / BEAM | **76,106** | **1.39ms** |
+| bun + yoga | Bun | 14,667 | 6.81ms |
+| mercurius | Node.js + Fastify | 13,213 | 10.00ms |
+| yoga (node) | Node.js | 11,408 | 9.87ms |
+| apollo | Node.js | 8,069 | 14.61ms |
+
+#### Medium query: `{ users { id name email posts { id title } } }`
+
+| Server | Runtime | Req/sec | Latency |
+|--------|---------|---------|---------|
+| **mochi** | Gleam / BEAM | **19,355** | **5.39ms** |
+| bun + yoga | Bun | 7,834 | 12.73ms |
+| yoga (node) | Node.js | 5,415 | 22.15ms |
+| mercurius | Node.js + Fastify | 5,345 | 28.73ms |
+| apollo | Node.js | 3,044 | 60.34ms |
+
+### Why mochi is fast — even without cache
+
+The notable result is that mochi's numbers barely change between the two rounds (~75k vs ~76k req/s on simple queries). Parse and validation are a negligible fraction of mochi's request budget. The JS frameworks gain 2–3× from caching because their parse/validate overhead is large relative to execution.
+
+**BEAM scheduler vs. single-threaded JS event loop.** Node.js serialises all requests through one event loop. The BEAM runs a scheduler per CPU core, each handling thousands of lightweight processes simultaneously. Under 100 concurrent connections mochi saturates all cores; Node cannot without clustering.
+
+**No shared-heap GC pauses.** Every request on the BEAM lives in its own process heap. When a request finishes, that heap is reclaimed instantly — no stop-the-world pause. V8 has a single shared heap across all in-flight requests, so GC pauses add latency spikes for every request in flight.
+
+**Flat execution path.** Gleam pattern matching on union types compiles to native BEAM tagged-tuple dispatch. There are no promise chains, middleware stacks, or resolver-wrapping layers. The code path from HTTP request to response is essentially a tight recursive descent.
+
+**Executor optimised for the hot path.** Each field in a selection set previously built a single-entry `Dict`, accumulated them into a list, then merged the list with a second decode pass. That is now a single `Dict` accumulation — one pass, no merge. Error lists use cons + flatten instead of O(n) `list.append` per field. Fragment cycle detection uses a `Set` instead of a `List` scan.
+
+### Running the benchmarks
+
 ```bash
-cd mochi_wisp/benchmark  # from mochi-examples repo
-docker compose up -d --build
-./run-host-bench.sh
+# from the mochi-examples repo
+cd mochi_wisp/benchmark
+./run-host-bench.sh   # runs both rounds automatically
 ```
 
 ## Features
