@@ -500,18 +500,27 @@ case security.validate(document, security.default_config()) {
 }
 ```
 
-### Persisted Queries (`mochi_apq`)
+### Persisted Queries (`mochi/apq`)
 
-Automatic Persisted Queries (APQ) for caching and bandwidth reduction. Requires the `mochi_apq` package.
+Automatic Persisted Queries (APQ) are built into the core. Clients send a SHA256 hash instead of the full query string — useful for reducing bandwidth on mobile or high-latency networks.
 
 ```gleam
-import mochi_apq
+import mochi/apq
 
-let store = mochi_apq.new()
-let #(store, hash) = mochi_apq.register(store, "{ users { id name } }")
-case mochi_apq.lookup(store, hash) {
-  Some(query) -> execute(query)
-  None -> error_response("PersistedQueryNotFound")
+let store = apq.new()
+
+// Client sends hash + full query on first request
+case apq.process(store, Some("{ users { id name } }"), hash) {
+  Ok(#(store, query)) -> execute(query)
+  Error(apq.NotFound) -> error_response("PersistedQueryNotFound")
+  Error(apq.HashMismatch(..)) -> error_response("InvalidHash")
+}
+
+// Client sends only hash on subsequent requests
+case apq.process(store, None, hash) {
+  Ok(#(store, query)) -> execute(query)
+  Error(apq.NotFound) -> error_response("PersistedQueryNotFound")
+  Error(_) -> error_response("InvalidHash")
 }
 ```
 
@@ -680,7 +689,7 @@ mochi_relay = { git = "https://github.com/qwexvf/mochi_relay", ref = "main" }   
 mochi_websocket = { git = "https://github.com/qwexvf/mochi_websocket", ref = "main" } # WebSocket subscriptions (graphql-ws)
 mochi_upload = { git = "https://github.com/qwexvf/mochi_upload", ref = "main" }      # Multipart file uploads
 mochi_codegen = { git = "https://github.com/qwexvf/mochi_codegen", ref = "main" }    # SDL + TypeScript codegen + GraphiQL
-mochi_apq = { git = "https://github.com/qwexvf/mochi_apq", ref = "main" }            # Automatic Persisted Queries
+mochi_apq = { git = "https://github.com/qwexvf/mochi_apq", ref = "main" }            # Automatic Persisted Queries (deprecated — now built into mochi core as mochi/apq)
 ```
 
 ```
