@@ -191,7 +191,6 @@ pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
       |> error.with_category(error.ResolverErrorCategory)
       |> maybe_with_location(location)
     executor.RichResolverError(
-      message: _,
       graphql_error: gql_err,
       path: err_path,
       location: location,

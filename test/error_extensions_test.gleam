@@ -2,7 +2,6 @@ import gleam/dict
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{None, Some}
-import gleam/result
 import gleam/string
 import gleeunit/should
 import mochi/error
@@ -20,24 +19,16 @@ pub fn extensions_serialized_in_json_test() {
 
   let json = response.to_json(response.failure([err]))
 
-  case
-    string.contains(json, "\"extensions\""),
-    string.contains(json, "NOT_FOUND"),
-    string.contains(json, "12345")
-  {
-    True, True, True -> Nil
-    _, _, _ -> panic as "extensions not serialized correctly"
-  }
+  should.be_true(string.contains(json, "\"extensions\""))
+  should.be_true(string.contains(json, "NOT_FOUND"))
+  should.be_true(string.contains(json, "12345"))
 }
 
 pub fn no_extensions_omits_field_test() {
   let err = error.error("Simple error")
   let json = response.to_json(response.failure([err]))
 
-  case string.contains(json, "\"extensions\"") {
-    False -> Nil
-    True -> panic as "extensions field should be omitted when None"
-  }
+  should.be_false(string.contains(json, "\"extensions\""))
 }
 
 pub fn with_code_helper_test() {
@@ -45,14 +36,8 @@ pub fn with_code_helper_test() {
     error.error("Not found")
     |> error.with_code("USER_NOT_FOUND")
 
-  case err.extensions {
-    Some(ext) ->
-      case dict.get(ext, "code") {
-        Ok(_) -> Nil
-        Error(_) -> panic as "code key missing from extensions"
-      }
-    None -> panic as "extensions should not be None"
-  }
+  let assert Some(ext) = err.extensions
+  should.be_ok(dict.get(ext, "code"))
 }
 
 pub fn error_code_type_test() {
@@ -60,19 +45,10 @@ pub fn error_code_type_test() {
     error.error("Unauthorized")
     |> error.with_error_code(error.Unauthorized)
 
-  case err.extensions {
-    Some(ext) ->
-      case dict.get(ext, "code") {
-        Ok(v) ->
-          case decode.run(v, decode.string) {
-            Ok("UNAUTHORIZED") -> Nil
-            Ok(other) -> panic as { "expected UNAUTHORIZED, got: " <> other }
-            Error(_) -> panic as "code value not a string"
-          }
-        Error(_) -> panic as "code key missing"
-      }
-    None -> panic as "extensions should not be None"
-  }
+  let assert Some(ext) = err.extensions
+  let assert Ok(v) = dict.get(ext, "code")
+  decode.run(v, decode.string)
+  |> should.equal(Ok("UNAUTHORIZED"))
 }
 
 pub fn code_to_string_covers_all_codes_test() {
@@ -85,16 +61,7 @@ pub fn code_to_string_covers_all_codes_test() {
   ]
   list.each(pairs, fn(pair) {
     let #(code, expected) = pair
-    case error.code_to_string(code) == expected {
-      True -> Nil
-      False ->
-        panic as {
-          "code_to_string mismatch for "
-          <> expected
-          <> " got "
-          <> error.code_to_string(code)
-        }
-    }
+    should.equal(error.code_to_string(code), expected)
   })
 }
 
@@ -105,19 +72,9 @@ pub fn to_payload_preserves_message_and_extensions_test() {
 
   let #(msg, extensions) = error.to_payload(err)
 
-  case msg == "Test payload" {
-    True -> Nil
-    False -> panic as "message should be preserved in payload"
-  }
-
-  case extensions {
-    Some(ext) ->
-      case dict.has_key(ext, "code") {
-        True -> Nil
-        False -> panic as "extensions should have code key"
-      }
-    None -> panic as "extensions should not be None"
-  }
+  should.equal(msg, "Test payload")
+  let assert Some(ext) = extensions
+  should.be_true(dict.has_key(ext, "code"))
 }
 
 pub fn rich_resolver_surfaces_extensions_in_response_test() {
@@ -148,32 +105,14 @@ pub fn rich_resolver_surfaces_extensions_in_response_test() {
 
   let result = executor.execute_query(user_schema, "{ user { id name } }")
 
-  case result.errors {
-    [] -> panic as "expected a resolver error"
-    [err, ..] -> {
-      let gql_err = response.execution_error_to_graphql_error(err)
-      case gql_err.message == "User not found" {
-        True -> Nil
-        False -> panic as { "unexpected message: " <> gql_err.message }
-      }
-      case gql_err.extensions {
-        Some(ext) ->
-          case dict.get(ext, "code") {
-            Ok(v) ->
-              case decode.run(v, decode.string) {
-                Ok("NOT_FOUND") -> Nil
-                Ok(other) ->
-                  panic as {
-                    "expected NOT_FOUND in extensions, got: " <> other
-                  }
-                Error(_) -> panic as "code value not a string"
-              }
-            Error(_) -> panic as "extensions should have code key"
-          }
-        None -> panic as "rich resolver error should carry extensions"
-      }
-    }
-  }
+  let assert [err, ..] = result.errors
+  let gql_err = response.execution_error_to_graphql_error(err)
+  should.equal(gql_err.message, "User not found")
+
+  let assert Some(ext) = gql_err.extensions
+  let assert Ok(v) = dict.get(ext, "code")
+  decode.run(v, decode.string)
+  |> should.equal(Ok("NOT_FOUND"))
 }
 
 pub fn rich_resolver_ok_path_works_test() {
@@ -198,15 +137,8 @@ pub fn rich_resolver_ok_path_works_test() {
 
   let result = executor.execute_query(user_schema, "{ user { id name } }")
 
-  case result.errors {
-    [] -> Nil
-    _ -> panic as "expected no errors"
-  }
-
-  case result.data {
-    Some(_) -> Nil
-    None -> panic as "expected data"
-  }
+  should.equal(result.errors, [])
+  should.be_true(result.data != None)
 }
 
 pub fn rich_resolver_error_path_uses_executor_path_test() {
@@ -237,18 +169,9 @@ pub fn rich_resolver_error_path_uses_executor_path_test() {
 
   let result = executor.execute_query(user_schema, "{ user { id } }")
 
-  case result.errors {
-    [err] -> {
-      let gql = response.execution_error_to_graphql_error(err)
-      case gql.path {
-        Some([error.FieldSegment("user")]) -> Nil
-        Some(path) ->
-          panic as { "expected path [user], got: " <> string.inspect(path) }
-        None -> panic as "expected path to be set"
-      }
-    }
-    _ -> panic as "expected exactly one error"
-  }
+  let assert [err] = result.errors
+  let gql = response.execution_error_to_graphql_error(err)
+  should.equal(gql.path, Some([error.FieldSegment("user")]))
 }
 
 pub fn with_extension_merges_with_existing_extensions_test() {
@@ -257,13 +180,9 @@ pub fn with_extension_merges_with_existing_extensions_test() {
     |> error.with_code("CODE_A")
     |> error.with_extension("extra", types.to_dynamic("val"))
 
-  case err.extensions {
-    Some(ext) -> {
-      should.be_true(dict.has_key(ext, "code"))
-      should.be_true(dict.has_key(ext, "extra"))
-    }
-    None -> panic as "extensions should not be None"
-  }
+  let assert Some(ext) = err.extensions
+  should.be_true(dict.has_key(ext, "code"))
+  should.be_true(dict.has_key(ext, "extra"))
 }
 
 pub fn with_extensions_replaces_all_extensions_test() {
@@ -274,18 +193,8 @@ pub fn with_extensions_replaces_all_extensions_test() {
       dict.from_list([#("code", types.to_dynamic("NEW"))]),
     )
 
-  case err.extensions {
-    Some(ext) ->
-      case
-        decode.run(
-          dict.get(ext, "code") |> result.unwrap(types.to_dynamic(Nil)),
-          decode.string,
-        )
-      {
-        Ok("NEW") -> Nil
-        Ok(other) -> panic as { "expected NEW, got: " <> other }
-        Error(_) -> panic as "code not a string"
-      }
-    None -> panic as "extensions should not be None"
-  }
+  let assert Some(ext) = err.extensions
+  let assert Ok(v) = dict.get(ext, "code")
+  decode.run(v, decode.string)
+  |> should.equal(Ok("NEW"))
 }

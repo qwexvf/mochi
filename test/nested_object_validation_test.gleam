@@ -239,7 +239,8 @@ pub fn sibling_field_after_nested_object_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -252,7 +253,8 @@ pub fn sibling_field_before_nested_object_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -265,7 +267,8 @@ pub fn multiple_sibling_fields_after_nested_object_are_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -279,7 +282,8 @@ pub fn two_nested_objects_then_sibling_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -292,7 +296,8 @@ pub fn nested_object_only_no_siblings_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -353,7 +358,8 @@ pub fn deeply_nested_object_with_sibling_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -368,7 +374,8 @@ pub fn sibling_after_nested_at_depth_two_is_valid_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -383,7 +390,8 @@ pub fn equity_and_gto_deviation_both_resolve_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
   case result.data {
@@ -400,7 +408,8 @@ pub fn user_siblings_after_nested_address_resolve_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
   case result.data {
@@ -561,7 +570,8 @@ pub fn product_nested_category_then_scalar_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
   case result.data {
@@ -578,7 +588,8 @@ pub fn scalar_then_nested_category_then_more_scalars_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -592,7 +603,8 @@ pub fn order_list_object_then_scalar_siblings_validation_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -606,7 +618,8 @@ pub fn order_scalars_before_and_after_list_object_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -751,7 +764,8 @@ pub fn three_level_deep_nesting_with_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
   case result.data {
@@ -769,7 +783,8 @@ pub fn siblings_after_nested_object_at_depth_two_org_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -796,7 +811,8 @@ pub fn alias_on_nested_object_and_sibling_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -810,7 +826,8 @@ pub fn multiple_aliases_on_different_fields_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -825,7 +842,8 @@ pub fn typename_inside_nested_object_then_parent_sibling_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -838,7 +856,8 @@ pub fn typename_on_parent_and_in_nested_object_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -867,7 +886,8 @@ pub fn named_fragment_with_nested_and_scalar_fields_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -898,7 +918,8 @@ pub fn named_fragment_on_nested_type_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -923,7 +944,8 @@ pub fn named_fragment_sibling_after_spread_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -939,7 +961,8 @@ pub fn inline_fragment_on_nested_type_then_sibling_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -952,7 +975,8 @@ pub fn inline_fragment_without_type_condition_in_nested_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -994,7 +1018,8 @@ pub fn mutation_returning_nested_type_with_siblings_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
   case result.data {
@@ -1014,7 +1039,8 @@ pub fn same_nested_type_reused_with_siblings_between_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
@@ -1027,12 +1053,23 @@ pub fn interleaved_nested_and_scalar_fields_test() {
     [] -> Nil
     errs ->
       panic as {
-        "Expected no errors but got: " <> string_join(errs, fn(e) { e.message })
+        "Expected no errors but got: "
+        <> string_join(errs, fn(e) { execution_error_message(e) })
       }
   }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn execution_error_message(err: executor.ExecutionError) -> String {
+  case err {
+    executor.ResolverError(message: m, ..)
+    | executor.ValidationError(message: m, ..)
+    | executor.TypeError(message: m, ..)
+    | executor.NullValueError(message: m, ..) -> m
+    executor.RichResolverError(graphql_error: e, ..) -> e.message
+  }
+}
 
 fn string_join(items: List(a), f: fn(a) -> String) -> String {
   case items {

@@ -55,7 +55,6 @@ pub type ExecutionError {
     location: Option(#(Int, Int)),
   )
   RichResolverError(
-    message: String,
     graphql_error: graphql_error.GraphQLError,
     path: List(String),
     location: Option(#(Int, Int)),
@@ -138,12 +137,7 @@ fn rich_resolver_error_at(
   path: List(String),
   loc: Option(#(Int, Int)),
 ) -> ExecutionResult {
-  error_result(RichResolverError(
-    message: err.message,
-    graphql_error: err,
-    path: path,
-    location: loc,
-  ))
+  error_result(RichResolverError(graphql_error: err, path: path, location: loc))
 }
 
 // ============================================================================

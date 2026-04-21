@@ -152,7 +152,16 @@ pub fn schema_guards_order_first_checked_first_test() {
   // The first guard in the list (guard_a) should be checked first
   let has_guard_a_error =
     result.errors
-    |> list.any(fn(err) { err.message == "Guard A failed" })
+    |> list.any(fn(err) {
+      case err {
+        executor.ResolverError(message: m, ..)
+        | executor.ValidationError(message: m, ..)
+        | executor.TypeError(message: m, ..)
+        | executor.NullValueError(message: m, ..) -> m == "Guard A failed"
+        executor.RichResolverError(graphql_error: e, ..) ->
+          e.message == "Guard A failed"
+      }
+    })
   should.be_true(has_guard_a_error)
 }
 
@@ -322,7 +331,15 @@ pub fn guard_error_message_preserved_test() {
   let has_admin_error =
     result.errors
     |> list.any(fn(err) {
-      err.message == "You must be an admin to access this resource"
+      case err {
+        executor.ResolverError(message: m, ..)
+        | executor.ValidationError(message: m, ..)
+        | executor.TypeError(message: m, ..)
+        | executor.NullValueError(message: m, ..) ->
+          m == "You must be an admin to access this resource"
+        executor.RichResolverError(graphql_error: e, ..) ->
+          e.message == "You must be an admin to access this resource"
+      }
     })
   should.be_true(has_admin_error)
 }
