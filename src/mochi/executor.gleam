@@ -1939,6 +1939,55 @@ fn get_introspection_schema_type() -> schema.ObjectType {
   )
 }
 
+fn make_include_deprecated_arg() -> schema.ArgumentDefinition {
+  schema.ArgumentDefinition(
+    name: "includeDeprecated",
+    description: None,
+    arg_type: schema.boolean_type(),
+    default_value: Some(types.to_dynamic(False)),
+  )
+}
+
+fn make_introspection_field_with_include_deprecated(
+  field_name: String,
+  data_key: String,
+  all_data_key: String,
+  field_type: schema.FieldType,
+) -> schema.FieldDefinition {
+  schema.FieldDefinition(
+    name: field_name,
+    description: None,
+    field_type: field_type,
+    arguments: dict.from_list([
+      #("includeDeprecated", make_include_deprecated_arg()),
+    ]),
+    resolver: Some(fn(info: schema.ResolverInfo) {
+      let include_deprecated =
+        dict.get(info.arguments, "includeDeprecated")
+        |> result.try(fn(v) {
+          decode.run(v, decode.bool) |> result.map_error(fn(_) { Nil })
+        })
+        |> result.unwrap(False)
+      case info.parent {
+        None -> Ok(types.to_dynamic(Nil))
+        Some(parent) ->
+          case include_deprecated {
+            True ->
+              decode.run(parent, decode.at([all_data_key], decode.dynamic))
+              |> result.map_error(fn(_) { "Cannot read " <> all_data_key })
+            False ->
+              decode.run(parent, decode.at([data_key], decode.dynamic))
+              |> result.map_error(fn(_) { "Cannot read " <> data_key })
+          }
+      }
+    }),
+    is_deprecated: False,
+    deprecation_reason: None,
+    topic_fn: None,
+    rich_resolver: None,
+  )
+}
+
 /// Build the __Type introspection ObjectType
 fn get_introspection_type_type() -> schema.ObjectType {
   schema.ObjectType(
@@ -1949,26 +1998,33 @@ fn get_introspection_type_type() -> schema.ObjectType {
       #("name", make_introspection_field("name", "String")),
       #("description", make_introspection_field("description", "String")),
       #("specifiedByURL", make_introspection_field("specifiedByURL", "String")),
-      // fields(includeDeprecated: Boolean = false): [__Field!]
-      #("fields", make_introspection_field_list("fields", "__Field")),
-      // interfaces: [__Type!]
+      #(
+        "fields",
+        make_introspection_field_with_include_deprecated(
+          "fields",
+          "fields",
+          "__fields_all",
+          schema.List(schema.NonNull(schema.Named("__Field"))),
+        ),
+      ),
       #("interfaces", make_introspection_field_list("interfaces", "__Type")),
-      // possibleTypes: [__Type!]
       #(
         "possibleTypes",
         make_introspection_field_list("possibleTypes", "__Type"),
       ),
-      // enumValues(includeDeprecated: Boolean = false): [__EnumValue!]
       #(
         "enumValues",
-        make_introspection_field_list("enumValues", "__EnumValue"),
+        make_introspection_field_with_include_deprecated(
+          "enumValues",
+          "enumValues",
+          "__enumValues_all",
+          schema.List(schema.NonNull(schema.Named("__EnumValue"))),
+        ),
       ),
-      // inputFields(includeDeprecated: Boolean = false): [__InputValue!]
       #(
         "inputFields",
         make_introspection_field_list("inputFields", "__InputValue"),
       ),
-      // ofType: __Type
       #("ofType", make_introspection_field("ofType", "__Type")),
     ]),
     interfaces: [],
@@ -2463,6 +2519,8 @@ fn build_scalar_introspection(name: String) -> Dynamic {
     None,
     None,
     None,
+    None,
+    None,
   )
 }
 
@@ -2514,6 +2572,8 @@ fn build_type_def_introspection(
         None,
         None,
         None,
+        None,
+        None,
       )
     schema.EnumTypeDef(enum) -> build_enum_introspection(enum)
     schema.InterfaceTypeDef(iface) ->
@@ -2529,6 +2589,8 @@ fn build_object_introspection(
   obj: schema.ObjectType,
 ) -> Dynamic {
   let fields = build_fields_introspection(schema_def, obj.fields)
+  let fields_all =
+    build_fields_introspection_filtered(schema_def, obj.fields, True)
   let interfaces =
     list.map(obj.interfaces, fn(i) {
       types.to_dynamic(
@@ -2544,48 +2606,52 @@ fn build_object_introspection(
     obj.name,
     option.unwrap(obj.description, ""),
     Some(fields),
+    Some(fields_all),
     Some(interfaces),
+    None,
     None,
     None,
     None,
   )
 }
 
-fn build_enum_introspection(enum: schema.EnumType) -> Dynamic {
-  build_enum_introspection_filtered(enum, True)
-}
-
-fn build_enum_introspection_filtered(
+fn build_enum_values(
   enum: schema.EnumType,
   include_deprecated: Bool,
-) -> Dynamic {
-  let values =
-    dict.to_list(enum.values)
-    |> list.filter(fn(kv) {
-      let #(_, def) = kv
-      include_deprecated || !def.is_deprecated
-    })
-    |> list.map(fn(kv) {
-      let #(name, def) = kv
-      types.to_dynamic(
-        dict.from_list([
-          #("name", types.to_dynamic(name)),
-          #("description", types.to_dynamic(option.unwrap(def.description, ""))),
-          #("isDeprecated", types.to_dynamic(def.is_deprecated)),
-          #("deprecationReason", case def.deprecation_reason {
-            option.Some(reason) -> types.to_dynamic(reason)
-            option.None -> types.to_dynamic(Nil)
-          }),
-        ]),
-      )
-    })
+) -> List(Dynamic) {
+  dict.to_list(enum.values)
+  |> list.filter(fn(kv) {
+    let #(_, def) = kv
+    include_deprecated || !def.is_deprecated
+  })
+  |> list.map(fn(kv) {
+    let #(name, def) = kv
+    types.to_dynamic(
+      dict.from_list([
+        #("name", types.to_dynamic(name)),
+        #("description", types.to_dynamic(option.unwrap(def.description, ""))),
+        #("isDeprecated", types.to_dynamic(def.is_deprecated)),
+        #("deprecationReason", case def.deprecation_reason {
+          option.Some(reason) -> types.to_dynamic(reason)
+          option.None -> types.to_dynamic(Nil)
+        }),
+      ]),
+    )
+  })
+}
+
+fn build_enum_introspection(enum: schema.EnumType) -> Dynamic {
+  let values = build_enum_values(enum, False)
+  let values_all = build_enum_values(enum, True)
   make_type_object(
     "ENUM",
     enum.name,
     option.unwrap(enum.description, ""),
     None,
     None,
+    None,
     Some(values),
+    Some(values_all),
     None,
     None,
   )
@@ -2596,6 +2662,8 @@ fn build_interface_introspection(
   iface: schema.InterfaceType,
 ) -> Dynamic {
   let fields = build_fields_introspection(schema_def, iface.fields)
+  let fields_all =
+    build_fields_introspection_filtered(schema_def, iface.fields, True)
   // Collect all object types that implement this interface
   let possible_types =
     dict.values(schema_def.types)
@@ -2623,6 +2691,8 @@ fn build_interface_introspection(
     iface.name,
     option.unwrap(iface.description, ""),
     Some(fields),
+    Some(fields_all),
+    None,
     None,
     None,
     None,
@@ -2685,6 +2755,8 @@ fn build_input_introspection(
     None,
     None,
     None,
+    None,
+    None,
     Some(fields),
     None,
   )
@@ -2704,6 +2776,8 @@ fn build_meta_type_introspection(name: String) -> Dynamic {
         "Introspection type",
         Some([]),
         Some([]),
+        Some([]),
+        None,
         None,
         None,
         None,
@@ -2715,6 +2789,8 @@ fn build_meta_type_introspection(name: String) -> Dynamic {
         "Introspection enum",
         None,
         None,
+        None,
+        Some([]),
         Some([]),
         None,
         None,
@@ -2728,8 +2804,10 @@ fn make_type_object(
   name: String,
   description: String,
   fields: Option(List(Dynamic)),
+  fields_all: Option(List(Dynamic)),
   interfaces: Option(List(Dynamic)),
   enum_values: Option(List(Dynamic)),
+  enum_values_all: Option(List(Dynamic)),
   input_fields: Option(List(Dynamic)),
   possible_types: Option(List(Dynamic)),
 ) -> Dynamic {
@@ -2741,6 +2819,11 @@ fn make_type_object(
       #(
         "fields",
         option.map(fields, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #(
+        "__fields_all",
+        option.map(fields_all, types.to_dynamic)
           |> option.unwrap(types.to_dynamic(Nil)),
       ),
       #(
@@ -2759,6 +2842,11 @@ fn make_type_object(
           |> option.unwrap(types.to_dynamic(Nil)),
       ),
       #(
+        "__enumValues_all",
+        option.map(enum_values_all, types.to_dynamic)
+          |> option.unwrap(types.to_dynamic(Nil)),
+      ),
+      #(
         "inputFields",
         option.map(input_fields, types.to_dynamic)
           |> option.unwrap(types.to_dynamic(Nil)),
@@ -2772,7 +2860,7 @@ fn build_fields_introspection(
   schema_def: schema.Schema,
   fields: Dict(String, schema.FieldDefinition),
 ) -> List(Dynamic) {
-  build_fields_introspection_filtered(schema_def, fields, True)
+  build_fields_introspection_filtered(schema_def, fields, False)
 }
 
 fn build_fields_introspection_filtered(

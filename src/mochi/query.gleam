@@ -10,6 +10,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import mochi/document_cache
+import mochi/scalars
 import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,
   type Resolver, type ResolverInfo, type Schema,
@@ -1105,6 +1106,18 @@ pub fn add_inputs(
   inputs: List(schema.InputObjectType),
 ) -> SchemaBuilder {
   list.fold(inputs, builder, fn(b, i) { add_input(b, i) })
+}
+
+/// Register all built-in custom scalars (DateTime, Date, UUID, Email, URL, JSON).
+pub fn with_common_scalars(builder: SchemaBuilder) -> SchemaBuilder {
+  add_scalars(builder, [
+    scalars.date_time(),
+    scalars.date(),
+    scalars.uuid(),
+    scalars.email(),
+    scalars.url(),
+    scalars.json(),
+  ])
 }
 
 fn check_duplicates(
