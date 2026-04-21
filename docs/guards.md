@@ -41,10 +41,12 @@ let my_posts = query.query_with_args(
   name: "myPosts",
   args: [query.arg("limit", schema.int_type())],
   returns: schema.list_type(schema.named_type("Post")),
-  decode: fn(args) { query.get_optional_int(args, "limit") },
-  resolve: fn(limit, ctx) { get_my_posts(ctx, limit) },
-  encode: fn(posts) { types.to_dynamic(posts) },
+  resolve: fn(args, ctx) {
+    let limit = query.get_optional_int(args, "limit")
+    get_my_posts(ctx, limit)
+  },
 )
+|> query.with_encoder(fn(posts) { types.to_dynamic(posts) })
 |> query.with_guard(require_auth)
 ```
 

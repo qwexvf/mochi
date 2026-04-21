@@ -59,10 +59,12 @@ fn user_query() {
     name: "user",
     args: [query.arg("id", schema.non_null(schema.id_type()))],
     returns: schema.named_type("User"),
-    decode: fn(args) { query.get_id(args, "id") },
-    resolve: fn(id, _ctx) { get_user_by_id(id) },
-    encode: types.to_dynamic,
+    resolve: fn(args, _ctx) {
+      use id <- result.try(query.get_id(args, "id"))
+      get_user_by_id(id)
+    },
   )
+  |> query.with_encoder(types.to_dynamic)
 }
 
 // 4. Build the schema
@@ -294,15 +296,17 @@ Define queries and mutations with type-safe resolvers. See module docs for full 
 ```gleam
 import mochi/query
 
-// Query with arguments (labeled for clarity)
+// Query with arguments
 let user_query = query.query_with_args(
   name: "user",
   args: [query.arg("id", schema.non_null(schema.id_type()))],
   returns: schema.named_type("User"),
-  decode: fn(args) { query.get_id(args, "id") },
-  resolve: fn(id, ctx) { get_user_by_id(id) },
-  encode: types.to_dynamic,
+  resolve: fn(args, ctx) {
+    use id <- result.try(query.get_id(args, "id"))
+    get_user_by_id(id)
+  },
 )
+|> query.with_encoder(types.to_dynamic)
 
 // Build schema
 let my_schema = query.new()
@@ -687,16 +691,15 @@ fn create_user_mutation() {
     name: "createUser",
     args: [query.arg("input", schema.non_null(schema.named_type("CreateUserInput")))],
     returns: schema.named_type("User"),
-    decode: decode_create_input,
-    resolve: fn(input, ctx) {
-      // Insert into database
+    resolve: fn(args, ctx) {
+      use input <- result.try(query.decode_input(args, "input", input_decoder))
       let user = User(id: generate_id(), name: input.name, email: input.email)
       db.insert_user(user)
       Ok(user)
     },
-    encode: types.to_dynamic,
   )
-  |> query.mutation_description("Create a new user")
+  |> query.with_encoder(types.to_dynamic)
+  |> query.with_description("Create a new user")
 }
 
 let schema = query.new()
