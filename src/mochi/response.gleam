@@ -89,14 +89,9 @@ pub fn partial(data: Dynamic, errors: List(GraphQLError)) -> GraphQLResponse {
 
 /// Create a response from an ExecutionResult
 pub fn from_execution_result(result: ExecutionResult) -> GraphQLResponse {
-  let errors = case result.errors {
-    [] -> None
-    errs -> Some(list.map(errs, execution_error_to_graphql_error))
-  }
-
   GraphQLResponse(
     data: result.data,
-    errors: errors,
+    errors: map_errors(result.errors),
     extensions: None,
     has_next: None,
   )
@@ -107,32 +102,24 @@ pub fn from_execution_result_incremental(
   result: ExecutionResult,
 ) -> IncrementalResponse {
   let has_deferred = !list.is_empty(result.deferred)
-  let initial_errors = case result.errors {
-    [] -> None
-    errs -> Some(list.map(errs, execution_error_to_graphql_error))
-  }
+  let last_idx = list.length(result.deferred) - 1
   let initial =
     GraphQLResponse(
       data: result.data,
-      errors: initial_errors,
+      errors: map_errors(result.errors),
       extensions: None,
       has_next: case has_deferred {
         True -> Some(True)
         False -> None
       },
     )
-  let last_idx = list.length(result.deferred) - 1
   let patches =
     result.deferred
     |> list.index_map(fn(patch, idx) {
-      let patch_errors = case patch.errors {
-        [] -> None
-        errs -> Some(list.map(errs, execution_error_to_graphql_error))
-      }
       DeferredPatchResponse(
         path: patch.path,
         data: patch.data,
-        errors: patch_errors,
+        errors: map_errors(patch.errors),
         label: patch.label,
         has_next: idx < last_idx,
       )
@@ -288,6 +275,13 @@ fn maybe_with_location(
     option.None -> err
     option.Some(#(line, col)) ->
       error.with_locations(err, [error.Location(line, col)])
+  }
+}
+
+fn map_errors(errors: List(ExecutionError)) -> Option(List(GraphQLError)) {
+  case errors {
+    [] -> None
+    errs -> Some(list.map(errs, execution_error_to_graphql_error))
   }
 }
 

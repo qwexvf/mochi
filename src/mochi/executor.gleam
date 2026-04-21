@@ -245,10 +245,8 @@ fn execute_definition(
 ) -> ExecutionResult {
   case definition {
     ast.OperationDefinition(operation) -> execute_operation(context, operation)
-    // Fragment definitions are collected separately and applied during field execution.
-    // This branch is unreachable in practice since find_operation_by_name only
-    // returns OperationDefinition nodes.
-    ast.FragmentDefinition(_) -> ok_result(types.to_dynamic(dict.new()))
+    ast.FragmentDefinition(_) ->
+      panic as "unreachable: fragment definition reached execute_definition"
   }
 }
 
@@ -646,6 +644,26 @@ fn execute_selection_set(
   }
 }
 
+fn extract_defer_label(
+  directive: ast.Directive,
+  variables: Dict(String, Dynamic),
+) -> Option(String) {
+  directive.arguments
+  |> list.find(fn(a) { a.name == "label" })
+  |> result.try(fn(a) {
+    case a.value {
+      ast.StringValue(s) -> Ok(s)
+      ast.VariableValue(name) ->
+        dict.get(variables, name)
+        |> result.try(fn(v) {
+          decode.run(v, decode.string) |> result.map_error(fn(_) { Nil })
+        })
+      _ -> Error(Nil)
+    }
+  })
+  |> option.from_result
+}
+
 fn get_defer_info(
   selection: ast.Selection,
   variables: Dict(String, Dynamic),
@@ -658,23 +676,10 @@ fn get_defer_info(
   case list.find(directives, fn(d) { d.name == "defer" }) {
     Error(_) -> None
     Ok(directive) -> {
-      let if_value =
+      let should_defer =
         get_directive_bool_arg([directive], "defer", "if", variables)
-      let should_defer = option.unwrap(if_value, True)
-      let label =
-        directive.arguments
-        |> list.find(fn(a) { a.name == "label" })
-        |> result.try(fn(a) {
-          case a.value {
-            ast.StringValue(s) -> Ok(s)
-            ast.VariableValue(name) ->
-              dict.get(variables, name)
-              |> result.try(fn(v) { decode.run(v, decode.string) |> result.map_error(fn(_) { Nil }) })
-            _ -> Error(Nil)
-          }
-        })
-        |> option.from_result
-      Some(#(label, should_defer))
+        |> option.unwrap(True)
+      Some(#(extract_defer_label(directive, variables), should_defer))
     }
   }
 }

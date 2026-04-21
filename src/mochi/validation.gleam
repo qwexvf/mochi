@@ -417,17 +417,14 @@ fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext
       ValidationContext(..ctx, current_location: Some(#(line, column)))
     None -> ctx
   }
-  // Validate directives on field
-  let ctx = validate_directives(ctx, field.directives, "FIELD")
-
   use ctx <- skip_introspection_field(field.name, ctx, field.arguments)
   use obj_type <- require_current_type(ctx)
   use field_def <- require_field_def(ctx, obj_type, field.name)
 
   ctx
+  |> validate_directives(field.directives, "FIELD")
   |> validate_field_arguments(field, field_def)
   |> track_argument_variables(field.arguments)
-  |> validate_directives(field.directives, "FIELD")
   |> validate_field_selection_set(field, field_def)
 }
 
@@ -810,28 +807,21 @@ fn validate_directives(
   directives: List(ast.Directive),
   location: String,
 ) -> ValidationContext {
-  // Check for unknown directives and duplicate non-repeatable directives
-  let #(seen, ctx) =
-    list.fold(directives, #(set.new(), ctx), fn(acc, directive) {
-      let #(seen_set, ctx) = acc
-      let ctx = validate_single_directive(ctx, directive, location)
-
-      // Check for duplicate non-repeatable directives
-      case set.contains(seen_set, directive.name) {
-        True ->
-          case is_repeatable_directive(ctx.schema, directive.name) {
-            True -> #(seen_set, ctx)
-            False -> #(
-              seen_set,
-              add_error(ctx, DuplicateDirective(directive.name)),
-            )
-          }
-        False -> #(set.insert(seen_set, directive.name), ctx)
-      }
-    })
-
-  let _ = seen
-  ctx
+  list.fold(directives, #(set.new(), ctx), fn(acc, directive) {
+    let #(seen_set, ctx) = acc
+    let ctx = validate_single_directive(ctx, directive, location)
+    case set.contains(seen_set, directive.name) {
+      True ->
+        case is_repeatable_directive(ctx.schema, directive.name) {
+          True -> #(seen_set, ctx)
+          False -> #(
+            seen_set,
+            add_error(ctx, DuplicateDirective(directive.name)),
+          )
+        }
+      False -> #(set.insert(seen_set, directive.name), ctx)
+    }
+  }).1
 }
 
 /// Validate a single directive

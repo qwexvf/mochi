@@ -270,10 +270,7 @@ pub fn defer_in_list_propagates_patches_test() {
     |> query.build
 
   let result =
-    executor.execute_query(
-      schema_def,
-      "{ users { id ... @defer { bio } } }",
-    )
+    executor.execute_query(schema_def, "{ users { id ... @defer { bio } } }")
 
   should.equal(result.errors, [])
   should.be_true(result.deferred != [])
@@ -285,7 +282,8 @@ pub fn defer_in_list_propagates_patches_test() {
 
 pub fn defer_label_from_variable_test() {
   let schema_def = build_test_schema()
-  let q = "query Q($lbl: String) { user { id ... @defer(label: $lbl) { bio } } }"
+  let q =
+    "query Q($lbl: String) { user { id ... @defer(label: $lbl) { bio } } }"
   let vars = dict.from_list([#("lbl", types.to_dynamic("my-label"))])
   let result = executor.execute_query_with_variables(schema_def, q, vars)
 
@@ -296,7 +294,8 @@ pub fn defer_label_from_variable_test() {
 
 pub fn defer_label_missing_variable_gives_no_label_test() {
   let schema_def = build_test_schema()
-  let q = "query Q($lbl: String) { user { id ... @defer(label: $lbl) { bio } } }"
+  let q =
+    "query Q($lbl: String) { user { id ... @defer(label: $lbl) { bio } } }"
   let result = executor.execute_query_with_variables(schema_def, q, dict.new())
 
   should.equal(result.errors, [])
