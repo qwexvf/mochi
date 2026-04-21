@@ -12,6 +12,7 @@ import gleam/result
 import gleam/string
 import mochi/ast
 import mochi/document_cache
+import mochi/error as graphql_error
 import mochi/input_coercion
 import mochi/lexer
 import mochi/parser
@@ -64,6 +65,11 @@ pub type ExecutionError {
     message: String,
     path: List(String),
     /// Source location of the field in the query document (line, column)
+    location: Option(#(Int, Int)),
+  )
+  RichResolverError(
+    graphql_error: graphql_error.GraphQLError,
+    path: List(String),
     location: Option(#(Int, Int)),
   )
 }
@@ -137,6 +143,14 @@ fn null_value_error_at(
   loc: Option(#(Int, Int)),
 ) -> ExecutionResult {
   error_result(NullValueError(msg, path, location: loc))
+}
+
+fn rich_resolver_error_at(
+  err: graphql_error.GraphQLError,
+  path: List(String),
+  loc: Option(#(Int, Int)),
+) -> ExecutionResult {
+  error_result(RichResolverError(graphql_error: err, path: path, location: loc))
 }
 
 // ============================================================================
@@ -1039,8 +1053,20 @@ fn execute_regular_field(
     )
   {
     Ok(field_args) -> {
-      case field_def.resolver {
-        Some(resolver) ->
+      case field_def.rich_resolver, field_def.resolver {
+        Some(rich_res), _ ->
+          resolve_rich_field(
+            context,
+            field,
+            field_def,
+            field_args,
+            response_name,
+            field_path,
+            rich_res,
+            field_context.parent_value,
+            field.directives,
+          )
+        None, Some(resolver) ->
           resolve_field(
             context,
             field,
@@ -1052,7 +1078,7 @@ fn execute_regular_field(
             field_context.parent_value,
             field.directives,
           )
-        None ->
+        None, None ->
           resolve_from_parent(
             field_context.parent_value,
             field.name,
@@ -1150,6 +1176,83 @@ fn resolve_field(
         Error(msg) -> resolver_error_at(msg, field_path, field_location)
       }
     Error(msg) -> resolver_error_at(msg, field_path, field_location)
+  }
+}
+
+fn resolve_rich_field(
+  context: QueryExecutionContext,
+  field: ast.Field,
+  field_def: schema.FieldDefinition,
+  field_args: Dict(String, Dynamic),
+  response_name: String,
+  field_path: List(String),
+  rich_res: schema.RichResolver,
+  parent_value: Option(Dynamic),
+  directives: List(ast.Directive),
+) -> ExecutionResult {
+  let field_location =
+    option.map(field.location, fn(pos) { #(pos.line, pos.column) })
+
+  let resolver_info =
+    schema.ResolverInfo(
+      parent: parent_value,
+      arguments: field_args,
+      context: context.execution_context,
+      info: types.to_dynamic(dict.new()),
+    )
+
+  emit_telemetry(
+    context.execution_context,
+    schema.SchemaFieldStart(field_def.name, response_name, field_path),
+  )
+  let start_ns = telemetry.get_timestamp_ns()
+  let rich_result = rich_res(resolver_info)
+  let duration_ns = telemetry.get_timestamp_ns() - start_ns
+  emit_telemetry(
+    context.execution_context,
+    schema.SchemaFieldEnd(
+      field_def.name,
+      response_name,
+      field_path,
+      result.is_ok(rich_result),
+      duration_ns,
+    ),
+  )
+
+  case rich_result {
+    Ok(resolved) ->
+      case
+        apply_custom_directives(
+          context.schema,
+          directives,
+          resolved,
+          context.variable_values,
+          field_path,
+        )
+      {
+        Ok(transformed) ->
+          handle_resolved_value(
+            context,
+            field,
+            field_def,
+            field_args,
+            response_name,
+            field_path,
+            transformed,
+          )
+        Error(msg) -> resolver_error_at(msg, field_path, field_location)
+      }
+    Error(#(msg, extensions)) ->
+      rich_resolver_error_at(
+        graphql_error.GraphQLError(
+          message: msg,
+          locations: None,
+          path: None,
+          extensions: extensions,
+        ),
+        field_path,
+        field_location,
+      )
   }
 }
 
@@ -1976,6 +2079,7 @@ fn make_introspection_field(
     is_deprecated: False,
     deprecation_reason: None,
     topic_fn: None,
+    rich_resolver: None,
   )
 }
 
@@ -1993,6 +2097,7 @@ fn make_introspection_field_non_null(
     is_deprecated: False,
     deprecation_reason: None,
     topic_fn: None,
+    rich_resolver: None,
   )
 }
 
@@ -2010,6 +2115,7 @@ fn make_introspection_field_list(
     is_deprecated: False,
     deprecation_reason: None,
     topic_fn: None,
+    rich_resolver: None,
   )
 }
 
@@ -2029,6 +2135,7 @@ fn make_introspection_field_list_non_null(
     is_deprecated: False,
     deprecation_reason: None,
     topic_fn: None,
+    rich_resolver: None,
   )
 }
 

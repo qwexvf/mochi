@@ -304,6 +304,17 @@ pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
       |> error.with_code("NULL_VALUE_ERROR")
       |> error.with_category(error.ResolverErrorCategory)
       |> maybe_with_location(location)
+    executor.RichResolverError(
+      graphql_error: gql_err,
+      path: err_path,
+      location: location,
+    ) -> {
+      error.GraphQLError(
+        ..gql_err,
+        path: Some(list.map(err_path, error.FieldSegment)),
+      )
+      |> maybe_with_location(location)
+    }
   }
 }
 

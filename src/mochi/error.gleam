@@ -142,6 +142,32 @@ pub fn with_code(err: GraphQLError, code: String) -> GraphQLError {
   with_extension(err, "code", types.to_dynamic(code))
 }
 
+pub type ErrorCode {
+  NotFound
+  Unauthorized
+  Forbidden
+  BadRequest
+  InternalError
+}
+
+pub fn code_to_string(code: ErrorCode) -> String {
+  case code {
+    NotFound -> "NOT_FOUND"
+    Unauthorized -> "UNAUTHORIZED"
+    Forbidden -> "FORBIDDEN"
+    BadRequest -> "BAD_REQUEST"
+    InternalError -> "INTERNAL_SERVER_ERROR"
+  }
+}
+
+pub fn with_error_code(err: GraphQLError, code: ErrorCode) -> GraphQLError {
+  with_code(err, code_to_string(code))
+}
+
+pub fn to_payload(err: GraphQLError) -> #(String, Option(Dict(String, Dynamic))) {
+  #(err.message, err.extensions)
+}
+
 // ============================================================================
 // Convenience Error Constructors
 // ============================================================================
