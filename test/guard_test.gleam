@@ -483,7 +483,6 @@ pub fn subscription_guard_allows_test() {
       returns: schema.named_type("User"),
       topic: "messages",
     )
-    |> query.with_encoder(fn(u) { types.to_dynamic(u) })
     |> query.with_guard(allow_guard)
 
   let field_def = query.to_field_def(sub)
@@ -497,7 +496,6 @@ pub fn subscription_guard_blocks_test() {
       returns: schema.named_type("User"),
       topic: "messages",
     )
-    |> query.with_encoder(fn(u) { types.to_dynamic(u) })
     |> query.with_guard(deny_guard)
 
   let field_def = query.to_field_def(sub)

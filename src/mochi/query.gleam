@@ -942,9 +942,6 @@ pub fn with_cache(builder: SchemaBuilder) -> SchemaBuilder {
   SchemaBuilder(..builder, cache: True)
 }
 
-pub fn build_without_cache(builder: SchemaBuilder) -> Schema {
-  build(SchemaBuilder(..builder, cache: False))
-}
 
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
