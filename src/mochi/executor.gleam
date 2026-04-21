@@ -664,10 +664,13 @@ fn get_defer_info(
       let label =
         directive.arguments
         |> list.find(fn(a) { a.name == "label" })
-        |> result.map(fn(a) {
+        |> result.try(fn(a) {
           case a.value {
-            ast.StringValue(s) -> s
-            _ -> ""
+            ast.StringValue(s) -> Ok(s)
+            ast.VariableValue(name) ->
+              dict.get(variables, name)
+              |> result.try(fn(v) { decode.run(v, decode.string) |> result.map_error(fn(_) { Nil }) })
+            _ -> Error(Nil)
           }
         })
         |> option.from_result
