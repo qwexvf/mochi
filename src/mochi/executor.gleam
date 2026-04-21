@@ -1426,10 +1426,9 @@ fn aggregate_list_results(
   field_type: schema.FieldType,
   response_name: String,
 ) -> ExecutionResult {
-  // Single-pass: collect data, errors, and check for null errors simultaneously
-  let #(data_acc, errors_acc, has_null_error) =
-    list.fold(results, #([], [], False), fn(acc, result) {
-      let #(data_list, error_list, null_found) = acc
+  let #(data_acc, errors_acc, deferred_acc, has_null_error) =
+    list.fold(results, #([], [], [], False), fn(acc, result) {
+      let #(data_list, error_list, deferred_list, null_found) = acc
       let new_data = case result.data {
         Some(d) -> [d, ..data_list]
         None -> data_list
@@ -1442,21 +1441,32 @@ fn aggregate_list_results(
             _ -> False
           }
         })
-      #(new_data, [result.errors, ..error_list], new_null)
+      #(
+        new_data,
+        [result.errors, ..error_list],
+        [result.deferred, ..deferred_list],
+        new_null,
+      )
     })
 
   let errors = list.reverse(errors_acc) |> list.flatten
+  let deferred = list.reverse(deferred_acc) |> list.flatten
   let data_list = list.reverse(data_acc)
 
   case has_null_error, errors {
-    True, _ -> handle_list_null_error(field_type, response_name, errors)
+    True, _ ->
+      handle_list_null_error(field_type, response_name, errors, deferred)
     False, [] ->
-      ok_result(make_field(response_name, types.to_dynamic(data_list)))
+      ExecutionResult(
+        data: Some(make_field(response_name, types.to_dynamic(data_list))),
+        errors: [],
+        deferred: deferred,
+      )
     False, _ ->
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(data_list))),
         errors: errors,
-        deferred: [],
+        deferred: deferred,
       )
   }
 }
@@ -1466,14 +1476,15 @@ fn handle_list_null_error(
   field_type: schema.FieldType,
   response_name: String,
   errors: List(ExecutionError),
+  deferred: List(DeferredPatch),
 ) -> ExecutionResult {
   case is_non_null_type(field_type) {
-    True -> ExecutionResult(data: None, errors: errors, deferred: [])
+    True -> ExecutionResult(data: None, errors: errors, deferred: deferred)
     False ->
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(Nil))),
         errors: errors,
-        deferred: [],
+        deferred: deferred,
       )
   }
 }

@@ -48,6 +48,8 @@ pub type GraphQLResponse {
     errors: Option(List(GraphQLError)),
     /// Additional metadata from extensions
     extensions: Option(Dict(String, Dynamic)),
+    /// For incremental delivery: top-level hasNext flag
+    has_next: Option(Bool),
   )
 }
 
@@ -57,17 +59,32 @@ pub type GraphQLResponse {
 
 /// Create a successful response with data
 pub fn success(data: Dynamic) -> GraphQLResponse {
-  GraphQLResponse(data: Some(data), errors: None, extensions: None)
+  GraphQLResponse(
+    data: Some(data),
+    errors: None,
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create an error-only response
 pub fn failure(errors: List(GraphQLError)) -> GraphQLResponse {
-  GraphQLResponse(data: None, errors: Some(errors), extensions: None)
+  GraphQLResponse(
+    data: None,
+    errors: Some(errors),
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create a partial response with data and errors
 pub fn partial(data: Dynamic, errors: List(GraphQLError)) -> GraphQLResponse {
-  GraphQLResponse(data: Some(data), errors: Some(errors), extensions: None)
+  GraphQLResponse(
+    data: Some(data),
+    errors: Some(errors),
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create a response from an ExecutionResult
@@ -77,7 +94,12 @@ pub fn from_execution_result(result: ExecutionResult) -> GraphQLResponse {
     errs -> Some(list.map(errs, execution_error_to_graphql_error))
   }
 
-  GraphQLResponse(data: result.data, errors: errors, extensions: None)
+  GraphQLResponse(
+    data: result.data,
+    errors: errors,
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Build an incremental response from an ExecutionResult that contains deferred patches
@@ -93,8 +115,9 @@ pub fn from_execution_result_incremental(
     GraphQLResponse(
       data: result.data,
       errors: initial_errors,
-      extensions: case has_deferred {
-        True -> Some(dict.from_list([#("hasNext", types.to_dynamic(True))]))
+      extensions: None,
+      has_next: case has_deferred {
+        True -> Some(True)
         False -> None
       },
     )
@@ -219,6 +242,12 @@ pub fn to_dynamic(response: GraphQLResponse) -> Dynamic {
   // Only include extensions if present
   let parts = case response.extensions {
     Some(ext) -> [#("extensions", types.to_dynamic(ext)), ..parts]
+    None -> parts
+  }
+
+  // hasNext is top-level per incremental delivery spec (not inside extensions)
+  let parts = case response.has_next {
+    Some(v) -> [#("hasNext", types.to_dynamic(v)), ..parts]
     None -> parts
   }
 

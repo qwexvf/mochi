@@ -77,6 +77,13 @@ pub type ValidationError {
   SelectionSetNotAllowed(field_name: String, type_name: String)
   /// Fields with same response name cannot be merged
   FieldsCannotMerge(field_name: String, reason: String)
+  /// Argument value has the wrong type
+  ArgumentTypeMismatch(
+    field_name: String,
+    argument_name: String,
+    expected_type: String,
+    got: String,
+  )
 }
 
 pub type LocatedError =
@@ -914,8 +921,26 @@ fn validate_defer_args(
 ) -> ValidationContext {
   list.fold(directive.arguments, ctx, fn(ctx, arg) {
     case arg.name {
-      "if" -> track_value_variables(ctx, arg.value)
-      "label" -> ctx
+      "if" ->
+        case arg.value {
+          ast.BooleanValue(_) | ast.VariableValue(_) ->
+            track_value_variables(ctx, arg.value)
+          _ ->
+            add_error(
+              ctx,
+              ArgumentTypeMismatch("@defer", "if", "Boolean", "non-boolean"),
+            )
+        }
+      "label" ->
+        case arg.value {
+          ast.StringValue(_) | ast.VariableValue(_) ->
+            track_value_variables(ctx, arg.value)
+          _ ->
+            add_error(
+              ctx,
+              ArgumentTypeMismatch("@defer", "label", "String", "non-string"),
+            )
+        }
       _ -> add_error(ctx, UnknownArgument("@defer", arg.name))
     }
   })
@@ -1070,6 +1095,15 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" conflict because "
       <> reason
       <> ". Use different aliases on the fields to fetch both if this was intentional."
+    ArgumentTypeMismatch(field_name, arg_name, expected, got) ->
+      "Argument \""
+      <> arg_name
+      <> "\" on \""
+      <> field_name
+      <> "\" has invalid type: expected "
+      <> expected
+      <> ", got "
+      <> got
   }
 }
 
