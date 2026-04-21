@@ -38,21 +38,16 @@ fn build_post_schema() -> schema.Schema {
     |> types.build(decode_post)
 
   let post_query =
-    query.query(
-      "post",
-      schema.Named("Post"),
-      fn(_) {
-        Ok(
-          types.to_dynamic(Post(
-            "1",
-            "Hello",
-            "hello-world",
-            "2024-01-15T10:30:00Z",
-          )),
-        )
-      },
-      fn(p) { types.to_dynamic(p) },
-    )
+    query.query("post", schema.Named("Post"), fn(_) {
+      Ok(
+        types.to_dynamic(Post(
+          "1",
+          "Hello",
+          "hello-world",
+          "2024-01-15T10:30:00Z",
+        )),
+      )
+    })
 
   query.new()
   |> query.add_query(post_query)
@@ -123,21 +118,16 @@ pub fn deprecated_no_reason_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query(
-        "post2",
-        schema.Named("Post2"),
-        fn(_) {
-          Ok(
-            types.to_dynamic(Post(
-              "1",
-              "Hello",
-              "hello-world",
-              "2024-01-15T10:30:00Z",
-            )),
-          )
-        },
-        fn(p) { types.to_dynamic(p) },
-      ),
+      query.query("post2", schema.Named("Post2"), fn(_) {
+        Ok(
+          types.to_dynamic(Post(
+            "1",
+            "Hello",
+            "hello-world",
+            "2024-01-15T10:30:00Z",
+          )),
+        )
+      }),
     )
     |> query.add_type(post_type)
     |> query.build
@@ -229,16 +219,9 @@ pub fn uuid_field_type_helper_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query(
-        "item",
-        schema.Named("Item"),
-        fn(_) {
-          Ok(
-            types.to_dynamic(Item("1", "550e8400-e29b-41d4-a716-446655440000")),
-          )
-        },
-        fn(i) { types.to_dynamic(i) },
-      ),
+      query.query("item", schema.Named("Item"), fn(_) {
+        Ok(types.to_dynamic(Item("1", "550e8400-e29b-41d4-a716-446655440000")))
+      }),
     )
     |> query.add_type(item_type)
     |> query.with_common_scalars()
@@ -261,12 +244,9 @@ pub fn optional_datetime_field_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query(
-        "event",
-        schema.Named("Event"),
-        fn(_) { Ok(types.to_dynamic(Event("1", None))) },
-        fn(e) { types.to_dynamic(e) },
-      ),
+      query.query("event", schema.Named("Event"), fn(_) {
+        Ok(types.to_dynamic(Event("1", None)))
+      }),
     )
     |> query.add_type(event_type)
     |> query.with_common_scalars()
@@ -295,20 +275,15 @@ pub fn email_and_url_field_helpers_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query(
-        "contact",
-        schema.Named("Contact"),
-        fn(_) {
-          Ok(
-            types.to_dynamic(Contact(
-              "1",
-              "alice@example.com",
-              "https://example.com",
-            )),
-          )
-        },
-        fn(c) { types.to_dynamic(c) },
-      ),
+      query.query("contact", schema.Named("Contact"), fn(_) {
+        Ok(
+          types.to_dynamic(Contact(
+            "1",
+            "alice@example.com",
+            "https://example.com",
+          )),
+        )
+      }),
     )
     |> query.add_type(contact_type)
     |> query.with_common_scalars()

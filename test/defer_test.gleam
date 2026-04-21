@@ -29,12 +29,9 @@ fn build_test_schema() -> schema.Schema {
     |> types.build(decode_user)
 
   let user_query =
-    query.query(
-      "user",
-      schema.Named("User"),
-      fn(_info) { Ok(types.to_dynamic(User("1", "Alice", "A developer"))) },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.query("user", schema.Named("User"), fn(_info) {
+      Ok(types.to_dynamic(User("1", "Alice", "A developer")))
+    })
 
   query.new()
   |> query.add_query(user_query)
@@ -249,19 +246,14 @@ pub fn defer_in_list_propagates_patches_test() {
     |> types.build(decode_user)
 
   let users_query =
-    query.query(
-      "users",
-      schema.List(schema.Named("User")),
-      fn(_info) {
-        Ok(
-          types.to_dynamic([
-            User("1", "Alice", "Dev"),
-            User("2", "Bob", "Ops"),
-          ]),
-        )
-      },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.query("users", schema.List(schema.Named("User")), fn(_info) {
+      Ok(
+        types.to_dynamic([
+          User("1", "Alice", "Dev"),
+          User("2", "Bob", "Ops"),
+        ]),
+      )
+    })
 
   let schema_def =
     query.new()

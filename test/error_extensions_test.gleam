@@ -86,19 +86,18 @@ pub fn rich_resolver_surfaces_extensions_in_response_test() {
 
   let user_schema =
     query.new()
-    |> query.add_rich_query(
-      "user",
-      [],
-      schema.named_type("User"),
-      fn(_) { Ok(Nil) },
-      fn(_, _) {
-        Error(
-          error.error("User not found")
-          |> error.with_error_code(error.NotFound)
-          |> error.to_payload,
-        )
-      },
-      types.to_dynamic,
+    |> query.add_query(
+      query.query_with_args(
+        name: "user",
+        args: [],
+        returns: schema.named_type("User"),
+        resolve: fn(_, _) {
+          Error(
+            error.error("User not found")
+            |> error.with_error_code(error.NotFound),
+          )
+        },
+      ),
     )
     |> query.add_type(user_type)
     |> query.build
@@ -124,13 +123,13 @@ pub fn rich_resolver_ok_path_works_test() {
 
   let user_schema =
     query.new()
-    |> query.add_rich_query(
-      "user",
-      [],
-      schema.named_type("User"),
-      fn(_) { Ok(Nil) },
-      fn(_, _) { Ok(#("42", "Alice")) },
-      types.to_dynamic,
+    |> query.add_query(
+      query.query_with_args(
+        name: "user",
+        args: [],
+        returns: schema.named_type("User"),
+        resolve: fn(_, _) { Ok(#("42", "Alice")) },
+      ),
     )
     |> query.add_type(user_type)
     |> query.build
@@ -150,19 +149,15 @@ pub fn rich_resolver_error_path_uses_executor_path_test() {
 
   let user_schema =
     query.new()
-    |> query.add_rich_query(
-      "user",
-      [],
-      schema.named_type("User"),
-      fn(_) { Ok(Nil) },
-      fn(_, _) {
-        Error(
-          error.error("Fail")
-          |> error.with_error_code(error.NotFound)
-          |> error.to_payload,
-        )
-      },
-      types.to_dynamic,
+    |> query.add_query(
+      query.query_with_args(
+        name: "user",
+        args: [],
+        returns: schema.named_type("User"),
+        resolve: fn(_, _) {
+          Error(error.error("Fail") |> error.with_error_code(error.NotFound))
+        },
+      ),
     )
     |> query.add_type(user_type)
     |> query.build

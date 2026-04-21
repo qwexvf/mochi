@@ -176,13 +176,12 @@ pub fn types_enum_builder_test() {
 pub fn query_simple_test() {
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([]) },
-      fn(_) { types.to_dynamic([]) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([]) },
     )
 
-  case query.query_get_name(users_query) == "users" {
+  case query.get_name(users_query) == "users" {
     True -> Nil
     False -> panic as "Query name should be 'users'"
   }
@@ -191,14 +190,13 @@ pub fn query_simple_test() {
 pub fn query_with_description_test() {
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([]) },
-      fn(_) { types.to_dynamic([]) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([]) },
     )
-    |> query.query_description("Get all users")
+    |> query.with_description("Get all users")
 
-  case query.query_get_description(users_query) {
+  case query.get_description(users_query) {
     Some("Get all users") -> Nil
     _ -> panic as "Query description should be set"
   }
@@ -210,22 +208,18 @@ pub fn query_with_args_test() {
       "user",
       [query.arg("id", schema.non_null(schema.id_type()))],
       schema.named_type("User"),
-      fn(args) {
-        case dict.get(args, "id") {
-          Ok(_) -> Ok("1")
-          Error(_) -> Error("Missing id")
-        }
+      fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
+        Ok(User(id, "Test", "test@example.com", 25))
       },
-      fn(_id, _ctx) { Ok(User("1", "Test", "test@example.com", 25)) },
-      fn(u) { types.to_dynamic(u) },
     )
 
-  case query.query_get_name(user_query) == "user" {
+  case query.get_name(user_query) == "user" {
     True -> Nil
     False -> panic as "Query name should be 'user'"
   }
 
-  case query.query_get_args(user_query) {
+  case query.get_args(user_query) {
     [arg] ->
       case arg.name == "id" {
         True -> Nil
@@ -241,12 +235,10 @@ pub fn mutation_test() {
       "createUser",
       [query.arg("name", schema.non_null(schema.string_type()))],
       schema.named_type("User"),
-      fn(_) { Ok("Test") },
-      fn(_name, _ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
-      fn(u) { types.to_dynamic(u) },
+      fn(_args, _ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
     )
 
-  case query.mutation_get_name(create_user) == "createUser" {
+  case query.get_name(create_user) == "createUser" {
     True -> Nil
     False -> panic as "Mutation name should be 'createUser'"
   }
@@ -254,17 +246,12 @@ pub fn mutation_test() {
 
 pub fn mutation_with_description_test() {
   let create_user =
-    query.mutation(
-      "createUser",
-      [],
-      schema.named_type("User"),
-      fn(_) { Ok(Nil) },
-      fn(_, _ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
-      fn(u) { types.to_dynamic(u) },
-    )
-    |> query.mutation_description("Create a new user")
+    query.mutation("createUser", [], schema.named_type("User"), fn(_args, _ctx) {
+      Ok(User("new", "Test", "test@example.com", 0))
+    })
+    |> query.with_description("Create a new user")
 
-  case query.mutation_get_description(create_user) {
+  case query.get_description(create_user) {
     Some("Create a new user") -> Nil
     _ -> panic as "Mutation description should be set"
   }
@@ -292,10 +279,9 @@ pub fn schema_builder_test() {
 
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([]) },
-      fn(_) { types.to_dynamic([]) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([]) },
     )
 
   let built_schema =
@@ -316,14 +302,9 @@ pub fn schema_builder_test() {
 
 pub fn schema_with_mutation_test() {
   let create_user =
-    query.mutation(
-      "createUser",
-      [],
-      schema.named_type("User"),
-      fn(_) { Ok(Nil) },
-      fn(_, _ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.mutation("createUser", [], schema.named_type("User"), fn(_args, _ctx) {
+      Ok(User("new", "Test", "test@example.com", 0))
+    })
 
   let built_schema =
     query.new()
@@ -343,18 +324,16 @@ pub fn schema_with_mutation_test() {
 pub fn schema_multiple_queries_test() {
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_) { Ok([]) },
-      types.to_dynamic,
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_) { Ok([]) },
     )
 
   let posts_query =
     query.query(
-      "posts",
-      schema.list_type(schema.named_type("Post")),
-      fn(_) { Ok([]) },
-      types.to_dynamic,
+      name: "posts",
+      returns: schema.list_type(schema.named_type("Post")),
+      resolve: fn(_) { Ok([]) },
     )
 
   let built_schema =
@@ -461,12 +440,9 @@ fn build_exec_schema() -> schema.Schema {
     |> types.build(decode_user)
 
   let user_query =
-    query.query(
-      "user",
-      schema.Named("User"),
-      fn(_) { Ok(User("1", "Alice", "alice@example.com", 30)) },
-      types.to_dynamic,
-    )
+    query.query(name: "user", returns: schema.Named("User"), resolve: fn(_) {
+      Ok(User("1", "Alice", "alice@example.com", 30))
+    })
 
   query.new()
   |> query.add_query(user_query)

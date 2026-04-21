@@ -4,6 +4,7 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
+import mochi/error
 import mochi/executor
 import mochi/query
 import mochi/schema
@@ -26,7 +27,8 @@ fn decode_user(_dyn: Dynamic) -> Result(User, String) {
 // ============================================================================
 
 fn build_test_schema_with_user_resolver(
-  user_resolver: fn(schema.ExecutionContext) -> Result(Dynamic, String),
+  user_resolver: fn(schema.ExecutionContext) ->
+    Result(Dynamic, error.GraphQLError),
 ) -> schema.Schema {
   let user_type =
     types.object("User")
@@ -36,9 +38,11 @@ fn build_test_schema_with_user_resolver(
 
   // Query with nullable user field
   let user_query =
-    query.query("user", schema.named_type("User"), user_resolver, fn(u) {
-      types.to_dynamic(u)
-    })
+    query.query(
+      name: "user",
+      returns: schema.named_type("User"),
+      resolve: user_resolver,
+    )
 
   query.new()
   |> query.add_query(user_query)
@@ -47,7 +51,8 @@ fn build_test_schema_with_user_resolver(
 }
 
 fn build_test_schema_with_required_user_resolver(
-  user_resolver: fn(schema.ExecutionContext) -> Result(Dynamic, String),
+  user_resolver: fn(schema.ExecutionContext) ->
+    Result(Dynamic, error.GraphQLError),
 ) -> schema.Schema {
   let user_type =
     types.object("User")
@@ -58,10 +63,9 @@ fn build_test_schema_with_required_user_resolver(
   // Query with NON-NULL user field (User!)
   let user_query =
     query.query(
-      "requiredUser",
-      schema.non_null(schema.named_type("User")),
-      user_resolver,
-      fn(u) { types.to_dynamic(u) },
+      name: "requiredUser",
+      returns: schema.non_null(schema.named_type("User")),
+      resolve: user_resolver,
     )
 
   query.new()

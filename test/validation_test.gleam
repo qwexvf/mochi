@@ -32,10 +32,9 @@ fn build_test_schema() -> schema.Schema {
 
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([]) },
-      fn(_) { types.to_dynamic([]) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([]) },
     )
 
   let user_query =
@@ -43,9 +42,7 @@ fn build_test_schema() -> schema.Schema {
       "user",
       [query.arg("id", schema.non_null(schema.id_type()))],
       schema.named_type("User"),
-      fn(_) { Ok("1") },
-      fn(_, _ctx) { Ok(User("1", "Test", "test@example.com", 25)) },
-      fn(u) { types.to_dynamic(u) },
+      fn(_args, _ctx) { Ok(User("1", "Test", "test@example.com", 25)) },
     )
 
   query.new()
@@ -756,16 +753,14 @@ pub fn invalid_subscription_multiple_root_fields_test() {
   let sub_schema =
     query.new()
     |> query.add_subscription(query.subscription(
-      "onUser",
-      schema.Named("String"),
-      "onUser",
-      types.to_dynamic,
+      name: "onUser",
+      returns: schema.Named("String"),
+      topic: "onUser",
     ))
     |> query.add_subscription(query.subscription(
-      "onPost",
-      schema.Named("String"),
-      "onPost",
-      types.to_dynamic,
+      name: "onPost",
+      returns: schema.Named("String"),
+      topic: "onPost",
     ))
     |> query.build
 
@@ -794,16 +789,14 @@ pub fn subscription_fragment_spread_parses_test() {
   let sub_schema =
     query.new()
     |> query.add_subscription(query.subscription(
-      "onUserCreated",
-      schema.Named("String"),
-      "onUserCreated",
-      types.to_dynamic,
+      name: "onUserCreated",
+      returns: schema.Named("String"),
+      topic: "onUserCreated",
     ))
     |> query.add_subscription(query.subscription(
-      "onUserUpdated",
-      schema.Named("String"),
-      "onUserUpdated",
-      types.to_dynamic,
+      name: "onUserUpdated",
+      returns: schema.Named("String"),
+      topic: "onUserUpdated",
     ))
     |> query.build
 

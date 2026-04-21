@@ -3,6 +3,8 @@
 
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
+import mochi/error
 import mochi/executor
 import mochi/query
 import mochi/schema
@@ -46,26 +48,22 @@ fn book_schema() -> query.SchemaBuilder {
     |> types.build(fn(_d) { Ok(Book("1", "Norwegian Wood", "1")) })
 
   let books_query =
-    query.query(
-      "books",
-      schema.list_type(schema.named_type("Book")),
-      fn(_ctx) { Ok(all_books()) },
-      fn(books) { types.to_dynamic(books) },
-    )
+    query.query("books", schema.list_type(schema.named_type("Book")), fn(_ctx) {
+      Ok(all_books())
+    })
 
   let book_query =
     query.query_with_args(
       name: "book",
       args: [query.arg("id", schema.non_null(schema.id_type()))],
       returns: schema.named_type("Book"),
-      decode: fn(args) { query.get_id(args, "id") },
-      resolve: fn(id, _ctx) {
+      resolve: fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
         case list.find(all_books(), fn(b) { b.id == id }) {
           Ok(b) -> Ok(b)
-          Error(_) -> Error("Not found")
+          Error(_) -> Error(error.new("Not found"))
         }
       },
-      encode: fn(b) { types.to_dynamic(b) },
     )
 
   let add_book =
@@ -76,17 +74,11 @@ fn book_schema() -> query.SchemaBuilder {
         query.arg("authorId", schema.non_null(schema.id_type())),
       ],
       returns: schema.non_null(schema.named_type("Book")),
-      decode: fn(args) {
-        case query.get_string(args, "title"), query.get_id(args, "authorId") {
-          Ok(t), Ok(a) -> Ok(#(t, a))
-          _, _ -> Error("Missing args")
-        }
-      },
-      resolve: fn(input, _ctx) {
-        let #(title, author_id) = input
+      resolve: fn(args, _ctx) {
+        use title <- result.try(query.get_string(args, "title"))
+        use author_id <- result.try(query.get_id(args, "authorId"))
         Ok(Book("new-1", title, author_id))
       },
-      encode: fn(b) { types.to_dynamic(b) },
     )
 
   query.new()
@@ -108,7 +100,6 @@ fn author_schema() -> query.SchemaBuilder {
       "authors",
       schema.list_type(schema.named_type("Author")),
       fn(_ctx) { Ok(all_authors()) },
-      fn(a) { types.to_dynamic(a) },
     )
 
   let author_query =
@@ -116,14 +107,13 @@ fn author_schema() -> query.SchemaBuilder {
       name: "author",
       args: [query.arg("id", schema.non_null(schema.id_type()))],
       returns: schema.named_type("Author"),
-      decode: fn(args) { query.get_id(args, "id") },
-      resolve: fn(id, _ctx) {
+      resolve: fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
         case list.find(all_authors(), fn(a) { a.id == id }) {
           Ok(a) -> Ok(a)
-          Error(_) -> Error("Not found")
+          Error(_) -> Error(error.new("Not found"))
         }
       },
-      encode: fn(a) { types.to_dynamic(a) },
     )
 
   query.new()
@@ -149,23 +139,13 @@ fn review_schema() -> query.SchemaBuilder {
         query.arg("comment", schema.string_type()),
       ],
       returns: schema.non_null(schema.named_type("Review")),
-      decode: fn(args) {
-        case query.get_id(args, "bookId"), query.get_int(args, "rating") {
-          Ok(bid), Ok(r) -> {
-            let c = case query.get_optional_string(args, "comment") {
-              option.Some(v) -> v
-              option.None -> ""
-            }
-            Ok(#(bid, r, c))
-          }
-          _, _ -> Error("Missing args")
-        }
-      },
-      resolve: fn(input, _ctx) {
-        let #(_bid, rating, comment) = input
+      resolve: fn(args, _ctx) {
+        use _bid <- result.try(query.get_id(args, "bookId"))
+        use rating <- result.try(query.get_int(args, "rating"))
+        let comment =
+          query.get_optional_string(args, "comment") |> option.unwrap("")
         Ok(Review("new-1", "1", rating, comment))
       },
-      encode: fn(r) { types.to_dynamic(r) },
     )
 
   query.new()

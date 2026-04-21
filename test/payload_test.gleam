@@ -6,6 +6,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 import gleeunit/should
 import mochi/executor
 import mochi/payload
@@ -55,10 +56,12 @@ fn build_mutation_schema(
       name: "createUser",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("CreateUserPayload"),
-      decode: fn(args) { query.get_string(args, "name") },
-      resolve: fn(name, ctx) { Ok(resolver(name, ctx)) },
-      encode: fn(p) { payload.to_dynamic(p, user_to_dynamic) },
-    ),
+      resolve: fn(args, ctx) {
+        use name <- result.try(query.get_string(args, "name"))
+        Ok(resolver(name, ctx))
+      },
+    )
+    |> query.with_encoder(fn(p) { payload.to_dynamic(p, user_to_dynamic) }),
   )
   |> query.build
 }

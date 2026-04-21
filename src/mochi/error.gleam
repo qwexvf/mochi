@@ -344,6 +344,17 @@ fn category_to_string(category: ErrorCategory) -> String {
   }
 }
 
+pub type GqlError =
+  GraphQLError
+
+pub fn new(message: String) -> GqlError {
+  GraphQLError(message: message, locations: None, path: None, extensions: None)
+}
+
+pub fn fail(message: String) -> Result(r, GqlError) {
+  Error(new(message))
+}
+
 /// Convert string path to PathSegment list
 pub fn path_from_strings(path: List(String)) -> List(PathSegment) {
   list.map(path, FieldSegment)

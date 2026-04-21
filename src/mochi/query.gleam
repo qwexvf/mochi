@@ -1,7 +1,3 @@
-// mochi/query.gleam
-// Code First API for defining GraphQL queries and mutations
-// Inspired by gqlkit's simple, type-safe approach
-
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
@@ -10,72 +6,84 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import mochi/document_cache
+import mochi/error.{type GqlError}
 import mochi/scalars
 import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,
-  type Resolver, type ResolverInfo, type Schema,
+  type ResolverInfo, type Schema,
+}
+import mochi/types as t
+
+// ============================================================================
+// Phantom Kind Types
+// ============================================================================
+
+pub type QueryKind {
+  QueryKind
+}
+
+pub type MutationKind {
+  MutationKind
+}
+
+pub type SubscriptionKind {
+  SubscriptionKind
+}
+
+pub opaque type FieldKind(parent) {
+  FieldKind(fn(parent) -> parent)
 }
 
 // ============================================================================
-// Core Types
+// Type Aliases
 // ============================================================================
 
-/// A query definition with typed arguments and return value
-pub opaque type QueryDef(args, result) {
-  QueryDef(
+pub type QueryOp(result) =
+  Op(QueryKind, result)
+
+pub type MutationOp(result) =
+  Op(MutationKind, result)
+
+pub type SubscriptionOp(event) =
+  Op(SubscriptionKind, event)
+
+pub type FieldOp(parent, result) =
+  Op(FieldKind(parent), result)
+
+// ============================================================================
+// Internal Resolver Variants
+// ============================================================================
+
+type InternalResolver(result) {
+  SimpleResolver(
+    fn(Dict(String, Dynamic), ExecutionContext) -> Result(result, GqlError),
+  )
+  TopicResolver(
+    fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, GqlError),
+  )
+  ParentResolver(
+    fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
+      Result(result, GqlError),
+  )
+}
+
+// ============================================================================
+// Unified Op Type
+// ============================================================================
+
+/// Unified operation type for queries, mutations, subscriptions, and fields.
+/// The `kind` parameter encodes what kind of operation this is at the type level.
+/// Use the type aliases `QueryOp`, `MutationOp`, `SubscriptionOp`, `FieldOp` in annotations.
+pub opaque type Op(kind, result) {
+  Op(
     name: String,
     description: Option(String),
-    args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-    resolver: fn(args, ExecutionContext) -> Result(result, String),
+    op_resolver: InternalResolver(result),
     result_encoder: fn(result) -> Dynamic,
     arg_definitions: List(ArgDef),
     return_type: FieldType,
     guards: List(Guard),
-  )
-}
-
-/// A mutation definition
-pub opaque type MutationDef(args, result) {
-  MutationDef(
-    name: String,
-    description: Option(String),
-    args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-    resolver: fn(args, ExecutionContext) -> Result(result, String),
-    result_encoder: fn(result) -> Dynamic,
-    arg_definitions: List(ArgDef),
-    return_type: FieldType,
-    guards: List(Guard),
-  )
-}
-
-/// A subscription definition
-pub opaque type SubscriptionDef(args, event) {
-  SubscriptionDef(
-    name: String,
-    description: Option(String),
-    args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-    /// Returns the topic to subscribe to
-    topic_resolver: fn(args, ExecutionContext) -> Result(String, String),
-    /// Transforms event data for GraphQL response
-    event_encoder: fn(event) -> Dynamic,
-    arg_definitions: List(ArgDef),
-    return_type: FieldType,
-    guards: List(Guard),
-  )
-}
-
-/// A field definition for extending types
-pub opaque type FieldDef(parent, args, result) {
-  FieldDef(
-    name: String,
-    description: Option(String),
-    parent_decoder: fn(Dynamic) -> Result(parent, String),
-    args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-    resolver: fn(parent, args, ExecutionContext) -> Result(result, String),
-    result_encoder: fn(result) -> Dynamic,
-    arg_definitions: List(ArgDef),
-    return_type: FieldType,
-    guards: List(Guard),
+    kind: kind,
   )
 }
 
@@ -89,327 +97,221 @@ pub type ArgDef {
   )
 }
 
-/// No arguments marker type
-pub type NoArgs {
-  NoArgs
+// ============================================================================
+// Generic Modifiers — work on any Op(k, r)
+// ============================================================================
+
+/// Override the result encoder. Works on any operation type.
+pub fn with_encoder(op: Op(k, r), encoder: fn(r) -> Dynamic) -> Op(k, r) {
+  Op(..op, result_encoder: encoder)
+}
+
+/// Add a guard. Works on any operation type. Guards run in the order added.
+pub fn with_guard(op: Op(k, r), guard_fn: Guard) -> Op(k, r) {
+  Op(..op, guards: list.append(op.guards, [guard_fn]))
+}
+
+/// Set the description. Works on any operation type.
+pub fn with_description(op: Op(k, r), desc: String) -> Op(k, r) {
+  Op(..op, description: Some(desc))
+}
+
+// ============================================================================
+// Generic Accessors
+// ============================================================================
+
+pub fn get_name(op: Op(k, r)) -> String {
+  op.name
+}
+
+pub fn get_description(op: Op(k, r)) -> Option(String) {
+  op.description
+}
+
+pub fn get_args(op: Op(k, r)) -> List(ArgDef) {
+  op.arg_definitions
 }
 
 // ============================================================================
 // Query Builders
 // ============================================================================
 
-/// Define a query with no arguments
+/// Define a query with no arguments.
 pub fn query(
-  name: String,
-  return_type: FieldType,
-  resolver: fn(ExecutionContext) -> Result(result, String),
-  encoder: fn(result) -> Dynamic,
-) -> QueryDef(NoArgs, result) {
-  QueryDef(
+  name name: String,
+  returns return_type: FieldType,
+  resolve resolver: fn(ExecutionContext) -> Result(result, GqlError),
+) -> QueryOp(result) {
+  Op(
     name: name,
     description: None,
-    args_decoder: fn(_) { Ok(NoArgs) },
-    resolver: fn(_, ctx) { resolver(ctx) },
-    result_encoder: encoder,
+    op_resolver: SimpleResolver(fn(_, ctx) { resolver(ctx) }),
+    result_encoder: t.to_dynamic,
     arg_definitions: [],
     return_type: return_type,
     guards: [],
+    kind: QueryKind,
   )
 }
 
-/// Define a query with arguments
-///
-/// Uses labeled arguments for clarity:
-/// ```gleam
-/// query.query_with_args(
-///   name: "user",
-///   args: [query.arg("id", schema.non_null(schema.id_type()))],
-///   returns: schema.named_type("User"),
-///   decode: fn(args) { get_id(args, "id") },
-///   resolve: fn(id, ctx) { get_user_by_id(id) },
-///   encode: fn(user) { types.to_dynamic(user) },
-/// )
-/// ```
+/// Define a query with arguments.
 pub fn query_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  decode args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolve resolver: fn(args, ExecutionContext) -> Result(result, String),
-  encode encoder: fn(result) -> Dynamic,
-) -> QueryDef(args, result) {
-  QueryDef(
+  resolve resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
+) -> QueryOp(result) {
+  Op(
     name: name,
     description: None,
-    args_decoder: args_decoder,
-    resolver: resolver,
-    result_encoder: encoder,
+    op_resolver: SimpleResolver(resolver),
+    result_encoder: t.to_dynamic,
     arg_definitions: arg_defs,
     return_type: return_type,
     guards: [],
+    kind: QueryKind,
   )
-}
-
-/// Add description to a query
-pub fn query_description(
-  q: QueryDef(args, result),
-  desc: String,
-) -> QueryDef(args, result) {
-  QueryDef(..q, description: Some(desc))
-}
-
-/// Add a guard to a query. Guards run in the order they are added — the first
-/// piped guard runs first:
-///
-/// ```gleam
-/// query.query_with_args(name: "myPosts", ...)
-/// |> query.with_guard(require_auth)   // checked first
-/// |> query.with_guard(require_admin)  // checked second
-/// ```
-pub fn with_guard(
-  q: QueryDef(args, result),
-  guard_fn: Guard,
-) -> QueryDef(args, result) {
-  QueryDef(..q, guards: list.append(q.guards, [guard_fn]))
 }
 
 // ============================================================================
 // Mutation Builders
 // ============================================================================
 
-/// Define a mutation with arguments
-///
-/// Uses labeled arguments for clarity:
-/// ```gleam
-/// query.mutation(
-///   name: "createUser",
-///   args: [query.arg("input", schema.non_null(schema.named_type("CreateUserInput")))],
-///   returns: schema.named_type("User"),
-///   decode: fn(args) { decode_create_user_input(args) },
-///   resolve: fn(input, ctx) { create_user(input) },
-///   encode: fn(user) { types.to_dynamic(user) },
-/// )
-/// ```
+/// Define a mutation with arguments.
 pub fn mutation(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  decode args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolve resolver: fn(args, ExecutionContext) -> Result(result, String),
-  encode encoder: fn(result) -> Dynamic,
-) -> MutationDef(args, result) {
-  MutationDef(
+  resolve resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
+) -> MutationOp(result) {
+  Op(
     name: name,
     description: None,
-    args_decoder: args_decoder,
-    resolver: resolver,
-    result_encoder: encoder,
+    op_resolver: SimpleResolver(resolver),
+    result_encoder: t.to_dynamic,
     arg_definitions: arg_defs,
     return_type: return_type,
     guards: [],
+    kind: MutationKind,
   )
-}
-
-/// Add description to a mutation
-pub fn mutation_description(
-  m: MutationDef(args, result),
-  desc: String,
-) -> MutationDef(args, result) {
-  MutationDef(..m, description: Some(desc))
-}
-
-/// Add a guard to a mutation. Guards run in the order they are added.
-pub fn mutation_with_guard(
-  m: MutationDef(args, result),
-  guard_fn: Guard,
-) -> MutationDef(args, result) {
-  MutationDef(..m, guards: list.append(m.guards, [guard_fn]))
 }
 
 // ============================================================================
 // Subscription Builders
 // ============================================================================
 
-/// Define a subscription with no arguments
+/// Define a subscription with a static topic string.
 pub fn subscription(
-  name: String,
-  return_type: FieldType,
-  topic: String,
-  encoder: fn(event) -> Dynamic,
-) -> SubscriptionDef(NoArgs, event) {
-  SubscriptionDef(
+  name name: String,
+  returns return_type: FieldType,
+  topic topic: String,
+) -> SubscriptionOp(event) {
+  Op(
     name: name,
     description: None,
-    args_decoder: fn(_) { Ok(NoArgs) },
-    topic_resolver: fn(_, _) { Ok(topic) },
-    event_encoder: encoder,
+    op_resolver: TopicResolver(fn(_, _) { Ok(topic) }),
+    result_encoder: t.to_dynamic,
     arg_definitions: [],
     return_type: return_type,
     guards: [],
+    kind: SubscriptionKind,
   )
 }
 
-/// Define a subscription with arguments
-///
-/// Uses labeled arguments for clarity:
-/// ```gleam
-/// query.subscription_with_args(
-///   name: "onMessage",
-///   args: [query.arg("channelId", schema.non_null(schema.id_type()))],
-///   returns: schema.named_type("Message"),
-///   decode: fn(args) { get_id(args, "channelId") },
-///   topic: fn(channel_id, ctx) { Ok("channel:" <> channel_id) },
-///   encode: fn(msg) { types.to_dynamic(msg) },
-/// )
-/// ```
+/// Define a subscription with arguments and a dynamic topic resolver.
 pub fn subscription_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  decode args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  topic topic_resolver: fn(args, ExecutionContext) -> Result(String, String),
-  encode encoder: fn(event) -> Dynamic,
-) -> SubscriptionDef(args, event) {
-  SubscriptionDef(
+  topic topic_resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(String, GqlError),
+) -> SubscriptionOp(event) {
+  Op(
     name: name,
     description: None,
-    args_decoder: args_decoder,
-    topic_resolver: topic_resolver,
-    event_encoder: encoder,
+    op_resolver: TopicResolver(topic_resolver),
+    result_encoder: t.to_dynamic,
     arg_definitions: arg_defs,
     return_type: return_type,
     guards: [],
+    kind: SubscriptionKind,
   )
-}
-
-/// Add description to a subscription
-pub fn subscription_description(
-  s: SubscriptionDef(args, event),
-  desc: String,
-) -> SubscriptionDef(args, event) {
-  SubscriptionDef(..s, description: Some(desc))
-}
-
-/// Add a guard to a subscription. Guards run in the order they are added.
-pub fn subscription_with_guard(
-  s: SubscriptionDef(args, event),
-  guard_fn: Guard,
-) -> SubscriptionDef(args, event) {
-  SubscriptionDef(..s, guards: list.append(s.guards, [guard_fn]))
 }
 
 // ============================================================================
 // Field Builders (for extending types)
 // ============================================================================
 
-/// Define a field on a type
+/// Define a field on a type with no extra arguments.
 pub fn field(
-  name: String,
-  return_type: FieldType,
-  parent_decoder: fn(Dynamic) -> Result(parent, String),
-  resolver: fn(parent, ExecutionContext) -> Result(result, String),
-  encoder: fn(result) -> Dynamic,
-) -> FieldDef(parent, NoArgs, result) {
-  FieldDef(
+  name name: String,
+  returns return_type: FieldType,
+  decode parent_decoder: fn(Dynamic) -> Result(parent, String),
+  resolve resolver: fn(parent, ExecutionContext) -> Result(result, GqlError),
+) -> FieldOp(parent, result) {
+  Op(
     name: name,
     description: None,
-    parent_decoder: parent_decoder,
-    args_decoder: fn(_) { Ok(NoArgs) },
-    resolver: fn(parent, _, ctx) { resolver(parent, ctx) },
-    result_encoder: encoder,
+    op_resolver: ParentResolver(fn(parent_dyn, _, ctx) {
+      use parent_dyn_val <- result.try(option.to_result(
+        parent_dyn,
+        error.new("No parent value provided"),
+      ))
+      use p <- result.try(
+        parent_decoder(parent_dyn_val)
+        |> result.map_error(fn(e) {
+          error.new("Failed to decode parent: " <> e)
+        }),
+      )
+      resolver(p, ctx)
+    }),
+    result_encoder: t.to_dynamic,
     arg_definitions: [],
     return_type: return_type,
     guards: [],
+    kind: FieldKind(fn(x) { x }),
   )
 }
 
-/// Define a field with arguments
-///
-/// Uses labeled arguments for clarity:
-/// ```gleam
-/// query.field_with_args(
-///   name: "posts",
-///   args: [query.arg("limit", schema.int_type())],
-///   returns: schema.list_type(schema.named_type("Post")),
-///   parent: decode_user,
-///   decode: fn(args) { get_optional_int(args, "limit") },
-///   resolve: fn(user, limit, ctx) { get_user_posts(user.id, limit) },
-///   encode: fn(posts) { types.to_dynamic(posts) },
-/// )
-/// ```
+/// Define a field on a type with arguments.
 pub fn field_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  parent parent_decoder: fn(Dynamic) -> Result(parent, String),
-  decode args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolve resolver: fn(parent, args, ExecutionContext) -> Result(result, String),
-  encode encoder: fn(result) -> Dynamic,
-) -> FieldDef(parent, args, result) {
-  FieldDef(
+  decode parent_decoder: fn(Dynamic) -> Result(parent, String),
+  resolve resolver: fn(parent, Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
+) -> FieldOp(parent, result) {
+  Op(
     name: name,
     description: None,
-    parent_decoder: parent_decoder,
-    args_decoder: args_decoder,
-    resolver: resolver,
-    result_encoder: encoder,
+    op_resolver: ParentResolver(fn(parent_dyn, args, ctx) {
+      use parent_dyn_val <- result.try(option.to_result(
+        parent_dyn,
+        error.new("No parent value provided"),
+      ))
+      use p <- result.try(
+        parent_decoder(parent_dyn_val)
+        |> result.map_error(fn(e) {
+          error.new("Failed to decode parent: " <> e)
+        }),
+      )
+      resolver(p, args, ctx)
+    }),
+    result_encoder: t.to_dynamic,
     arg_definitions: arg_defs,
     return_type: return_type,
     guards: [],
+    kind: FieldKind(fn(x) { x }),
   )
-}
-
-/// Add description to a field
-pub fn field_description(
-  f: FieldDef(parent, args, result),
-  desc: String,
-) -> FieldDef(parent, args, result) {
-  FieldDef(..f, description: Some(desc))
-}
-
-/// Add a guard to a field. Guards run in the order they are added.
-pub fn field_with_guard(
-  f: FieldDef(parent, args, result),
-  guard_fn: Guard,
-) -> FieldDef(parent, args, result) {
-  FieldDef(..f, guards: list.append(f.guards, [guard_fn]))
 }
 
 // ============================================================================
 // Guard Combinators
 // ============================================================================
 
-// ============================================================================
-// Accessor functions (for inspection/testing of opaque Def types)
-// ============================================================================
-
-pub fn query_get_name(q: QueryDef(a, b)) -> String {
-  q.name
-}
-
-pub fn query_get_description(q: QueryDef(a, b)) -> Option(String) {
-  q.description
-}
-
-pub fn query_get_args(q: QueryDef(a, b)) -> List(ArgDef) {
-  q.arg_definitions
-}
-
-pub fn mutation_get_name(m: MutationDef(a, b)) -> String {
-  m.name
-}
-
-pub fn mutation_get_description(m: MutationDef(a, b)) -> Option(String) {
-  m.description
-}
-
-pub fn subscription_get_name(s: SubscriptionDef(a, b)) -> String {
-  s.name
-}
-
-// ============================================================================
-
-/// Guard type for the Code First API.
 pub type Guard =
   fn(ExecutionContext) -> Result(Nil, String)
 
@@ -444,38 +346,48 @@ fn try_any(
   }
 }
 
-fn apply_op_guards(
+fn apply_gql_guards(
   guards: List(Guard),
-  resolver: fn(args, ExecutionContext) -> Result(result, String),
-) -> fn(args, ExecutionContext) -> Result(result, String) {
+  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
+) -> fn(Dict(String, Dynamic), ExecutionContext) -> Result(result, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
-      use _ <- result.try(g(ctx))
-      inner(args, ctx)
-    }
-  })
-}
-
-fn apply_field_guards(
-  guards: List(Guard),
-  resolver: fn(parent, args, ExecutionContext) -> Result(result, String),
-) -> fn(parent, args, ExecutionContext) -> Result(result, String) {
-  list.fold(list.reverse(guards), resolver, fn(inner, g) {
-    fn(parent, args, ctx) {
-      use _ <- result.try(g(ctx))
-      inner(parent, args, ctx)
+      case g(ctx) {
+        Ok(Nil) -> inner(args, ctx)
+        Error(msg) -> Error(error.new(msg))
+      }
     }
   })
 }
 
 fn apply_topic_guards(
   guards: List(Guard),
-  resolver: fn(args, ExecutionContext) -> Result(String, String),
-) -> fn(args, ExecutionContext) -> Result(String, String) {
+  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(String, GqlError),
+) -> fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
-      use _ <- result.try(g(ctx))
-      inner(args, ctx)
+      case g(ctx) {
+        Ok(Nil) -> inner(args, ctx)
+        Error(msg) -> Error(error.new(msg))
+      }
+    }
+  })
+}
+
+fn apply_parent_gql_guards(
+  guards: List(Guard),
+  resolver: fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
+) -> fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
+  Result(result, GqlError) {
+  list.fold(list.reverse(guards), resolver, fn(inner, g) {
+    fn(parent, args, ctx) {
+      case g(ctx) {
+        Ok(Nil) -> inner(parent, args, ctx)
+        Error(msg) -> Error(error.new(msg))
+      }
     }
   })
 }
@@ -504,10 +416,6 @@ pub fn arg_with_desc(
 }
 
 /// Create an argument with a default value
-///
-/// ```gleam
-/// query.arg_with_default("limit", schema.int_type(), types.to_dynamic(10))
-/// ```
 pub fn arg_with_default(
   name: String,
   arg_type: FieldType,
@@ -522,10 +430,6 @@ pub fn arg_with_default(
 }
 
 /// Create an argument with default value and description
-///
-/// ```gleam
-/// query.arg_with_default_desc("limit", schema.int_type(), types.to_dynamic(10), "Maximum items to return")
-/// ```
 pub fn arg_with_default_desc(
   name: String,
   arg_type: FieldType,
@@ -549,13 +453,15 @@ fn fetch_required(
   key: String,
   decoder: decode.Decoder(a),
   type_label: String,
-) -> Result(a, String) {
+) -> Result(a, GqlError) {
   case dict.get(args, key) {
-    Error(_) -> Error("Missing required argument: " <> key)
+    Error(_) -> Error(error.new("Missing required argument: " <> key))
     Ok(value) ->
       decode.run(value, decoder)
       |> result.map_error(fn(_) {
-        "Invalid type for argument '" <> key <> "': expected " <> type_label
+        error.new(
+          "Invalid type for argument '" <> key <> "': expected " <> type_label,
+        )
       })
   }
 }
@@ -587,72 +493,41 @@ fn fetch_or(
   }
 }
 
-/// Get a required string argument from the arguments dict
-///
-/// ```gleam
-/// fn decode_args(args) {
-///   use name <- result.try(query.get_string(args, "name"))
-///   Ok(name)
-/// }
-/// ```
 pub fn get_string(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(String, String) {
+) -> Result(String, GqlError) {
   fetch_required(args, key, decode.string, "String")
 }
 
-/// Get a required ID argument (as String) from the arguments dict
-///
-/// ```gleam
-/// fn decode_args(args) {
-///   use id <- result.try(query.get_id(args, "id"))
-///   Ok(id)
-/// }
-/// ```
 pub fn get_id(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(String, String) {
+) -> Result(String, GqlError) {
   fetch_required(args, key, decode.string, "ID")
 }
 
-/// Get a required int argument from the arguments dict
-///
-/// ```gleam
-/// fn decode_args(args) {
-///   use age <- result.try(query.get_int(args, "age"))
-///   Ok(age)
-/// }
-/// ```
-pub fn get_int(args: Dict(String, Dynamic), key: String) -> Result(Int, String) {
+pub fn get_int(
+  args: Dict(String, Dynamic),
+  key: String,
+) -> Result(Int, GqlError) {
   fetch_required(args, key, decode.int, "Int")
 }
 
-/// Get a required float argument from the arguments dict
 pub fn get_float(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(Float, String) {
+) -> Result(Float, GqlError) {
   fetch_required(args, key, decode.float, "Float")
 }
 
-/// Get a required bool argument from the arguments dict
 pub fn get_bool(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(Bool, String) {
+) -> Result(Bool, GqlError) {
   fetch_required(args, key, decode.bool, "Bool")
 }
 
-/// Get an optional string argument from the arguments dict
-///
-/// ```gleam
-/// fn decode_args(args) {
-///   let name = query.get_optional_string(args, "name")
-///   Ok(SearchArgs(name: name))
-/// }
-/// ```
 pub fn get_optional_string(
   args: Dict(String, Dynamic),
   key: String,
@@ -660,7 +535,6 @@ pub fn get_optional_string(
   fetch_optional(args, key, decode.string)
 }
 
-/// Get an optional ID argument from the arguments dict
 pub fn get_optional_id(
   args: Dict(String, Dynamic),
   key: String,
@@ -668,12 +542,10 @@ pub fn get_optional_id(
   get_optional_string(args, key)
 }
 
-/// Get an optional int argument from the arguments dict
 pub fn get_optional_int(args: Dict(String, Dynamic), key: String) -> Option(Int) {
   fetch_optional(args, key, decode.int)
 }
 
-/// Get an optional float argument from the arguments dict
 pub fn get_optional_float(
   args: Dict(String, Dynamic),
   key: String,
@@ -681,7 +553,6 @@ pub fn get_optional_float(
   fetch_optional(args, key, decode.float)
 }
 
-/// Get an optional bool argument from the arguments dict
 pub fn get_optional_bool(
   args: Dict(String, Dynamic),
   key: String,
@@ -689,19 +560,17 @@ pub fn get_optional_bool(
   fetch_optional(args, key, decode.bool)
 }
 
-/// Get a required list of strings from the arguments dict
 pub fn get_string_list(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(List(String), String) {
+) -> Result(List(String), GqlError) {
   fetch_required(args, key, decode.list(decode.string), "[String]")
 }
 
-/// Get a required list of ints from the arguments dict
 pub fn get_int_list(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(List(Int), String) {
+) -> Result(List(Int), GqlError) {
   fetch_required(args, key, decode.list(decode.int), "[Int]")
 }
 
@@ -709,21 +578,23 @@ pub fn decode_input(
   args: Dict(String, Dynamic),
   key: String,
   decoder: decode.Decoder(a),
-) -> Result(a, String) {
+) -> Result(a, GqlError) {
   case dict.get(args, key) {
-    Error(_) -> Error("Missing required argument: " <> key)
+    Error(_) -> Error(error.new("Missing required argument: " <> key))
     Ok(value) ->
       decode.run(value, decoder)
-      |> result.map_error(fn(_) { "Invalid input for '" <> key <> "'" })
+      |> result.map_error(fn(_) {
+        error.new("Invalid input for '" <> key <> "'")
+      })
   }
 }
 
 pub fn get_dynamic(
   args: Dict(String, Dynamic),
   key: String,
-) -> Result(Dynamic, String) {
+) -> Result(Dynamic, GqlError) {
   dict.get(args, key)
-  |> result.map_error(fn(_) { "Missing required argument: " <> key })
+  |> result.map_error(fn(_) { error.new("Missing required argument: " <> key) })
 }
 
 pub fn get_optional_dynamic(
@@ -734,15 +605,6 @@ pub fn get_optional_dynamic(
   |> option.from_result
 }
 
-// ============================================================================
-// Argument Parsing Helpers with Defaults
-// ============================================================================
-
-/// Get a string argument or return default if not present
-///
-/// ```gleam
-/// let name = query.get_string_or(args, "name", "Anonymous")
-/// ```
 pub fn get_string_or(
   args: Dict(String, Dynamic),
   key: String,
@@ -751,7 +613,6 @@ pub fn get_string_or(
   fetch_or(args, key, decode.string, default)
 }
 
-/// Get an ID argument or return default if not present
 pub fn get_id_or(
   args: Dict(String, Dynamic),
   key: String,
@@ -760,20 +621,10 @@ pub fn get_id_or(
   get_string_or(args, key, default)
 }
 
-/// Get an int argument or return default if not present
-///
-/// ```gleam
-/// let limit = query.get_int_or(args, "limit", 10)
-/// ```
 pub fn get_int_or(args: Dict(String, Dynamic), key: String, default: Int) -> Int {
   fetch_or(args, key, decode.int, default)
 }
 
-/// Get a float argument or return default if not present
-///
-/// ```gleam
-/// let price = query.get_float_or(args, "price", 0.0)
-/// ```
 pub fn get_float_or(
   args: Dict(String, Dynamic),
   key: String,
@@ -782,11 +633,6 @@ pub fn get_float_or(
   fetch_or(args, key, decode.float, default)
 }
 
-/// Get a bool argument or return default if not present
-///
-/// ```gleam
-/// let active = query.get_bool_or(args, "active", True)
-/// ```
 pub fn get_bool_or(
   args: Dict(String, Dynamic),
   key: String,
@@ -799,35 +645,15 @@ pub fn get_bool_or(
 // Schema Building
 // ============================================================================
 
-fn build_op_resolver(
-  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolver: fn(args, ExecutionContext) -> Result(result, String),
-  result_encoder: fn(result) -> Dynamic,
-) -> Resolver {
-  fn(info: ResolverInfo) {
-    use decoded_args <- result.try(
-      args_decoder(info.arguments)
-      |> result.map_error(fn(e) { "Failed to decode arguments: " <> e }),
-    )
-    use res <- result.map(resolver(decoded_args, info.context))
-    result_encoder(res)
-  }
-}
-
-fn build_rich_op_resolver(
-  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolver: fn(args, ExecutionContext) ->
-    Result(result, schema.RichResolverPayload),
+fn build_gql_resolver(
+  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+    Result(result, GqlError),
   result_encoder: fn(result) -> Dynamic,
 ) -> schema.RichResolver {
   fn(info: ResolverInfo) {
-    case args_decoder(info.arguments) {
-      Error(e) -> Error(#("Failed to decode arguments: " <> e, option.None))
-      Ok(decoded_args) ->
-        case resolver(decoded_args, info.context) {
-          Error(payload) -> Error(payload)
-          Ok(res) -> Ok(result_encoder(res))
-        }
+    case resolver(info.arguments, info.context) {
+      Error(err) -> Error(error.to_payload(err))
+      Ok(res) -> Ok(result_encoder(res))
     }
   }
 }
@@ -839,81 +665,49 @@ fn apply_desc(field: FieldDefinition, desc: Option(String)) -> FieldDefinition {
   }
 }
 
-/// Convert a QueryDef to a schema FieldDefinition
-pub fn query_to_field_def(q: QueryDef(args, result)) -> FieldDefinition {
-  schema.field_def(q.name, q.return_type)
-  |> schema.resolver(build_op_resolver(
-    q.args_decoder,
-    apply_op_guards(q.guards, q.resolver),
-    q.result_encoder,
-  ))
-  |> add_args_to_field(q.arg_definitions)
-  |> apply_desc(q.description)
-}
-
-/// Convert a MutationDef to a schema FieldDefinition
-pub fn mutation_to_field_def(m: MutationDef(args, result)) -> FieldDefinition {
-  schema.field_def(m.name, m.return_type)
-  |> schema.resolver(build_op_resolver(
-    m.args_decoder,
-    apply_op_guards(m.guards, m.resolver),
-    m.result_encoder,
-  ))
-  |> add_args_to_field(m.arg_definitions)
-  |> apply_desc(m.description)
-}
-
-/// Convert a SubscriptionDef to a schema FieldDefinition.
-/// Actual subscription logic is handled by the subscription executor;
-/// this creates the schema definition for introspection and SDL generation.
-pub fn subscription_to_field_def(
-  s: SubscriptionDef(args, event),
-) -> FieldDefinition {
-  // placeholder — subscriptions are routed through the subscription executor, not resolved here
-  let resolver: Resolver = fn(_info: ResolverInfo) {
-    Error("Subscriptions must be executed through the subscription executor")
-  }
-
-  let guarded_topic = apply_topic_guards(s.guards, s.topic_resolver)
-  let topic_fn =
-    Some(fn(raw_args: Dict(String, Dynamic), ctx: ExecutionContext) {
-      case s.args_decoder(raw_args) {
-        Ok(decoded_args) -> guarded_topic(decoded_args, ctx)
-        Error(e) -> Error("Failed to decode subscription args: " <> e)
+/// Convert any Op to a schema FieldDefinition.
+pub fn to_field_def(op: Op(k, r)) -> FieldDefinition {
+  let base =
+    schema.field_def(op.name, op.return_type)
+    |> add_args_to_field(op.arg_definitions)
+    |> apply_desc(op.description)
+  case op.op_resolver {
+    SimpleResolver(resolver) ->
+      schema.rich_resolver_fn(
+        base,
+        build_gql_resolver(
+          apply_gql_guards(op.guards, resolver),
+          op.result_encoder,
+        ),
+      )
+    TopicResolver(resolver) -> {
+      let guarded_topic = apply_topic_guards(op.guards, resolver)
+      base
+      |> schema.resolver(fn(_: ResolverInfo) {
+        Error(
+          "Subscriptions must be executed through the subscription executor",
+        )
+      })
+      |> fn(fd) {
+        schema.FieldDefinition(
+          ..fd,
+          topic_fn: Some(fn(args, ctx) {
+            guarded_topic(args, ctx)
+            |> result.map_error(fn(e) { e.message })
+          }),
+        )
       }
-    })
-
-  schema.field_def(s.name, s.return_type)
-  |> schema.resolver(resolver)
-  |> fn(fd) { schema.FieldDefinition(..fd, topic_fn: topic_fn) }
-  |> add_args_to_field(s.arg_definitions)
-  |> apply_desc(s.description)
-}
-
-/// Convert a FieldDef to a schema FieldDefinition
-pub fn field_def_to_schema(f: FieldDef(parent, args, result)) -> FieldDefinition {
-  let guarded_resolver = apply_field_guards(f.guards, f.resolver)
-  let resolver: Resolver = fn(info: ResolverInfo) {
-    use parent_dyn <- result.try(option.to_result(
-      info.parent,
-      "No parent value provided",
-    ))
-    use parent <- result.try(
-      f.parent_decoder(parent_dyn)
-      |> result.map_error(fn(e) { "Failed to decode parent: " <> e }),
-    )
-    use decoded_args <- result.try(
-      f.args_decoder(info.arguments)
-      |> result.map_error(fn(e) { "Failed to decode arguments: " <> e }),
-    )
-    use res <- result.map(guarded_resolver(parent, decoded_args, info.context))
-    f.result_encoder(res)
+    }
+    ParentResolver(resolver) -> {
+      let guarded = apply_parent_gql_guards(op.guards, resolver)
+      schema.rich_resolver_fn(base, fn(info: ResolverInfo) {
+        case guarded(info.parent, info.arguments, info.context) {
+          Error(err) -> Error(error.to_payload(err))
+          Ok(res) -> Ok(op.result_encoder(res))
+        }
+      })
+    }
   }
-
-  schema.field_def(f.name, f.return_type)
-  |> schema.resolver(resolver)
-  |> add_args_to_field(f.arg_definitions)
-  |> apply_desc(f.description)
 }
 
 fn add_args_to_field(
@@ -938,10 +732,9 @@ fn add_args_to_field(
 }
 
 // ============================================================================
-// Schema Builder - Fluent API
+// Schema Builder
 // ============================================================================
 
-/// Schema builder for collecting queries, mutations, and subscriptions
 pub type SchemaBuilder {
   SchemaBuilder(
     queries: List(FieldDefinition),
@@ -957,7 +750,6 @@ pub type SchemaBuilder {
   )
 }
 
-/// Create a new schema builder
 pub fn new() -> SchemaBuilder {
   SchemaBuilder(
     queries: [],
@@ -973,89 +765,35 @@ pub fn new() -> SchemaBuilder {
   )
 }
 
-/// Add a query to the schema
-pub fn add_query(
-  builder: SchemaBuilder,
-  q: QueryDef(args, result),
-) -> SchemaBuilder {
-  SchemaBuilder(..builder, queries: [query_to_field_def(q), ..builder.queries])
+pub fn add_query(builder: SchemaBuilder, q: Op(QueryKind, r)) -> SchemaBuilder {
+  SchemaBuilder(..builder, queries: [to_field_def(q), ..builder.queries])
 }
 
-/// Add a mutation to the schema
 pub fn add_mutation(
   builder: SchemaBuilder,
-  m: MutationDef(args, result),
+  m: Op(MutationKind, r),
 ) -> SchemaBuilder {
-  SchemaBuilder(..builder, mutations: [
-    mutation_to_field_def(m),
-    ..builder.mutations
-  ])
+  SchemaBuilder(..builder, mutations: [to_field_def(m), ..builder.mutations])
 }
 
-pub fn add_rich_query(
-  builder: SchemaBuilder,
-  name: String,
-  arg_defs: List(ArgDef),
-  return_type: schema.FieldType,
-  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolver: fn(args, ExecutionContext) ->
-    Result(result, schema.RichResolverPayload),
-  encoder: fn(result) -> Dynamic,
-) -> SchemaBuilder {
-  let field =
-    schema.field_def(name, return_type)
-    |> schema.rich_resolver_fn(build_rich_op_resolver(
-      args_decoder,
-      resolver,
-      encoder,
-    ))
-    |> add_args_to_field(arg_defs)
-  SchemaBuilder(..builder, queries: [field, ..builder.queries])
-}
-
-pub fn add_rich_mutation(
-  builder: SchemaBuilder,
-  name: String,
-  arg_defs: List(ArgDef),
-  return_type: schema.FieldType,
-  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
-  resolver: fn(args, ExecutionContext) ->
-    Result(result, schema.RichResolverPayload),
-  encoder: fn(result) -> Dynamic,
-) -> SchemaBuilder {
-  let field =
-    schema.field_def(name, return_type)
-    |> schema.rich_resolver_fn(build_rich_op_resolver(
-      args_decoder,
-      resolver,
-      encoder,
-    ))
-    |> add_args_to_field(arg_defs)
-  SchemaBuilder(..builder, mutations: [field, ..builder.mutations])
-}
-
-/// Add a subscription to the schema
 pub fn add_subscription(
   builder: SchemaBuilder,
-  s: SubscriptionDef(args, event),
+  s: Op(SubscriptionKind, e),
 ) -> SchemaBuilder {
   SchemaBuilder(..builder, subscriptions: [
-    subscription_to_field_def(s),
+    to_field_def(s),
     ..builder.subscriptions
   ])
 }
 
-/// Add a type definition
 pub fn add_type(builder: SchemaBuilder, t: ObjectType) -> SchemaBuilder {
   SchemaBuilder(..builder, types: [t, ..builder.types])
 }
 
-/// Add an enum type
 pub fn add_enum(builder: SchemaBuilder, e: schema.EnumType) -> SchemaBuilder {
   SchemaBuilder(..builder, enums: [e, ..builder.enums])
 }
 
-/// Add an interface type
 pub fn add_interface(
   builder: SchemaBuilder,
   i: schema.InterfaceType,
@@ -1063,17 +801,14 @@ pub fn add_interface(
   SchemaBuilder(..builder, interfaces: [i, ..builder.interfaces])
 }
 
-/// Add a union type
 pub fn add_union(builder: SchemaBuilder, u: schema.UnionType) -> SchemaBuilder {
   SchemaBuilder(..builder, unions: [u, ..builder.unions])
 }
 
-/// Add a custom scalar type (e.g., Upload, DateTime, JSON)
 pub fn add_scalar(builder: SchemaBuilder, s: schema.ScalarType) -> SchemaBuilder {
   SchemaBuilder(..builder, scalars: [s, ..builder.scalars])
 }
 
-/// Add an input object type
 pub fn add_input(
   builder: SchemaBuilder,
   i: schema.InputObjectType,
@@ -1081,31 +816,27 @@ pub fn add_input(
   SchemaBuilder(..builder, inputs: [i, ..builder.inputs])
 }
 
-/// Add multiple queries to the schema
 pub fn add_queries(
   builder: SchemaBuilder,
-  queries: List(QueryDef(args, result)),
+  queries: List(Op(QueryKind, r)),
 ) -> SchemaBuilder {
   list.fold(queries, builder, fn(b, q) { add_query(b, q) })
 }
 
-/// Add multiple mutations to the schema
 pub fn add_mutations(
   builder: SchemaBuilder,
-  mutations: List(MutationDef(args, result)),
+  mutations: List(Op(MutationKind, r)),
 ) -> SchemaBuilder {
   list.fold(mutations, builder, fn(b, m) { add_mutation(b, m) })
 }
 
-/// Add multiple subscriptions to the schema
 pub fn add_subscriptions(
   builder: SchemaBuilder,
-  subscriptions: List(SubscriptionDef(args, event)),
+  subscriptions: List(Op(SubscriptionKind, e)),
 ) -> SchemaBuilder {
   list.fold(subscriptions, builder, fn(b, s) { add_subscription(b, s) })
 }
 
-/// Add multiple type definitions
 pub fn add_types(
   builder: SchemaBuilder,
   types: List(ObjectType),
@@ -1113,7 +844,6 @@ pub fn add_types(
   list.fold(types, builder, fn(b, t) { add_type(b, t) })
 }
 
-/// Add multiple enum types
 pub fn add_enums(
   builder: SchemaBuilder,
   enums: List(schema.EnumType),
@@ -1121,7 +851,6 @@ pub fn add_enums(
   list.fold(enums, builder, fn(b, e) { add_enum(b, e) })
 }
 
-/// Add multiple interface types
 pub fn add_interfaces(
   builder: SchemaBuilder,
   interfaces: List(schema.InterfaceType),
@@ -1129,7 +858,6 @@ pub fn add_interfaces(
   list.fold(interfaces, builder, fn(b, i) { add_interface(b, i) })
 }
 
-/// Add multiple union types
 pub fn add_unions(
   builder: SchemaBuilder,
   unions: List(schema.UnionType),
@@ -1137,7 +865,6 @@ pub fn add_unions(
   list.fold(unions, builder, fn(b, u) { add_union(b, u) })
 }
 
-/// Add multiple custom scalar types
 pub fn add_scalars(
   builder: SchemaBuilder,
   scalars: List(schema.ScalarType),
@@ -1145,7 +872,6 @@ pub fn add_scalars(
   list.fold(scalars, builder, fn(b, s) { add_scalar(b, s) })
 }
 
-/// Add multiple input object types
 pub fn add_inputs(
   builder: SchemaBuilder,
   inputs: List(schema.InputObjectType),
@@ -1212,7 +938,6 @@ pub fn merge(a: SchemaBuilder, b: SchemaBuilder) -> SchemaBuilder {
   )
 }
 
-/// Build the final schema
 pub fn with_cache(builder: SchemaBuilder) -> SchemaBuilder {
   SchemaBuilder(..builder, cache: True)
 }

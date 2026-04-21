@@ -21,62 +21,50 @@ import mochi/types
 fn build_schema() -> schema.Schema {
   let echo_string =
     query.query_with_args(
-      "echoString",
-      [query.arg("x", schema.string_type())],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoString",
+      args: [query.arg("x", schema.string_type())],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   let echo_id =
     query.query_with_args(
-      "echoId",
-      [query.arg("x", schema.id_type())],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoId",
+      args: [query.arg("x", schema.id_type())],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   let echo_int =
     query.query_with_args(
-      "echoInt",
-      [query.arg("x", schema.int_type())],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoInt",
+      args: [query.arg("x", schema.int_type())],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   let echo_float =
     query.query_with_args(
-      "echoFloat",
-      [query.arg("x", schema.float_type())],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoFloat",
+      args: [query.arg("x", schema.float_type())],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   let echo_bool =
     query.query_with_args(
-      "echoBool",
-      [query.arg("x", schema.boolean_type())],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoBool",
+      args: [query.arg("x", schema.boolean_type())],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   let echo_required =
     query.query_with_args(
-      "echoRequired",
-      [query.arg("x", schema.non_null(schema.string_type()))],
-      schema.string_type(),
-      fn(_args) { Ok("ok") },
-      fn(_decoded, _ctx) { Ok("ok") },
-      types.to_dynamic,
+      name: "echoRequired",
+      args: [query.arg("x", schema.non_null(schema.string_type()))],
+      returns: schema.string_type(),
+      resolve: fn(_args, _ctx) { Ok("ok") },
     )
 
   query.new()

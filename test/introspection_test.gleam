@@ -67,28 +67,22 @@ fn create_test_schema() -> schema.Schema {
     |> types.build_enum
 
   let users_query =
-    query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([TestUser("1", "Test", "test@example.com")]) },
-      types.to_dynamic,
-    )
-    |> query.query_description("Get all users")
+    query.query("users", schema.list_type(schema.named_type("User")), fn(_ctx) {
+      Ok([TestUser("1", "Test", "test@example.com")])
+    })
+    |> query.with_description("Get all users")
 
   let user_query =
     query.query_with_args(
       "user",
       [query.arg("id", schema.non_null(schema.id_type()))],
       schema.named_type("User"),
-      fn(args) {
-        dict.get(args, "id")
-        |> result.map(fn(_) { "1" })
-        |> result.map_error(fn(_) { "Missing id" })
+      fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
+        Ok(TestUser(id, "User " <> id, "user@example.com"))
       },
-      fn(id, _ctx) { Ok(TestUser(id, "User " <> id, "user@example.com")) },
-      types.to_dynamic,
     )
-    |> query.query_description("Get a user by ID")
+    |> query.with_description("Get a user by ID")
 
   query.new()
   |> query.add_query(users_query)
@@ -317,12 +311,11 @@ pub fn field_type_kind_for_enum_test() {
 
   let test_schema =
     query.new()
-    |> query.add_query(query.query(
-      "item",
-      schema.named_type("Item"),
-      fn(_) { Ok(Item("1", "ACTIVE")) },
-      types.to_dynamic,
-    ))
+    |> query.add_query(
+      query.query("item", schema.named_type("Item"), fn(_) {
+        Ok(Item("1", "ACTIVE"))
+      }),
+    )
     |> query.add_type(item_type)
     |> query.add_enum(role_enum)
     |> query.build
@@ -417,12 +410,9 @@ pub fn interface_possible_types_test() {
 
   let test_schema =
     query.new()
-    |> query.add_query(query.query(
-      "dog",
-      schema.named_type("Dog2"),
-      fn(_) { Ok(Dog("Rex")) },
-      types.to_dynamic,
-    ))
+    |> query.add_query(
+      query.query("dog", schema.named_type("Dog2"), fn(_) { Ok(Dog("Rex")) }),
+    )
     |> query.add_type(dog_type)
     |> query.add_interface(animal_interface)
     |> query.build

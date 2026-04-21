@@ -69,9 +69,9 @@ fn build_interface_schema() -> schema.Schema {
   // Query that returns the interface type
   let animal_query =
     query.query(
-      "animal",
-      schema.Named("Animal"),
-      fn(_info) {
+      name: "animal",
+      returns: schema.Named("Animal"),
+      resolve: fn(_info) {
         // Return a Cat
         Ok(
           types.to_dynamic(
@@ -83,7 +83,6 @@ fn build_interface_schema() -> schema.Schema {
           ),
         )
       },
-      fn(a) { types.to_dynamic(a) },
     )
 
   query.new()
@@ -145,23 +144,18 @@ fn build_union_schema() -> schema.Schema {
 
   // Query that returns the union type
   let pet_query =
-    query.query(
-      "pet",
-      schema.Named("Pet"),
-      fn(_info) {
-        // Return a Dog
-        Ok(
-          types.to_dynamic(
-            dict.from_list([
-              #("id", types.to_dynamic("2")),
-              #("name", types.to_dynamic("Rex")),
-              #("barks", types.to_dynamic(True)),
-            ]),
-          ),
-        )
-      },
-      fn(p) { types.to_dynamic(p) },
-    )
+    query.query(name: "pet", returns: schema.Named("Pet"), resolve: fn(_info) {
+      // Return a Dog
+      Ok(
+        types.to_dynamic(
+          dict.from_list([
+            #("id", types.to_dynamic("2")),
+            #("name", types.to_dynamic("Rex")),
+            #("barks", types.to_dynamic(True)),
+          ]),
+        ),
+      )
+    })
 
   query.new()
   |> query.add_query(pet_query)
@@ -232,14 +226,9 @@ fn build_simple_schema() -> schema.Schema {
     |> types.build(fn(_) { Ok(User("1", "Alice", "alice@example.com")) })
 
   let user_query =
-    query.query(
-      "user",
-      schema.Named("User"),
-      fn(_info) {
-        Ok(types.to_dynamic(User("1", "Alice", "alice@example.com")))
-      },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.query(name: "user", returns: schema.Named("User"), resolve: fn(_info) {
+      Ok(types.to_dynamic(User("1", "Alice", "alice@example.com")))
+    })
 
   query.new()
   |> query.add_query(user_query)

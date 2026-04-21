@@ -458,12 +458,9 @@ fn create_person_schema() -> schema.Schema {
     |> types.build(decode_person)
 
   let person_query =
-    query.query(
-      "person",
-      schema.named_type("Person"),
-      fn(_ctx) { Ok(TestPerson("1", "Test")) },
-      types.to_dynamic,
-    )
+    query.query("person", schema.named_type("Person"), fn(_ctx) {
+      Ok(TestPerson("1", "Test"))
+    })
 
   query.new()
   |> query.add_query(person_query)

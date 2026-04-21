@@ -31,10 +31,9 @@ pub fn add_types_test() {
     query.new()
     |> query.add_query(
       query.query(
-        "item",
-        schema.named_type("Foo"),
-        fn(_ctx) { Ok(Item("1", "foo")) },
-        fn(i) { types.to_dynamic(i) },
+        name: "item",
+        returns: schema.named_type("Foo"),
+        resolve: fn(_ctx) { Ok(Item("1", "foo")) },
       ),
     )
     |> query.add_types([item_type("Foo"), item_type("Bar")])
@@ -67,9 +66,11 @@ pub fn add_enums_test() {
   let schema =
     query.new()
     |> query.add_query(
-      query.query("ping", schema.string_type(), fn(_ctx) { Ok("pong") }, fn(s) {
-        types.to_dynamic(s)
-      }),
+      query.query(
+        name: "ping",
+        returns: schema.string_type(),
+        resolve: fn(_ctx) { Ok("pong") },
+      ),
     )
     |> query.add_enums([e1, e2])
     |> query.build
@@ -123,9 +124,11 @@ pub fn add_inputs_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query("ping", schema.string_type(), fn(_ctx) { Ok("pong") }, fn(s) {
-        types.to_dynamic(s)
-      }),
+      query.query(
+        name: "ping",
+        returns: schema.string_type(),
+        resolve: fn(_ctx) { Ok("pong") },
+      ),
     )
     |> query.add_inputs([input1, input2])
     |> query.build
@@ -147,9 +150,7 @@ pub fn add_mutations_batch_test() {
       name: "doA",
       args: [query.arg("x", schema.non_null(schema.string_type()))],
       returns: schema.string_type(),
-      decode: fn(args) { query.get_string(args, "x") },
-      resolve: fn(x, _ctx) { Ok(x) },
-      encode: fn(s) { types.to_dynamic(s) },
+      resolve: fn(args, _ctx) { query.get_string(args, "x") },
     )
 
   let m2 =
@@ -157,17 +158,17 @@ pub fn add_mutations_batch_test() {
       name: "doB",
       args: [query.arg("y", schema.non_null(schema.string_type()))],
       returns: schema.string_type(),
-      decode: fn(args) { query.get_string(args, "y") },
-      resolve: fn(y, _ctx) { Ok(y) },
-      encode: fn(s) { types.to_dynamic(s) },
+      resolve: fn(args, _ctx) { query.get_string(args, "y") },
     )
 
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query("ping", schema.string_type(), fn(_ctx) { Ok("pong") }, fn(s) {
-        types.to_dynamic(s)
-      }),
+      query.query(
+        name: "ping",
+        returns: schema.string_type(),
+        resolve: fn(_ctx) { Ok("pong") },
+      ),
     )
     |> query.add_mutations([m1, m2])
     |> query.build
@@ -207,12 +208,9 @@ pub fn add_scalars_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query(
-        "now",
-        schema.string_type(),
-        fn(_ctx) { Ok("2024-01-01") },
-        fn(s) { types.to_dynamic(s) },
-      ),
+      query.query(name: "now", returns: schema.string_type(), resolve: fn(_ctx) {
+        Ok("2024-01-01")
+      }),
     )
     |> query.add_scalars([s1, s2])
     |> query.build
@@ -240,9 +238,11 @@ pub fn add_interfaces_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query("ping", schema.string_type(), fn(_ctx) { Ok("pong") }, fn(s) {
-        types.to_dynamic(s)
-      }),
+      query.query(
+        name: "ping",
+        returns: schema.string_type(),
+        resolve: fn(_ctx) { Ok("pong") },
+      ),
     )
     |> query.add_interfaces([iface])
     |> query.build
@@ -270,9 +270,11 @@ pub fn add_unions_test() {
   let schema_def =
     query.new()
     |> query.add_query(
-      query.query("ping", schema.string_type(), fn(_ctx) { Ok("pong") }, fn(s) {
-        types.to_dynamic(s)
-      }),
+      query.query(
+        name: "ping",
+        returns: schema.string_type(),
+        resolve: fn(_ctx) { Ok("pong") },
+      ),
     )
     |> query.add_unions([union])
     |> query.build

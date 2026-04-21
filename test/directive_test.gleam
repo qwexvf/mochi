@@ -27,12 +27,9 @@ fn build_test_schema() -> schema.Schema {
     |> types.build(decode_user)
 
   let users_query =
-    query.query(
-      "user",
-      schema.Named("User"),
-      fn(_info) { Ok(types.to_dynamic(User("1", "Alice", True))) },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.query("user", schema.Named("User"), fn(_info) {
+      Ok(types.to_dynamic(User("1", "Alice", True)))
+    })
 
   query.new()
   |> query.add_query(users_query)

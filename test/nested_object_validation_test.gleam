@@ -153,12 +153,7 @@ fn user_schema() {
     )
 
   let user_query =
-    query.query(
-      "user",
-      schema.named_type("User"),
-      fn(_ctx) { Ok(the_user) },
-      types.to_dynamic,
-    )
+    query.query("user", schema.named_type("User"), fn(_ctx) { Ok(the_user) })
 
   query.new()
   |> query.add_query(user_query)
@@ -180,12 +175,9 @@ fn hand_schema() {
     )
 
   let hand_query =
-    query.query(
-      "hand",
-      schema.named_type("DetectedHand"),
-      fn(_ctx) { Ok(the_hand) },
-      types.to_dynamic,
-    )
+    query.query("hand", schema.named_type("DetectedHand"), fn(_ctx) {
+      Ok(the_hand)
+    })
 
   query.new()
   |> query.add_query(hand_query)
@@ -210,12 +202,9 @@ fn comment_schema() {
     )
 
   let comment_query =
-    query.query(
-      "comment",
-      schema.named_type("Comment"),
-      fn(_ctx) { Ok(the_comment) },
-      types.to_dynamic,
-    )
+    query.query("comment", schema.named_type("Comment"), fn(_ctx) {
+      Ok(the_comment)
+    })
 
   query.new()
   |> query.add_query(comment_query)
@@ -526,12 +515,9 @@ fn the_order() {
 
 fn order_schema() {
   let order_query =
-    query.query(
-      "order",
-      schema.named_type("Order"),
-      fn(_ctx) { Ok(the_order()) },
-      types.to_dynamic,
-    )
+    query.query("order", schema.named_type("Order"), fn(_ctx) {
+      Ok(the_order())
+    })
 
   query.new()
   |> query.add_query(order_query)
@@ -548,12 +534,7 @@ fn product_schema() {
     Product("prod-1", "Mechanical Keyboard", cat, 149.99, True, "KB-MX-001")
 
   let product_query =
-    query.query(
-      "product",
-      schema.named_type("Product"),
-      fn(_ctx) { Ok(prod) },
-      types.to_dynamic,
-    )
+    query.query("product", schema.named_type("Product"), fn(_ctx) { Ok(prod) })
 
   query.new()
   |> query.add_query(product_query)
@@ -740,12 +721,7 @@ fn org_schema() {
   let org = Organization("org-1", "Acme Corp", [dept], ceo, 2010)
 
   let org_query =
-    query.query(
-      "org",
-      schema.named_type("Organization"),
-      fn(_ctx) { Ok(org) },
-      types.to_dynamic,
-    )
+    query.query("org", schema.named_type("Organization"), fn(_ctx) { Ok(org) })
 
   query.new()
   |> query.add_query(org_query)
@@ -999,9 +975,7 @@ pub fn mutation_returning_nested_type_with_siblings_test() {
       name: "createProduct",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("Product"),
-      decode: fn(args) { query.get_string(args, "name") },
-      resolve: fn(_name, _ctx) { Ok(prod) },
-      encode: types.to_dynamic,
+      resolve: fn(_args, _ctx) { Ok(prod) },
     )
 
   let s =

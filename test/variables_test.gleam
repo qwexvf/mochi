@@ -235,16 +235,13 @@ fn create_test_schema() -> schema.Schema {
 
   let user_query =
     query.query_with_args(
-      "user",
-      [query.arg("id", schema.non_null(schema.id_type()))],
-      schema.named_type("User"),
-      fn(args) {
-        dict.get(args, "id")
-        |> result.map(fn(_) { "1" })
-        |> result.map_error(fn(_) { "Missing id" })
+      name: "user",
+      args: [query.arg("id", schema.non_null(schema.id_type()))],
+      returns: schema.named_type("User"),
+      resolve: fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
+        Ok(TestUser(id, "User " <> id, 25))
       },
-      fn(id, _ctx) { Ok(TestUser(id, "User " <> id, 25)) },
-      types.to_dynamic,
     )
 
   query.new()

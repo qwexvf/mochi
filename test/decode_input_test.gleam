@@ -26,7 +26,7 @@ pub fn decode_input_valid_test() {
   case query.decode_input(args, "input", decoder) {
     Ok(#("Alice", 30)) -> Nil
     Ok(_) -> panic as "Wrong decoded values"
-    Error(e) -> panic as { "Should succeed: " <> e }
+    Error(e) -> panic as { "Should succeed: " <> e.message }
   }
 }
 
@@ -35,9 +35,9 @@ pub fn decode_input_missing_test() {
   let decoder = decode.string
   case query.decode_input(args, "input", decoder) {
     Error(msg) ->
-      case string.contains(msg, "input") {
+      case string.contains(msg.message, "input") {
         True -> Nil
-        False -> panic as { "Error should mention field name: " <> msg }
+        False -> panic as { "Error should mention field name: " <> msg.message }
       }
     Ok(_) -> panic as "Should fail on missing key"
   }
@@ -47,7 +47,7 @@ pub fn get_dynamic_present_test() {
   let args = dict.from_list([#("file", types.to_dynamic("path/to/file"))])
   case query.get_dynamic(args, "file") {
     Ok(_) -> Nil
-    Error(e) -> panic as { "Should find dynamic value: " <> e }
+    Error(e) -> panic as { "Should find dynamic value: " <> e.message }
   }
 }
 

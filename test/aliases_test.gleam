@@ -100,31 +100,24 @@ fn create_test_schema() -> schema.Schema {
       "user",
       [query.arg("id", schema.non_null(schema.id_type()))],
       schema.named_type("User"),
-      fn(args) {
-        dict.get(args, "id")
-        |> result.map(fn(_) { "1" })
-        |> result.map_error(fn(_) { "Missing id" })
+      fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
+        Ok(TestUser(id, "User " <> id, "user@example.com"))
       },
-      fn(id, _ctx) { Ok(TestUser(id, "User " <> id, "user@example.com")) },
-      types.to_dynamic,
     )
 
   // Simple name query for basic alias testing
   let name_query =
-    query.query(
-      "name",
-      schema.string_type(),
-      fn(_ctx) { Ok("John Doe") },
-      types.to_dynamic,
-    )
+    query.query(name: "name", returns: schema.string_type(), resolve: fn(_ctx) {
+      Ok("John Doe")
+    })
 
   // Simple greeting query for basic alias testing
   let greeting_query =
     query.query(
-      "greeting",
-      schema.string_type(),
-      fn(_ctx) { Ok("Hello, World!") },
-      types.to_dynamic,
+      name: "greeting",
+      returns: schema.string_type(),
+      resolve: fn(_ctx) { Ok("Hello, World!") },
     )
 
   query.new()

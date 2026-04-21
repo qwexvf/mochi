@@ -67,12 +67,9 @@ fn build_uppercase_schema() -> schema.Schema {
     |> types.build(decode_message)
 
   let message_query =
-    query.query(
-      "message",
-      schema.Named("Message"),
-      fn(_info) { Ok(types.to_dynamic(Message("1", "hello world", 5))) },
-      fn(m) { types.to_dynamic(m) },
-    )
+    query.query("message", schema.Named("Message"), fn(_info) {
+      Ok(types.to_dynamic(Message("1", "hello world", 5)))
+    })
 
   query.new()
   |> query.add_query(message_query)
@@ -154,12 +151,9 @@ fn build_multiply_schema() -> schema.Schema {
     |> types.build(decode_message)
 
   let message_query =
-    query.query(
-      "message",
-      schema.Named("Message"),
-      fn(_info) { Ok(types.to_dynamic(Message("1", "hello", 5))) },
-      fn(m) { types.to_dynamic(m) },
-    )
+    query.query("message", schema.Named("Message"), fn(_info) {
+      Ok(types.to_dynamic(Message("1", "hello", 5)))
+    })
 
   query.new()
   |> query.add_query(message_query)
@@ -241,12 +235,9 @@ fn build_chained_schema() -> schema.Schema {
     |> types.build(decode_message)
 
   let message_query =
-    query.query(
-      "message",
-      schema.Named("Message"),
-      fn(_info) { Ok(types.to_dynamic(Message("1", "hello", 5))) },
-      fn(m) { types.to_dynamic(m) },
-    )
+    query.query("message", schema.Named("Message"), fn(_info) {
+      Ok(types.to_dynamic(Message("1", "hello", 5)))
+    })
 
   query.new()
   |> query.add_query(message_query)
@@ -321,12 +312,9 @@ fn build_failing_directive_schema() -> schema.Schema {
     |> types.build(decode_message)
 
   let message_query =
-    query.query(
-      "message",
-      schema.Named("Message"),
-      fn(_info) { Ok(types.to_dynamic(Message("1", "hello", 5))) },
-      fn(m) { types.to_dynamic(m) },
-    )
+    query.query("message", schema.Named("Message"), fn(_info) {
+      Ok(types.to_dynamic(Message("1", "hello", 5)))
+    })
 
   query.new()
   |> query.add_query(message_query)
@@ -393,12 +381,9 @@ fn build_no_handler_schema() -> schema.Schema {
     |> types.build(decode_message)
 
   let message_query =
-    query.query(
-      "message",
-      schema.Named("Message"),
-      fn(_info) { Ok(types.to_dynamic(Message("1", "hello", 5))) },
-      fn(m) { types.to_dynamic(m) },
-    )
+    query.query("message", schema.Named("Message"), fn(_info) {
+      Ok(types.to_dynamic(Message("1", "hello", 5)))
+    })
 
   query.new()
   |> query.add_query(message_query)

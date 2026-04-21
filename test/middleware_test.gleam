@@ -36,21 +36,16 @@ fn build_test_schema() -> schema.Schema {
     |> types.build(decode_user)
 
   let user_query =
-    query.query(
-      "user",
-      schema.Named("User"),
-      fn(_info) { Ok(types.to_dynamic(User("1", "Alice", 30))) },
-      fn(u) { types.to_dynamic(u) },
-    )
+    query.query("user", schema.Named("User"), fn(_info) {
+      Ok(types.to_dynamic(User("1", "Alice", 30)))
+    })
 
   let user_by_id_query =
     query.query_with_args(
       "userById",
       [query.arg("id", schema.non_null(schema.id_type()))],
       schema.Named("User"),
-      fn(_) { Ok("1") },
-      fn(_, _ctx) { Ok(User("1", "Alice", 30)) },
-      fn(u) { types.to_dynamic(u) },
+      fn(_args, _ctx) { Ok(User("1", "Alice", 30)) },
     )
 
   query.new()

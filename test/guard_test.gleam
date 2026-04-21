@@ -210,10 +210,9 @@ pub fn query_guard_stacking_test() {
   // Both guards must pass — second one denies
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([User("1", "Alice")]) },
-      fn(users) { types.to_dynamic(users) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([User("1", "Alice")]) },
     )
     |> query.with_guard(allow_guard)
     |> query.with_guard(deny_guard)
@@ -404,10 +403,9 @@ fn build_query_with_guard(
 
   let users_query =
     query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok([User("1", "Alice")]) },
-      fn(users) { types.to_dynamic(users) },
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_ctx) { Ok([User("1", "Alice")]) },
     )
     |> query.with_guard(guard_fn)
 
@@ -431,11 +429,9 @@ fn build_mutation_with_guard(
       name: "createUser",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("User"),
-      decode: fn(args) { query.get_string(args, "name") },
-      resolve: fn(_name, _ctx) { Ok(User("2", "Bob")) },
-      encode: fn(user) { types.to_dynamic(user) },
+      resolve: fn(_args, _ctx) { Ok(User("2", "Bob")) },
     )
-    |> query.mutation_with_guard(guard_fn)
+    |> query.with_guard(guard_fn)
 
   query.new()
   |> query.add_mutation(create_user_mutation)
@@ -452,9 +448,8 @@ fn build_field_with_guard(
       schema.string_type(),
       fn(_dyn) { Ok(Nil) },
       fn(_parent, _ctx) { Ok("top-secret-value") },
-      fn(s) { types.to_dynamic(s) },
     )
-    |> query.field_with_guard(guard_fn)
+    |> query.with_guard(guard_fn)
 
   // Build the User type with the guarded secret field added via schema API
   let user_type =
@@ -462,14 +457,13 @@ fn build_field_with_guard(
     |> types.id("id", fn(u: User) { u.id })
     |> types.string("name", fn(u: User) { u.name })
     |> types.build(decode_user)
-    |> schema.field(query.field_def_to_schema(secret_field))
+    |> schema.field(query.to_field_def(secret_field))
 
   let user_query =
     query.query(
-      "user",
-      schema.named_type("User"),
-      fn(_ctx) { Ok(User("1", "Alice")) },
-      fn(u) { types.to_dynamic(u) },
+      name: "user",
+      returns: schema.named_type("User"),
+      resolve: fn(_ctx) { Ok(User("1", "Alice")) },
     )
 
   query.new()
@@ -485,28 +479,28 @@ fn build_field_with_guard(
 pub fn subscription_guard_allows_test() {
   let sub =
     query.subscription(
-      "onMessage",
-      schema.named_type("User"),
-      "messages",
-      fn(u) { types.to_dynamic(u) },
+      name: "onMessage",
+      returns: schema.named_type("User"),
+      topic: "messages",
     )
-    |> query.subscription_with_guard(allow_guard)
+    |> query.with_encoder(fn(u) { types.to_dynamic(u) })
+    |> query.with_guard(allow_guard)
 
-  let field_def = query.subscription_to_field_def(sub)
+  let field_def = query.to_field_def(sub)
   should.equal(field_def.name, "onMessage")
 }
 
 pub fn subscription_guard_blocks_test() {
   let sub =
     query.subscription(
-      "onMessage",
-      schema.named_type("User"),
-      "messages",
-      fn(u) { types.to_dynamic(u) },
+      name: "onMessage",
+      returns: schema.named_type("User"),
+      topic: "messages",
     )
-    |> query.subscription_with_guard(deny_guard)
+    |> query.with_encoder(fn(u) { types.to_dynamic(u) })
+    |> query.with_guard(deny_guard)
 
-  let field_def = query.subscription_to_field_def(sub)
+  let field_def = query.to_field_def(sub)
   // The topic_fn should fail when guard blocks
   case field_def.topic_fn {
     option.Some(topic_fn) -> {

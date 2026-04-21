@@ -68,28 +68,20 @@ fn post_type() {
 
 fn build_schema() {
   let user_query =
-    query.query(
-      "user",
-      schema.named_type("User"),
-      fn(_ctx) {
-        Ok(User(
-          "1",
-          "Alice",
-          "alice@example.com",
-          42,
-          Profile("dev", "example.com"),
-        ))
-      },
-      types.to_dynamic,
-    )
+    query.query("user", schema.named_type("User"), fn(_ctx) {
+      Ok(User(
+        "1",
+        "Alice",
+        "alice@example.com",
+        42,
+        Profile("dev", "example.com"),
+      ))
+    })
 
   let post_query =
-    query.query(
-      "post",
-      schema.named_type("Post"),
-      fn(_ctx) { Ok(Post("1", "Hello", "World", "1")) },
-      types.to_dynamic,
-    )
+    query.query("post", schema.named_type("Post"), fn(_ctx) {
+      Ok(Post("1", "Hello", "World", "1"))
+    })
 
   query.new()
   |> query.add_query(user_query)

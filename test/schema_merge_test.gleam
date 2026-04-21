@@ -1,6 +1,7 @@
 // Tests for schema splitting and merging via SchemaBuilder
 
 import gleam/option.{None, Some}
+import gleam/result
 import mochi/executor
 import mochi/query
 import mochi/schema
@@ -35,21 +36,19 @@ fn sample_users() {
 
 fn user_queries_schema() -> query.SchemaBuilder {
   let users_query =
-    query.query(
-      "users",
-      schema.list_type(schema.named_type("User")),
-      fn(_ctx) { Ok(sample_users()) },
-      fn(users) { types.to_dynamic(users) },
-    )
+    query.query("users", schema.list_type(schema.named_type("User")), fn(_ctx) {
+      Ok(sample_users())
+    })
 
   let user_query =
     query.query_with_args(
       name: "user",
       args: [query.arg("id", schema.non_null(schema.id_type()))],
       returns: schema.named_type("User"),
-      decode: fn(args) { query.get_id(args, "id") },
-      resolve: fn(_id, _ctx) { Ok(User("1", "Alice", "alice@example.com")) },
-      encode: fn(user) { types.to_dynamic(user) },
+      resolve: fn(args, _ctx) {
+        use _id <- result.try(query.get_id(args, "id"))
+        Ok(User("1", "Alice", "alice@example.com"))
+      },
     )
 
   query.new()
@@ -71,17 +70,11 @@ fn user_mutations_schema() -> query.SchemaBuilder {
         query.arg("email", schema.non_null(schema.string_type())),
       ],
       returns: schema.named_type("User"),
-      decode: fn(args) {
-        case query.get_string(args, "name"), query.get_string(args, "email") {
-          Ok(name), Ok(email) -> Ok(#(name, email))
-          _, _ -> Error("Missing name or email")
-        }
-      },
-      resolve: fn(input, _ctx) {
-        let #(name, email) = input
+      resolve: fn(args, _ctx) {
+        use name <- result.try(query.get_string(args, "name"))
+        use email <- result.try(query.get_string(args, "email"))
         Ok(User("3", name, email))
       },
-      encode: fn(user) { types.to_dynamic(user) },
     )
 
   let update_user =
@@ -92,17 +85,11 @@ fn user_mutations_schema() -> query.SchemaBuilder {
         query.arg("name", schema.non_null(schema.string_type())),
       ],
       returns: schema.named_type("User"),
-      decode: fn(args) {
-        case query.get_id(args, "id"), query.get_string(args, "name") {
-          Ok(id), Ok(name) -> Ok(#(id, name))
-          _, _ -> Error("Missing id or name")
-        }
-      },
-      resolve: fn(input, _ctx) {
-        let #(id, name) = input
+      resolve: fn(args, _ctx) {
+        use id <- result.try(query.get_id(args, "id"))
+        use name <- result.try(query.get_string(args, "name"))
         Ok(User(id, name, "updated@example.com"))
       },
-      encode: fn(user) { types.to_dynamic(user) },
     )
 
   query.new()
@@ -255,12 +242,7 @@ pub fn merge_multiple_schemas_test() {
   let extra =
     query.new()
     |> query.add_query(
-      query.query(
-        "userCount",
-        schema.int_type(),
-        fn(_ctx) { Ok(42) },
-        fn(count) { types.to_dynamic(count) },
-      ),
+      query.query("userCount", schema.int_type(), fn(_ctx) { Ok(42) }),
     )
 
   let schema =
