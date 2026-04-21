@@ -130,6 +130,8 @@ pub type TypeField(a) {
     description: Option(String),
     field_type: FieldType,
     extractor: fn(a) -> Dynamic,
+    is_deprecated: Bool,
+    deprecation_reason: Option(String),
   )
   /// Field with arguments and resolver
   TypeFieldWithArgs(
@@ -139,6 +141,8 @@ pub type TypeField(a) {
     args: List(ArgumentDefinition),
     resolver: fn(a, Dict(String, Dynamic), ExecutionContext) ->
       Result(Dynamic, String),
+    is_deprecated: Bool,
+    deprecation_reason: Option(String),
   )
 }
 
@@ -150,6 +154,51 @@ pub fn object(name: String) -> TypeBuilder(a) {
 /// Add description to type
 pub fn description(builder: TypeBuilder(a), desc: String) -> TypeBuilder(a) {
   TypeBuilder(..builder, description: Some(desc))
+}
+
+/// Mark the most recently added field as deprecated with a reason.
+pub fn deprecated(builder: TypeBuilder(a), reason: String) -> TypeBuilder(a) {
+  case builder.fields {
+    [] -> builder
+    [field, ..rest] ->
+      TypeBuilder(..builder, fields: [
+        mark_deprecated(field, True, Some(reason)),
+        ..rest
+      ])
+  }
+}
+
+/// Mark the most recently added field as deprecated without a reason.
+pub fn deprecated_no_reason(builder: TypeBuilder(a)) -> TypeBuilder(a) {
+  case builder.fields {
+    [] -> builder
+    [field, ..rest] ->
+      TypeBuilder(..builder, fields: [
+        mark_deprecated(field, True, None),
+        ..rest
+      ])
+  }
+}
+
+fn mark_deprecated(
+  field: TypeField(a),
+  is_deprecated: Bool,
+  reason: Option(String),
+) -> TypeField(a) {
+  case field {
+    TypeField(..) ->
+      TypeField(
+        ..field,
+        is_deprecated: is_deprecated,
+        deprecation_reason: reason,
+      )
+    TypeFieldWithArgs(..) ->
+      TypeFieldWithArgs(
+        ..field,
+        is_deprecated: is_deprecated,
+        deprecation_reason: reason,
+      )
+  }
 }
 
 fn add_field(
@@ -165,6 +214,8 @@ fn add_field(
       description: description,
       field_type: field_type,
       extractor: extractor,
+      is_deprecated: False,
+      deprecation_reason: None,
     ),
     ..builder.fields
   ])
@@ -246,6 +297,128 @@ pub fn bool(
 ) -> TypeBuilder(a) {
   add_field(builder, name, None, schema.boolean_type(), fn(a) {
     to_dynamic(extractor(a))
+  })
+}
+
+// ============================================================================
+// Custom Scalar Field Helpers
+// ============================================================================
+
+pub fn datetime(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> String,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.datetime_type(), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn optional_datetime(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.datetime_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
+pub fn date(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> String,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.date_type(), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn optional_date(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.date_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
+pub fn uuid(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> String,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.uuid_type(), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn optional_uuid(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.uuid_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
+pub fn email(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> String,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.email_type(), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn optional_email(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.email_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
+pub fn url(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> String,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.url_type(), fn(a) {
+    to_dynamic(extractor(a))
+  })
+}
+
+pub fn optional_url(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.url_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
+pub fn json(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Dynamic,
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.json_type(), extractor)
+}
+
+pub fn optional_json(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> Option(Dynamic),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.json_type(), fn(a) {
+    option(extractor(a))
   })
 }
 
@@ -601,6 +774,8 @@ pub fn field_with_args(
       field_type: field_type,
       args: args,
       resolver: resolver,
+      is_deprecated: False,
+      deprecation_reason: None,
     )
   TypeBuilder(..builder, fields: [field, ..builder.fields])
 }
@@ -710,9 +885,31 @@ pub fn build_direct(builder: TypeBuilder(a)) -> #(ObjectType, fn(a) -> Dynamic) 
   #(object_type, to_dynamic)
 }
 
+fn apply_deprecation(
+  field: FieldDefinition,
+  is_deprecated: Bool,
+  deprecation_reason: Option(String),
+) -> FieldDefinition {
+  case is_deprecated {
+    False -> field
+    True ->
+      case deprecation_reason {
+        Some(reason) -> schema.deprecate(field, reason)
+        None -> schema.deprecate_field(field)
+      }
+  }
+}
+
 fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
   case f {
-    TypeField(name, description, field_type, extractor) -> {
+    TypeField(
+      name,
+      description,
+      field_type,
+      extractor,
+      is_deprecated,
+      deprecation_reason,
+    ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) -> Ok(extractor(unsafe_coerce(parent_dyn)))
@@ -722,13 +919,22 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       let base =
         schema.field_def(name, field_type)
         |> schema.resolver(resolver)
-      case description {
+      let with_desc = case description {
         Some(desc) -> schema.field_description(base, desc)
         None -> base
       }
+      apply_deprecation(with_desc, is_deprecated, deprecation_reason)
     }
 
-    TypeFieldWithArgs(name, description, field_type, args, field_resolver) -> {
+    TypeFieldWithArgs(
+      name,
+      description,
+      field_type,
+      args,
+      field_resolver,
+      is_deprecated,
+      deprecation_reason,
+    ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) ->
@@ -745,10 +951,11 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
         |> schema.resolver(resolver)
       let with_args =
         list.fold(args, base, fn(field, arg) { schema.argument(field, arg) })
-      case description {
+      let with_desc = case description {
         Some(desc) -> schema.field_description(with_args, desc)
         None -> with_args
       }
+      apply_deprecation(with_desc, is_deprecated, deprecation_reason)
     }
   }
 }
@@ -758,10 +965,9 @@ pub fn encoder(builder: TypeBuilder(a)) -> fn(a) -> Dynamic {
     let field_pairs =
       list.filter_map(builder.fields, fn(f) {
         case f {
-          TypeField(name, _, _, extractor) -> Ok(#(name, extractor(value)))
-          TypeFieldWithArgs(_, _, _, _, _) ->
-            // Fields with args are resolved separately, not included in basic encoding
-            Error(Nil)
+          TypeField(name, _, _, extractor, _, _) ->
+            Ok(#(name, extractor(value)))
+          TypeFieldWithArgs(_, _, _, _, _, _, _) -> Error(Nil)
         }
       })
     to_dynamic(dict.from_list(field_pairs))
@@ -773,7 +979,14 @@ fn to_field_def(
   decoder: fn(Dynamic) -> Result(a, String),
 ) -> FieldDefinition {
   case f {
-    TypeField(name, description, field_type, extractor) -> {
+    TypeField(
+      name,
+      description,
+      field_type,
+      extractor,
+      is_deprecated,
+      deprecation_reason,
+    ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) -> result.map(decoder(parent_dyn), extractor)
@@ -785,13 +998,22 @@ fn to_field_def(
         schema.field_def(name, field_type)
         |> schema.resolver(resolver)
 
-      case description {
+      let with_desc = case description {
         Some(desc) -> schema.field_description(base, desc)
         None -> base
       }
+      apply_deprecation(with_desc, is_deprecated, deprecation_reason)
     }
 
-    TypeFieldWithArgs(name, description, field_type, args, field_resolver) -> {
+    TypeFieldWithArgs(
+      name,
+      description,
+      field_type,
+      args,
+      field_resolver,
+      is_deprecated,
+      deprecation_reason,
+    ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) ->
@@ -809,10 +1031,11 @@ fn to_field_def(
       let with_args =
         list.fold(args, base, fn(field, arg) { schema.argument(field, arg) })
 
-      case description {
+      let with_desc = case description {
         Some(desc) -> schema.field_description(with_args, desc)
         None -> with_args
       }
+      apply_deprecation(with_desc, is_deprecated, deprecation_reason)
     }
   }
 }

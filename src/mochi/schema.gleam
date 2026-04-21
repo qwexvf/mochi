@@ -1001,6 +1001,30 @@ pub fn named_type(name: String) -> FieldType {
   Named(name)
 }
 
+pub fn datetime_type() -> FieldType {
+  Named("DateTime")
+}
+
+pub fn date_type() -> FieldType {
+  Named("Date")
+}
+
+pub fn uuid_type() -> FieldType {
+  Named("UUID")
+}
+
+pub fn email_type() -> FieldType {
+  Named("Email")
+}
+
+pub fn url_type() -> FieldType {
+  Named("URL")
+}
+
+pub fn json_type() -> FieldType {
+  Named("JSON")
+}
+
 pub fn non_null(inner: FieldType) -> FieldType {
   NonNull(inner)
 }
