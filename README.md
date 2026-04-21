@@ -64,7 +64,6 @@ fn user_query() {
       get_user_by_id(id)
     },
   )
-  |> query.with_encoder(types.to_dynamic)
 }
 
 // 4. Build the schema
@@ -306,7 +305,6 @@ let user_query = query.query_with_args(
     get_user_by_id(id)
   },
 )
-|> query.with_encoder(types.to_dynamic)
 
 // Build schema
 let my_schema = query.new()
@@ -698,7 +696,6 @@ fn create_user_mutation() {
       Ok(user)
     },
   )
-  |> query.with_encoder(types.to_dynamic)
   |> query.with_description("Create a new user")
 }
 

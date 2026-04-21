@@ -46,7 +46,6 @@ let my_posts = query.query_with_args(
     get_my_posts(ctx, limit)
   },
 )
-|> query.with_encoder(fn(posts) { types.to_dynamic(posts) })
 |> query.with_guard(require_auth)
 ```
 
