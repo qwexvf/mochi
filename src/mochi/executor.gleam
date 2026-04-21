@@ -600,10 +600,7 @@ fn execute_selection_set(
                 label: label,
               )
             let new_deferred =
-              list.append(deferred_list, [
-                patch,
-                ..result.deferred
-              ])
+              list.append(deferred_list, [patch, ..result.deferred])
             #(data_map, errors_list, none_found, new_deferred)
           }
           _ -> {
@@ -662,12 +659,7 @@ fn get_defer_info(
     Error(_) -> None
     Ok(directive) -> {
       let if_value =
-        get_directive_bool_arg(
-          [directive],
-          "defer",
-          "if",
-          variables,
-        )
+        get_directive_bool_arg([directive], "defer", "if", variables)
       let should_defer = option.unwrap(if_value, True)
       let label =
         directive.arguments

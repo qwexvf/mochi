@@ -81,7 +81,8 @@ pub fn partial_response_test() {
 pub fn from_execution_result_success_test() {
   let data =
     types.to_dynamic(dict.from_list([#("result", types.to_dynamic("ok"))]))
-  let exec_result = executor.ExecutionResult(data: Some(data), errors: [], deferred: [])
+  let exec_result =
+    executor.ExecutionResult(data: Some(data), errors: [], deferred: [])
 
   let resp = response.from_execution_result(exec_result)
 
@@ -102,7 +103,8 @@ pub fn from_execution_result_with_errors_test() {
     ),
     executor.ResolverError("Database error", ["query", "users"], location: None),
   ]
-  let exec_result = executor.ExecutionResult(data: Some(data), errors: errors, deferred: [])
+  let exec_result =
+    executor.ExecutionResult(data: Some(data), errors: errors, deferred: [])
 
   let resp = response.from_execution_result(exec_result)
 
@@ -119,7 +121,8 @@ pub fn from_execution_result_with_errors_test() {
 
 pub fn from_execution_result_failure_test() {
   let errors = [executor.TypeError("Type mismatch", ["field"], location: None)]
-  let exec_result = executor.ExecutionResult(data: None, errors: errors, deferred: [])
+  let exec_result =
+    executor.ExecutionResult(data: None, errors: errors, deferred: [])
 
   let resp = response.from_execution_result(exec_result)
 

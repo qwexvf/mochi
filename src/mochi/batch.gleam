@@ -161,9 +161,13 @@ pub fn execute_with_operation_name(
       executor.execute(schema_def, new_doc, root_value, ctx, variables)
     }
     Error(msg) ->
-      executor.ExecutionResult(data: None, errors: [
-        executor.ValidationError(msg, [], location: None),
-      ], deferred: [])
+      executor.ExecutionResult(
+        data: None,
+        errors: [
+          executor.ValidationError(msg, [], location: None),
+        ],
+        deferred: [],
+      )
   }
 }
 
@@ -234,14 +238,18 @@ pub fn execute_batch(
     True ->
       BatchResult(
         results: [
-          executor.ExecutionResult(data: None, errors: [
-            executor.ValidationError(
-              "Batch size exceeds maximum of "
-                <> string.inspect(config.max_batch_size),
-              [],
-              location: None,
-            ),
-          ], deferred: []),
+          executor.ExecutionResult(
+            data: None,
+            errors: [
+              executor.ValidationError(
+                "Batch size exceeds maximum of "
+                  <> string.inspect(config.max_batch_size),
+                [],
+                location: None,
+              ),
+            ],
+            deferred: [],
+          ),
         ],
         all_succeeded: False,
         failure_count: 1,
@@ -274,13 +282,17 @@ fn execute_batch_internal(
           // If not continuing on error and we have a failure, skip remaining
           False, True -> #(
             [
-              executor.ExecutionResult(data: None, errors: [
-                executor.ValidationError(
-                  "Batch execution halted due to error",
-                  [],
-                  location: None,
-                ),
-              ], deferred: []),
+              executor.ExecutionResult(
+                data: None,
+                errors: [
+                  executor.ValidationError(
+                    "Batch execution halted due to error",
+                    [],
+                    location: None,
+                  ),
+                ],
+                deferred: [],
+              ),
               ..results_acc
             ],
             True,
@@ -326,13 +338,17 @@ fn execute_single_request(
         req.operation_name,
       )
     Error(parse_error) ->
-      executor.ExecutionResult(data: None, errors: [
-        executor.ValidationError(
-          "Parse error: " <> format_parse_error(parse_error),
-          [],
-          location: None,
-        ),
-      ], deferred: [])
+      executor.ExecutionResult(
+        data: None,
+        errors: [
+          executor.ValidationError(
+            "Parse error: " <> format_parse_error(parse_error),
+            [],
+            location: None,
+          ),
+        ],
+        deferred: [],
+      )
   }
 }
 

@@ -42,10 +42,7 @@ pub fn defer_inline_fragment_test() {
   let schema_def = build_test_schema()
 
   let result =
-    executor.execute_query(
-      schema_def,
-      "{ user { id ... @defer { bio } } }",
-    )
+    executor.execute_query(schema_def, "{ user { id ... @defer { bio } } }")
 
   should.equal(result.errors, [])
   should.be_true(option.is_some(result.data))
@@ -114,18 +111,10 @@ pub fn defer_non_deferred_in_initial_test() {
   should.be_true(option.is_some(result.data))
 
   let assert Some(data) = result.data
-  let name_result =
-    decode.run(
-      data,
-      decode.at(["user", "name"], decode.string),
-    )
+  let name_result = decode.run(data, decode.at(["user", "name"], decode.string))
   should.be_ok(name_result)
 
-  let id_result =
-    decode.run(
-      data,
-      decode.at(["user", "id"], decode.string),
-    )
+  let id_result = decode.run(data, decode.at(["user", "id"], decode.string))
   should.be_ok(id_result)
 
   should.equal(list.length(result.deferred), 1)

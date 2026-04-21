@@ -94,8 +94,7 @@ pub fn from_execution_result_incremental(
       data: result.data,
       errors: initial_errors,
       extensions: case has_deferred {
-        True ->
-          Some(dict.from_list([#("hasNext", types.to_dynamic(True))]))
+        True -> Some(dict.from_list([#("hasNext", types.to_dynamic(True))]))
         False -> None
       },
     )
