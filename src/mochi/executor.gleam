@@ -24,8 +24,21 @@ import mochi/validation
 // Types
 // ============================================================================
 
+pub type DeferredPatch {
+  DeferredPatch(
+    path: List(String),
+    data: Option(Dynamic),
+    errors: List(ExecutionError),
+    label: Option(String),
+  )
+}
+
 pub type ExecutionResult {
-  ExecutionResult(data: Option(Dynamic), errors: List(ExecutionError))
+  ExecutionResult(
+    data: Option(Dynamic),
+    errors: List(ExecutionError),
+    deferred: List(DeferredPatch),
+  )
 }
 
 pub type ExecutionError {
@@ -79,11 +92,11 @@ pub type FieldContext {
 // ============================================================================
 
 fn ok_result(data: Dynamic) -> ExecutionResult {
-  ExecutionResult(data: Some(data), errors: [])
+  ExecutionResult(data: Some(data), errors: [], deferred: [])
 }
 
 fn error_result(error: ExecutionError) -> ExecutionResult {
-  ExecutionResult(data: None, errors: [error])
+  ExecutionResult(data: None, errors: [error], deferred: [])
 }
 
 fn validation_error(msg: String, path: List(String)) -> ExecutionResult {
@@ -232,10 +245,8 @@ fn execute_definition(
 ) -> ExecutionResult {
   case definition {
     ast.OperationDefinition(operation) -> execute_operation(context, operation)
-    // Fragment definitions are collected separately and applied during field execution.
-    // This branch is unreachable in practice since find_operation_by_name only
-    // returns OperationDefinition nodes.
-    ast.FragmentDefinition(_) -> ok_result(types.to_dynamic(dict.new()))
+    ast.FragmentDefinition(_) ->
+      panic as "unreachable: fragment definition reached execute_definition"
   }
 }
 
@@ -259,7 +270,7 @@ fn execute_operation(
 
   // Coerce and validate variable values against their declared types
   let exec_result = case coerce_variable_values(context, var_defs) {
-    Error(errors) -> ExecutionResult(data: None, errors: errors)
+    Error(errors) -> ExecutionResult(data: None, errors: errors, deferred: [])
     Ok(coerced_variables) -> {
       let context =
         QueryExecutionContext(..context, variable_values: coerced_variables)
@@ -568,37 +579,108 @@ fn execute_selection_set(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  let #(data_dict, errors_acc, has_none) =
+  let #(data_dict, errors_acc, has_none, deferred_acc) =
     list.fold(
       selection_set.selections,
-      #(dict.new(), [], False),
+      #(dict.new(), [], False, []),
       fn(acc, selection) {
-        let #(data_map, errors_list, none_found) = acc
-        let result =
-          execute_selection(context, selection, object_type, field_context)
+        let #(data_map, errors_list, none_found, deferred_list) = acc
 
-        let new_map = case result.data {
-          Some(d) ->
-            case decode.run(d, decode.dict(decode.string, decode.dynamic)) {
-              Ok(field_dict) -> dict.merge(data_map, field_dict)
-              Error(_) -> data_map
+        case get_defer_info(selection, context.variable_values) {
+          Some(#(label, True)) -> {
+            let result =
+              execute_selection(context, selection, object_type, field_context)
+            let patch =
+              DeferredPatch(
+                path: field_context.path,
+                data: result.data,
+                errors: result.errors,
+                label: label,
+              )
+            let new_deferred =
+              list.append(deferred_list, [patch, ..result.deferred])
+            #(data_map, errors_list, none_found, new_deferred)
+          }
+          _ -> {
+            let result =
+              execute_selection(context, selection, object_type, field_context)
+
+            let new_map = case result.data {
+              Some(d) ->
+                case decode.run(d, decode.dict(decode.string, decode.dynamic)) {
+                  Ok(field_dict) -> dict.merge(data_map, field_dict)
+                  Error(_) -> data_map
+                }
+              None -> data_map
             }
-          None -> data_map
-        }
-        let new_none = none_found || option.is_none(result.data)
+            let new_none = none_found || option.is_none(result.data)
+            let new_deferred = list.append(deferred_list, result.deferred)
 
-        #(new_map, [result.errors, ..errors_list], new_none)
+            #(new_map, [result.errors, ..errors_list], new_none, new_deferred)
+          }
+        }
       },
     )
 
   let errors = list.reverse(errors_acc) |> list.flatten
 
   case has_none, dict.is_empty(data_dict), errors {
-    True, _, _ -> ExecutionResult(data: None, errors: errors)
-    False, True, [] -> ok_result(types.to_dynamic(dict.new()))
-    False, True, _ -> ExecutionResult(data: None, errors: errors)
+    True, _, _ ->
+      ExecutionResult(data: None, errors: errors, deferred: deferred_acc)
+    False, True, [] ->
+      ExecutionResult(
+        data: Some(types.to_dynamic(dict.new())),
+        errors: [],
+        deferred: deferred_acc,
+      )
+    False, True, _ ->
+      ExecutionResult(data: None, errors: errors, deferred: deferred_acc)
     False, False, _ ->
-      ExecutionResult(data: Some(types.to_dynamic(data_dict)), errors: errors)
+      ExecutionResult(
+        data: Some(types.to_dynamic(data_dict)),
+        errors: errors,
+        deferred: deferred_acc,
+      )
+  }
+}
+
+fn extract_defer_label(
+  directive: ast.Directive,
+  variables: Dict(String, Dynamic),
+) -> Option(String) {
+  directive.arguments
+  |> list.find(fn(a) { a.name == "label" })
+  |> result.try(fn(a) {
+    case a.value {
+      ast.StringValue(s) -> Ok(s)
+      ast.VariableValue(name) ->
+        dict.get(variables, name)
+        |> result.try(fn(v) {
+          decode.run(v, decode.string) |> result.map_error(fn(_) { Nil })
+        })
+      _ -> Error(Nil)
+    }
+  })
+  |> option.from_result
+}
+
+fn get_defer_info(
+  selection: ast.Selection,
+  variables: Dict(String, Dynamic),
+) -> Option(#(Option(String), Bool)) {
+  let directives = case selection {
+    ast.InlineFragment(inline) -> inline.directives
+    ast.FragmentSpread(spread) -> spread.directives
+    ast.FieldSelection(_) -> []
+  }
+  case list.find(directives, fn(d) { d.name == "defer" }) {
+    Error(_) -> None
+    Ok(directive) -> {
+      let should_defer =
+        get_directive_bool_arg([directive], "defer", "if", variables)
+        |> option.unwrap(True)
+      Some(#(extract_defer_label(directive, variables), should_defer))
+    }
   }
 }
 
@@ -873,7 +955,7 @@ fn skip_builtin_directive(
   next: fn() -> Result(Dynamic, String),
 ) -> Result(Dynamic, String) {
   case name {
-    "skip" | "include" | "deprecated" -> Ok(value)
+    "skip" | "include" | "deprecated" | "defer" -> Ok(value)
     _ -> next()
   }
 }
@@ -1230,6 +1312,7 @@ fn handle_sub_selection_result(
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(Nil))),
         errors: sub_result.errors,
+        deferred: sub_result.deferred,
       )
   }
 }
@@ -1351,10 +1434,9 @@ fn aggregate_list_results(
   field_type: schema.FieldType,
   response_name: String,
 ) -> ExecutionResult {
-  // Single-pass: collect data, errors, and check for null errors simultaneously
-  let #(data_acc, errors_acc, has_null_error) =
-    list.fold(results, #([], [], False), fn(acc, result) {
-      let #(data_list, error_list, null_found) = acc
+  let #(data_acc, errors_acc, deferred_acc, has_null_error) =
+    list.fold(results, #([], [], [], False), fn(acc, result) {
+      let #(data_list, error_list, deferred_list, null_found) = acc
       let new_data = case result.data {
         Some(d) -> [d, ..data_list]
         None -> data_list
@@ -1367,20 +1449,32 @@ fn aggregate_list_results(
             _ -> False
           }
         })
-      #(new_data, [result.errors, ..error_list], new_null)
+      #(
+        new_data,
+        [result.errors, ..error_list],
+        [result.deferred, ..deferred_list],
+        new_null,
+      )
     })
 
   let errors = list.reverse(errors_acc) |> list.flatten
+  let deferred = list.reverse(deferred_acc) |> list.flatten
   let data_list = list.reverse(data_acc)
 
   case has_null_error, errors {
-    True, _ -> handle_list_null_error(field_type, response_name, errors)
+    True, _ ->
+      handle_list_null_error(field_type, response_name, errors, deferred)
     False, [] ->
-      ok_result(make_field(response_name, types.to_dynamic(data_list)))
+      ExecutionResult(
+        data: Some(make_field(response_name, types.to_dynamic(data_list))),
+        errors: [],
+        deferred: deferred,
+      )
     False, _ ->
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(data_list))),
         errors: errors,
+        deferred: deferred,
       )
   }
 }
@@ -1390,13 +1484,15 @@ fn handle_list_null_error(
   field_type: schema.FieldType,
   response_name: String,
   errors: List(ExecutionError),
+  deferred: List(DeferredPatch),
 ) -> ExecutionResult {
   case is_non_null_type(field_type) {
-    True -> ExecutionResult(data: None, errors: errors)
+    True -> ExecutionResult(data: None, errors: errors, deferred: deferred)
     False ->
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(Nil))),
         errors: errors,
+        deferred: deferred,
       )
   }
 }
@@ -2840,7 +2936,7 @@ pub fn execute_query_with_context(
                     location: loc,
                   )
                 })
-              ExecutionResult(data: None, errors: errors)
+              ExecutionResult(data: None, errors: errors, deferred: [])
             }
           }
         }

@@ -77,6 +77,13 @@ pub type ValidationError {
   SelectionSetNotAllowed(field_name: String, type_name: String)
   /// Fields with same response name cannot be merged
   FieldsCannotMerge(field_name: String, reason: String)
+  /// Argument value has the wrong type
+  ArgumentTypeMismatch(
+    field_name: String,
+    argument_name: String,
+    expected_type: String,
+    got: String,
+  )
 }
 
 pub type LocatedError =
@@ -410,17 +417,14 @@ fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext
       ValidationContext(..ctx, current_location: Some(#(line, column)))
     None -> ctx
   }
-  // Validate directives on field
-  let ctx = validate_directives(ctx, field.directives, "FIELD")
-
   use ctx <- skip_introspection_field(field.name, ctx, field.arguments)
   use obj_type <- require_current_type(ctx)
   use field_def <- require_field_def(ctx, obj_type, field.name)
 
   ctx
+  |> validate_directives(field.directives, "FIELD")
   |> validate_field_arguments(field, field_def)
   |> track_argument_variables(field.arguments)
-  |> validate_directives(field.directives, "FIELD")
   |> validate_field_selection_set(field, field_def)
 }
 
@@ -803,28 +807,21 @@ fn validate_directives(
   directives: List(ast.Directive),
   location: String,
 ) -> ValidationContext {
-  // Check for unknown directives and duplicate non-repeatable directives
-  let #(seen, ctx) =
-    list.fold(directives, #(set.new(), ctx), fn(acc, directive) {
-      let #(seen_set, ctx) = acc
-      let ctx = validate_single_directive(ctx, directive, location)
-
-      // Check for duplicate non-repeatable directives
-      case set.contains(seen_set, directive.name) {
-        True ->
-          case is_repeatable_directive(ctx.schema, directive.name) {
-            True -> #(seen_set, ctx)
-            False -> #(
-              seen_set,
-              add_error(ctx, DuplicateDirective(directive.name)),
-            )
-          }
-        False -> #(set.insert(seen_set, directive.name), ctx)
-      }
-    })
-
-  let _ = seen
-  ctx
+  list.fold(directives, #(set.new(), ctx), fn(acc, directive) {
+    let #(seen_set, ctx) = acc
+    let ctx = validate_single_directive(ctx, directive, location)
+    case set.contains(seen_set, directive.name) {
+      True ->
+        case is_repeatable_directive(ctx.schema, directive.name) {
+          True -> #(seen_set, ctx)
+          False -> #(
+            seen_set,
+            add_error(ctx, DuplicateDirective(directive.name)),
+          )
+        }
+      False -> #(set.insert(seen_set, directive.name), ctx)
+    }
+  }).1
 }
 
 /// Validate a single directive
@@ -851,9 +848,14 @@ fn validate_single_directive(
         _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     "specifiedBy" ->
-      // Valid only on SCALAR
       case location {
         "SCALAR" -> ctx
+        _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
+      }
+    "defer" ->
+      case location {
+        "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" ->
+          validate_defer_args(ctx, directive)
         _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     _ ->
@@ -894,13 +896,44 @@ fn validate_directive_location(
 /// Check if a directive is repeatable
 fn is_repeatable_directive(schema: Schema, directive_name: String) -> Bool {
   case directive_name {
-    "skip" | "include" | "deprecated" | "specifiedBy" -> False
+    "skip" | "include" | "deprecated" | "specifiedBy" | "defer" -> False
     _ ->
       case dict.get(schema.directives, directive_name) {
         Ok(directive_def) -> directive_def.is_repeatable
         Error(_) -> False
       }
   }
+}
+
+fn validate_defer_args(
+  ctx: ValidationContext,
+  directive: ast.Directive,
+) -> ValidationContext {
+  list.fold(directive.arguments, ctx, fn(ctx, arg) {
+    case arg.name {
+      "if" ->
+        case arg.value {
+          ast.BooleanValue(_) | ast.VariableValue(_) ->
+            track_value_variables(ctx, arg.value)
+          _ ->
+            add_error(
+              ctx,
+              ArgumentTypeMismatch("@defer", "if", "Boolean", "non-boolean"),
+            )
+        }
+      "label" ->
+        case arg.value {
+          ast.StringValue(_) | ast.VariableValue(_) ->
+            track_value_variables(ctx, arg.value)
+          _ ->
+            add_error(
+              ctx,
+              ArgumentTypeMismatch("@defer", "label", "String", "non-string"),
+            )
+        }
+      _ -> add_error(ctx, UnknownArgument("@defer", arg.name))
+    }
+  })
 }
 
 fn validate_skip_include_args(
@@ -1052,6 +1085,15 @@ pub fn format_error(error: ValidationError) -> String {
       <> "\" conflict because "
       <> reason
       <> ". Use different aliases on the fields to fetch both if this was intentional."
+    ArgumentTypeMismatch(field_name, arg_name, expected, got) ->
+      "Argument \""
+      <> arg_name
+      <> "\" on \""
+      <> field_name
+      <> "\" has invalid type: expected "
+      <> expected
+      <> ", got "
+      <> got
   }
 }
 

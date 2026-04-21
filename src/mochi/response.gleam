@@ -18,6 +18,23 @@ import mochi/executor.{type ExecutionError, type ExecutionResult}
 import mochi/json
 import mochi/types
 
+pub type IncrementalResponse {
+  IncrementalResponse(
+    initial: GraphQLResponse,
+    patches: List(DeferredPatchResponse),
+  )
+}
+
+pub type DeferredPatchResponse {
+  DeferredPatchResponse(
+    path: List(String),
+    data: Option(Dynamic),
+    errors: Option(List(GraphQLError)),
+    label: Option(String),
+    has_next: Bool,
+  )
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -31,6 +48,8 @@ pub type GraphQLResponse {
     errors: Option(List(GraphQLError)),
     /// Additional metadata from extensions
     extensions: Option(Dict(String, Dynamic)),
+    /// For incremental delivery: top-level hasNext flag
+    has_next: Option(Bool),
   )
 }
 
@@ -40,27 +59,109 @@ pub type GraphQLResponse {
 
 /// Create a successful response with data
 pub fn success(data: Dynamic) -> GraphQLResponse {
-  GraphQLResponse(data: Some(data), errors: None, extensions: None)
+  GraphQLResponse(
+    data: Some(data),
+    errors: None,
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create an error-only response
 pub fn failure(errors: List(GraphQLError)) -> GraphQLResponse {
-  GraphQLResponse(data: None, errors: Some(errors), extensions: None)
+  GraphQLResponse(
+    data: None,
+    errors: Some(errors),
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create a partial response with data and errors
 pub fn partial(data: Dynamic, errors: List(GraphQLError)) -> GraphQLResponse {
-  GraphQLResponse(data: Some(data), errors: Some(errors), extensions: None)
+  GraphQLResponse(
+    data: Some(data),
+    errors: Some(errors),
+    extensions: None,
+    has_next: None,
+  )
 }
 
 /// Create a response from an ExecutionResult
 pub fn from_execution_result(result: ExecutionResult) -> GraphQLResponse {
-  let errors = case result.errors {
-    [] -> None
-    errs -> Some(list.map(errs, execution_error_to_graphql_error))
-  }
+  GraphQLResponse(
+    data: result.data,
+    errors: map_errors(result.errors),
+    extensions: None,
+    has_next: None,
+  )
+}
 
-  GraphQLResponse(data: result.data, errors: errors, extensions: None)
+/// Build an incremental response from an ExecutionResult that contains deferred patches
+pub fn from_execution_result_incremental(
+  result: ExecutionResult,
+) -> IncrementalResponse {
+  let has_deferred = !list.is_empty(result.deferred)
+  let last_idx = list.length(result.deferred) - 1
+  let initial =
+    GraphQLResponse(
+      data: result.data,
+      errors: map_errors(result.errors),
+      extensions: None,
+      has_next: case has_deferred {
+        True -> Some(True)
+        False -> None
+      },
+    )
+  let patches =
+    result.deferred
+    |> list.index_map(fn(patch, idx) {
+      DeferredPatchResponse(
+        path: patch.path,
+        data: patch.data,
+        errors: map_errors(patch.errors),
+        label: patch.label,
+        has_next: idx < last_idx,
+      )
+    })
+  IncrementalResponse(initial: initial, patches: patches)
+}
+
+/// Serialize an incremental response patch to Dynamic
+pub fn deferred_patch_to_dynamic(patch: DeferredPatchResponse) -> Dynamic {
+  let parts = [
+    #("path", types.to_dynamic(patch.path)),
+    #("data", case patch.data {
+      Some(d) -> d
+      None -> types.to_dynamic(Nil)
+    }),
+  ]
+  let parts = case patch.errors {
+    Some(errors) -> [#("errors", error.errors_to_dynamic(errors)), ..parts]
+    None -> parts
+  }
+  let parts = case patch.label {
+    Some(label) -> [#("label", types.to_dynamic(label)), ..parts]
+    None -> parts
+  }
+  types.to_dynamic(dict.from_list(parts))
+}
+
+/// Serialize an incremental delivery envelope to Dynamic
+/// Shape: {"incremental": [...patches], "hasNext": bool}
+pub fn incremental_envelope_to_dynamic(
+  patches: List(DeferredPatchResponse),
+  has_next: Bool,
+) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #(
+        "incremental",
+        types.to_dynamic(list.map(patches, deferred_patch_to_dynamic)),
+      ),
+      #("hasNext", types.to_dynamic(has_next)),
+    ]),
+  )
 }
 
 /// Add extensions to a response
@@ -131,6 +232,12 @@ pub fn to_dynamic(response: GraphQLResponse) -> Dynamic {
     None -> parts
   }
 
+  // hasNext is top-level per incremental delivery spec (not inside extensions)
+  let parts = case response.has_next {
+    Some(v) -> [#("hasNext", types.to_dynamic(v)), ..parts]
+    None -> parts
+  }
+
   types.to_dynamic(dict.from_list(parts))
 }
 
@@ -168,6 +275,13 @@ fn maybe_with_location(
     option.None -> err
     option.Some(#(line, col)) ->
       error.with_locations(err, [error.Location(line, col)])
+  }
+}
+
+fn map_errors(errors: List(ExecutionError)) -> Option(List(GraphQLError)) {
+  case errors {
+    [] -> None
+    errs -> Some(list.map(errs, execution_error_to_graphql_error))
   }
 }
 
