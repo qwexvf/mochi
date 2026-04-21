@@ -176,6 +176,7 @@ pub type FieldDefinition {
     topic_fn: Option(
       fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, String),
     ),
+    rich_resolver: Option(RichResolver),
   )
 }
 
@@ -264,6 +265,12 @@ pub type InputFieldDefinition {
 // Resolver type
 pub type Resolver =
   fn(ResolverInfo) -> Result(Dynamic, String)
+
+pub type RichResolverPayload =
+  #(String, option.Option(dict.Dict(String, Dynamic)))
+
+pub type RichResolver =
+  fn(ResolverInfo) -> Result(Dynamic, RichResolverPayload)
 
 /// Context for GraphQL execution, including DataLoader instances
 pub type ExecutionContext {
@@ -620,6 +627,7 @@ pub fn field_def(name: String, field_type: FieldType) -> FieldDefinition {
     is_deprecated: False,
     deprecation_reason: None,
     topic_fn: None,
+    rich_resolver: None,
   )
 }
 
@@ -656,6 +664,13 @@ pub fn argument(
 
 pub fn resolver(field: FieldDefinition, resolve_fn: Resolver) -> FieldDefinition {
   FieldDefinition(..field, resolver: Some(resolve_fn))
+}
+
+pub fn rich_resolver_fn(
+  field: FieldDefinition,
+  resolve_fn: RichResolver,
+) -> FieldDefinition {
+  FieldDefinition(..field, rich_resolver: Some(resolve_fn))
 }
 
 // ============================================================================
@@ -779,6 +794,7 @@ pub fn auto_field(
       is_deprecated: False,
       deprecation_reason: None,
       topic_fn: None,
+      rich_resolver: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -883,6 +899,7 @@ pub fn resolver_field(
       is_deprecated: False,
       deprecation_reason: None,
       topic_fn: None,
+      rich_resolver: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -930,6 +947,7 @@ pub fn query_with_args(
       is_deprecated: False,
       deprecation_reason: None,
       topic_fn: None,
+      rich_resolver: None,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }

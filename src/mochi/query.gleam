@@ -770,6 +770,24 @@ fn build_op_resolver(
   }
 }
 
+fn build_rich_op_resolver(
+  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
+  resolver: fn(args, ExecutionContext) ->
+    Result(result, schema.RichResolverPayload),
+  result_encoder: fn(result) -> Dynamic,
+) -> schema.RichResolver {
+  fn(info: ResolverInfo) {
+    case args_decoder(info.arguments) {
+      Error(e) -> Error(#("Failed to decode arguments: " <> e, option.None))
+      Ok(decoded_args) ->
+        case resolver(decoded_args, info.context) {
+          Error(payload) -> Error(payload)
+          Ok(res) -> Ok(result_encoder(res))
+        }
+    }
+  }
+}
+
 fn apply_desc(field: FieldDefinition, desc: Option(String)) -> FieldDefinition {
   case desc {
     Some(d) -> schema.field_description(field, d)
@@ -926,6 +944,48 @@ pub fn add_mutation(
     mutation_to_field_def(m),
     ..builder.mutations
   ])
+}
+
+pub fn add_rich_query(
+  builder: SchemaBuilder,
+  name: String,
+  arg_defs: List(ArgDef),
+  return_type: schema.FieldType,
+  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
+  resolver: fn(args, ExecutionContext) ->
+    Result(result, schema.RichResolverPayload),
+  encoder: fn(result) -> Dynamic,
+) -> SchemaBuilder {
+  let field =
+    schema.field_def(name, return_type)
+    |> schema.rich_resolver_fn(build_rich_op_resolver(
+      args_decoder,
+      resolver,
+      encoder,
+    ))
+    |> add_args_to_field(arg_defs)
+  SchemaBuilder(..builder, queries: [field, ..builder.queries])
+}
+
+pub fn add_rich_mutation(
+  builder: SchemaBuilder,
+  name: String,
+  arg_defs: List(ArgDef),
+  return_type: schema.FieldType,
+  args_decoder: fn(Dict(String, Dynamic)) -> Result(args, String),
+  resolver: fn(args, ExecutionContext) ->
+    Result(result, schema.RichResolverPayload),
+  encoder: fn(result) -> Dynamic,
+) -> SchemaBuilder {
+  let field =
+    schema.field_def(name, return_type)
+    |> schema.rich_resolver_fn(build_rich_op_resolver(
+      args_decoder,
+      resolver,
+      encoder,
+    ))
+    |> add_args_to_field(arg_defs)
+  SchemaBuilder(..builder, mutations: [field, ..builder.mutations])
 }
 
 /// Add a subscription to the schema

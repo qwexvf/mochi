@@ -99,6 +99,7 @@ fn error_message(err: executor.ExecutionError) -> String {
     executor.ResolverError(message: m, ..) -> m
     executor.TypeError(message: m, ..) -> m
     executor.NullValueError(message: m, ..) -> m
+    executor.RichResolverError(message: m, ..) -> m
   }
 }
 
