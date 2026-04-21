@@ -1802,7 +1802,8 @@ fn execute_introspection_schema(
   field: ast.Field,
   response_name: String,
 ) -> ExecutionResult {
-  let introspection_data = introspection.build_schema_introspection(context.schema)
+  let introspection_data =
+    introspection.build_schema_introspection(context.schema)
 
   // Process selection set if present
   case field.selection_set {

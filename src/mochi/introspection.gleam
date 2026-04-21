@@ -78,7 +78,10 @@ pub fn get_introspection_type_type() -> schema.ObjectType {
       ),
       #(
         "interfaces",
-        field_def("interfaces", schema.List(schema.NonNull(schema.Named("__Type")))),
+        field_def(
+          "interfaces",
+          schema.List(schema.NonNull(schema.Named("__Type"))),
+        ),
       ),
       #(
         "possibleTypes",
@@ -214,7 +217,10 @@ fn get_introspection_directive_type() -> schema.ObjectType {
   )
 }
 
-fn field_def(name: String, field_type: schema.FieldType) -> schema.FieldDefinition {
+fn field_def(
+  name: String,
+  field_type: schema.FieldType,
+) -> schema.FieldDefinition {
   schema.FieldDefinition(
     name: name,
     description: None,
@@ -281,17 +287,14 @@ pub fn build_schema_introspection(schema_def: schema.Schema) -> Dynamic {
     dict.from_list([
       #("queryType", build_type_ref(schema_def, schema_def.query)),
       #("mutationType", build_type_ref(schema_def, schema_def.mutation)),
-      #(
-        "subscriptionType",
-        build_type_ref(schema_def, schema_def.subscription),
-      ),
+      #("subscriptionType", build_type_ref(schema_def, schema_def.subscription)),
       #(
         "types",
         types.to_dynamic(
-          list.map(
-            get_all_type_names(schema_def),
-            build_type_introspection(schema_def, _),
-          ),
+          list.map(get_all_type_names(schema_def), build_type_introspection(
+            schema_def,
+            _,
+          )),
         ),
       ),
       #("directives", build_directives_introspection(schema_def)),
@@ -373,10 +376,7 @@ fn build_builtin_directive(
     dict.from_list([
       #("name", types.to_dynamic(name)),
       #("description", types.to_dynamic(description)),
-      #(
-        "locations",
-        types.to_dynamic(list.map(locations, types.to_dynamic)),
-      ),
+      #("locations", types.to_dynamic(list.map(locations, types.to_dynamic))),
       #("args", types.to_dynamic(args)),
       #("isRepeatable", types.to_dynamic(False)),
     ]),
@@ -532,7 +532,10 @@ fn get_all_type_names(schema_def: schema.Schema) -> List(String) {
   list.flatten([builtin, user_types, root_types, introspection]) |> list.unique
 }
 
-pub fn build_type_introspection(schema_def: schema.Schema, name: String) -> Dynamic {
+pub fn build_type_introspection(
+  schema_def: schema.Schema,
+  name: String,
+) -> Dynamic {
   case name {
     "String" | "Int" | "Float" | "Boolean" | "ID" ->
       build_scalar_introspection(name)
