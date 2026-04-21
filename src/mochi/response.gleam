@@ -196,15 +196,11 @@ pub fn execution_error_to_graphql_error(err: ExecutionError) -> GraphQLError {
       path: err_path,
       location: location,
     ) -> {
-      let with_path = case gql_err.path {
-        None ->
-          error.GraphQLError(
-            ..gql_err,
-            path: Some(list.map(err_path, error.FieldSegment)),
-          )
-        Some(_) -> gql_err
-      }
-      maybe_with_location(with_path, location)
+      error.GraphQLError(
+        ..gql_err,
+        path: Some(list.map(err_path, error.FieldSegment)),
+      )
+      |> maybe_with_location(location)
     }
   }
 }

@@ -1125,7 +1125,25 @@ fn resolve_rich_field(
       info: types.to_dynamic(dict.new()),
     )
 
-  case rich_res(resolver_info) {
+  emit_telemetry(
+    context.execution_context,
+    schema.SchemaFieldStart(field_def.name, response_name, field_path),
+  )
+  let start_ns = telemetry.get_timestamp_ns()
+  let rich_result = rich_res(resolver_info)
+  let duration_ns = telemetry.get_timestamp_ns() - start_ns
+  emit_telemetry(
+    context.execution_context,
+    schema.SchemaFieldEnd(
+      field_def.name,
+      response_name,
+      field_path,
+      result.is_ok(rich_result),
+      duration_ns,
+    ),
+  )
+
+  case rich_result {
     Ok(resolved) ->
       case
         apply_custom_directives(
