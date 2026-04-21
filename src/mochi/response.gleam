@@ -18,6 +18,23 @@ import mochi/executor.{type ExecutionError, type ExecutionResult}
 import mochi/json
 import mochi/types
 
+pub type IncrementalResponse {
+  IncrementalResponse(
+    initial: GraphQLResponse,
+    patches: List(DeferredPatchResponse),
+  )
+}
+
+pub type DeferredPatchResponse {
+  DeferredPatchResponse(
+    path: List(String),
+    data: Option(Dynamic),
+    errors: Option(List(GraphQLError)),
+    label: Option(String),
+    has_next: Bool,
+  )
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -61,6 +78,81 @@ pub fn from_execution_result(result: ExecutionResult) -> GraphQLResponse {
   }
 
   GraphQLResponse(data: result.data, errors: errors, extensions: None)
+}
+
+/// Build an incremental response from an ExecutionResult that contains deferred patches
+pub fn from_execution_result_incremental(
+  result: ExecutionResult,
+) -> IncrementalResponse {
+  let has_deferred = !list.is_empty(result.deferred)
+  let initial_errors = case result.errors {
+    [] -> None
+    errs -> Some(list.map(errs, execution_error_to_graphql_error))
+  }
+  let initial =
+    GraphQLResponse(
+      data: result.data,
+      errors: initial_errors,
+      extensions: case has_deferred {
+        True ->
+          Some(dict.from_list([#("hasNext", types.to_dynamic(True))]))
+        False -> None
+      },
+    )
+  let last_idx = list.length(result.deferred) - 1
+  let patches =
+    result.deferred
+    |> list.index_map(fn(patch, idx) {
+      let patch_errors = case patch.errors {
+        [] -> None
+        errs -> Some(list.map(errs, execution_error_to_graphql_error))
+      }
+      DeferredPatchResponse(
+        path: patch.path,
+        data: patch.data,
+        errors: patch_errors,
+        label: patch.label,
+        has_next: idx < last_idx,
+      )
+    })
+  IncrementalResponse(initial: initial, patches: patches)
+}
+
+/// Serialize an incremental response patch to Dynamic
+pub fn deferred_patch_to_dynamic(patch: DeferredPatchResponse) -> Dynamic {
+  let parts = [
+    #("path", types.to_dynamic(patch.path)),
+    #("data", case patch.data {
+      Some(d) -> d
+      None -> types.to_dynamic(Nil)
+    }),
+  ]
+  let parts = case patch.errors {
+    Some(errors) -> [#("errors", error.errors_to_dynamic(errors)), ..parts]
+    None -> parts
+  }
+  let parts = case patch.label {
+    Some(label) -> [#("label", types.to_dynamic(label)), ..parts]
+    None -> parts
+  }
+  types.to_dynamic(dict.from_list(parts))
+}
+
+/// Serialize an incremental delivery envelope to Dynamic
+/// Shape: {"incremental": [...patches], "hasNext": bool}
+pub fn incremental_envelope_to_dynamic(
+  patches: List(DeferredPatchResponse),
+  has_next: Bool,
+) -> Dynamic {
+  types.to_dynamic(
+    dict.from_list([
+      #(
+        "incremental",
+        types.to_dynamic(list.map(patches, deferred_patch_to_dynamic)),
+      ),
+      #("hasNext", types.to_dynamic(has_next)),
+    ]),
+  )
 }
 
 /// Add extensions to a response

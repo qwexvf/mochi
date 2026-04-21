@@ -851,9 +851,14 @@ fn validate_single_directive(
         _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     "specifiedBy" ->
-      // Valid only on SCALAR
       case location {
         "SCALAR" -> ctx
+        _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
+      }
+    "defer" ->
+      case location {
+        "FRAGMENT_SPREAD" | "INLINE_FRAGMENT" ->
+          validate_defer_args(ctx, directive)
         _ -> add_error(ctx, DirectiveNotAllowed(directive.name, location))
       }
     _ ->
@@ -894,13 +899,26 @@ fn validate_directive_location(
 /// Check if a directive is repeatable
 fn is_repeatable_directive(schema: Schema, directive_name: String) -> Bool {
   case directive_name {
-    "skip" | "include" | "deprecated" | "specifiedBy" -> False
+    "skip" | "include" | "deprecated" | "specifiedBy" | "defer" -> False
     _ ->
       case dict.get(schema.directives, directive_name) {
         Ok(directive_def) -> directive_def.is_repeatable
         Error(_) -> False
       }
   }
+}
+
+fn validate_defer_args(
+  ctx: ValidationContext,
+  directive: ast.Directive,
+) -> ValidationContext {
+  list.fold(directive.arguments, ctx, fn(ctx, arg) {
+    case arg.name {
+      "if" -> track_value_variables(ctx, arg.value)
+      "label" -> ctx
+      _ -> add_error(ctx, UnknownArgument("@defer", arg.name))
+    }
+  })
 }
 
 fn validate_skip_include_args(

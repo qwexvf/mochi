@@ -24,8 +24,21 @@ import mochi/validation
 // Types
 // ============================================================================
 
+pub type DeferredPatch {
+  DeferredPatch(
+    path: List(String),
+    data: Option(Dynamic),
+    errors: List(ExecutionError),
+    label: Option(String),
+  )
+}
+
 pub type ExecutionResult {
-  ExecutionResult(data: Option(Dynamic), errors: List(ExecutionError))
+  ExecutionResult(
+    data: Option(Dynamic),
+    errors: List(ExecutionError),
+    deferred: List(DeferredPatch),
+  )
 }
 
 pub type ExecutionError {
@@ -79,11 +92,11 @@ pub type FieldContext {
 // ============================================================================
 
 fn ok_result(data: Dynamic) -> ExecutionResult {
-  ExecutionResult(data: Some(data), errors: [])
+  ExecutionResult(data: Some(data), errors: [], deferred: [])
 }
 
 fn error_result(error: ExecutionError) -> ExecutionResult {
-  ExecutionResult(data: None, errors: [error])
+  ExecutionResult(data: None, errors: [error], deferred: [])
 }
 
 fn validation_error(msg: String, path: List(String)) -> ExecutionResult {
@@ -259,7 +272,7 @@ fn execute_operation(
 
   // Coerce and validate variable values against their declared types
   let exec_result = case coerce_variable_values(context, var_defs) {
-    Error(errors) -> ExecutionResult(data: None, errors: errors)
+    Error(errors) -> ExecutionResult(data: None, errors: errors, deferred: [])
     Ok(coerced_variables) -> {
       let context =
         QueryExecutionContext(..context, variable_values: coerced_variables)
@@ -568,37 +581,106 @@ fn execute_selection_set(
   object_type: schema.ObjectType,
   field_context: FieldContext,
 ) -> ExecutionResult {
-  let #(data_dict, errors_acc, has_none) =
+  let #(data_dict, errors_acc, has_none, deferred_acc) =
     list.fold(
       selection_set.selections,
-      #(dict.new(), [], False),
+      #(dict.new(), [], False, []),
       fn(acc, selection) {
-        let #(data_map, errors_list, none_found) = acc
-        let result =
-          execute_selection(context, selection, object_type, field_context)
+        let #(data_map, errors_list, none_found, deferred_list) = acc
 
-        let new_map = case result.data {
-          Some(d) ->
-            case decode.run(d, decode.dict(decode.string, decode.dynamic)) {
-              Ok(field_dict) -> dict.merge(data_map, field_dict)
-              Error(_) -> data_map
+        case get_defer_info(selection, context.variable_values) {
+          Some(#(label, True)) -> {
+            let result =
+              execute_selection(context, selection, object_type, field_context)
+            let patch =
+              DeferredPatch(
+                path: field_context.path,
+                data: result.data,
+                errors: result.errors,
+                label: label,
+              )
+            let new_deferred =
+              list.append(deferred_list, [
+                patch,
+                ..result.deferred
+              ])
+            #(data_map, errors_list, none_found, new_deferred)
+          }
+          _ -> {
+            let result =
+              execute_selection(context, selection, object_type, field_context)
+
+            let new_map = case result.data {
+              Some(d) ->
+                case decode.run(d, decode.dict(decode.string, decode.dynamic)) {
+                  Ok(field_dict) -> dict.merge(data_map, field_dict)
+                  Error(_) -> data_map
+                }
+              None -> data_map
             }
-          None -> data_map
-        }
-        let new_none = none_found || option.is_none(result.data)
+            let new_none = none_found || option.is_none(result.data)
+            let new_deferred = list.append(deferred_list, result.deferred)
 
-        #(new_map, [result.errors, ..errors_list], new_none)
+            #(new_map, [result.errors, ..errors_list], new_none, new_deferred)
+          }
+        }
       },
     )
 
   let errors = list.reverse(errors_acc) |> list.flatten
 
   case has_none, dict.is_empty(data_dict), errors {
-    True, _, _ -> ExecutionResult(data: None, errors: errors)
-    False, True, [] -> ok_result(types.to_dynamic(dict.new()))
-    False, True, _ -> ExecutionResult(data: None, errors: errors)
+    True, _, _ ->
+      ExecutionResult(data: None, errors: errors, deferred: deferred_acc)
+    False, True, [] ->
+      ExecutionResult(
+        data: Some(types.to_dynamic(dict.new())),
+        errors: [],
+        deferred: deferred_acc,
+      )
+    False, True, _ ->
+      ExecutionResult(data: None, errors: errors, deferred: deferred_acc)
     False, False, _ ->
-      ExecutionResult(data: Some(types.to_dynamic(data_dict)), errors: errors)
+      ExecutionResult(
+        data: Some(types.to_dynamic(data_dict)),
+        errors: errors,
+        deferred: deferred_acc,
+      )
+  }
+}
+
+fn get_defer_info(
+  selection: ast.Selection,
+  variables: Dict(String, Dynamic),
+) -> Option(#(Option(String), Bool)) {
+  let directives = case selection {
+    ast.InlineFragment(inline) -> inline.directives
+    ast.FragmentSpread(spread) -> spread.directives
+    ast.FieldSelection(_) -> []
+  }
+  case list.find(directives, fn(d) { d.name == "defer" }) {
+    Error(_) -> None
+    Ok(directive) -> {
+      let if_value =
+        get_directive_bool_arg(
+          [directive],
+          "defer",
+          "if",
+          variables,
+        )
+      let should_defer = option.unwrap(if_value, True)
+      let label =
+        directive.arguments
+        |> list.find(fn(a) { a.name == "label" })
+        |> result.map(fn(a) {
+          case a.value {
+            ast.StringValue(s) -> s
+            _ -> ""
+          }
+        })
+        |> option.from_result
+      Some(#(label, should_defer))
+    }
   }
 }
 
@@ -873,7 +955,7 @@ fn skip_builtin_directive(
   next: fn() -> Result(Dynamic, String),
 ) -> Result(Dynamic, String) {
   case name {
-    "skip" | "include" | "deprecated" -> Ok(value)
+    "skip" | "include" | "deprecated" | "defer" -> Ok(value)
     _ -> next()
   }
 }
@@ -1230,6 +1312,7 @@ fn handle_sub_selection_result(
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(Nil))),
         errors: sub_result.errors,
+        deferred: sub_result.deferred,
       )
   }
 }
@@ -1381,6 +1464,7 @@ fn aggregate_list_results(
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(data_list))),
         errors: errors,
+        deferred: [],
       )
   }
 }
@@ -1392,11 +1476,12 @@ fn handle_list_null_error(
   errors: List(ExecutionError),
 ) -> ExecutionResult {
   case is_non_null_type(field_type) {
-    True -> ExecutionResult(data: None, errors: errors)
+    True -> ExecutionResult(data: None, errors: errors, deferred: [])
     False ->
       ExecutionResult(
         data: Some(make_field(response_name, types.to_dynamic(Nil))),
         errors: errors,
+        deferred: [],
       )
   }
 }
@@ -2840,7 +2925,7 @@ pub fn execute_query_with_context(
                     location: loc,
                   )
                 })
-              ExecutionResult(data: None, errors: errors)
+              ExecutionResult(data: None, errors: errors, deferred: [])
             }
           }
         }

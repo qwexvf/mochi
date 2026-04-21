@@ -163,7 +163,7 @@ pub fn execute_with_operation_name(
     Error(msg) ->
       executor.ExecutionResult(data: None, errors: [
         executor.ValidationError(msg, [], location: None),
-      ])
+      ], deferred: [])
   }
 }
 
@@ -241,7 +241,7 @@ pub fn execute_batch(
               [],
               location: None,
             ),
-          ]),
+          ], deferred: []),
         ],
         all_succeeded: False,
         failure_count: 1,
@@ -280,7 +280,7 @@ fn execute_batch_internal(
                   [],
                   location: None,
                 ),
-              ]),
+              ], deferred: []),
               ..results_acc
             ],
             True,
@@ -332,7 +332,7 @@ fn execute_single_request(
           [],
           location: None,
         ),
-      ])
+      ], deferred: [])
   }
 }
 
