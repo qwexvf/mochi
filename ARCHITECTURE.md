@@ -257,13 +257,15 @@ flowchart TD
         security[security]
         error[error]
         response[response]
+        apq[apq]
+        middleware[middleware]
+        json[json]
     end
 
     mochi_relay --> mochi
     mochi_websocket --> mochi
     mochi_upload --> mochi
     mochi_codegen --> mochi
-    mochi_apq["mochi_apq (standalone)"]
 ```
 
 ## Null Propagation
@@ -326,7 +328,10 @@ mochi/                          # Core GraphQL engine
     ├── error.gleam             # GraphQL-spec errors
     ├── response.gleam          # Response serialization
     ├── security.gleam          # Query depth/complexity limits
-    └── telemetry.gleam         # Execution hooks
+    ├── telemetry.gleam         # Execution hooks
+    ├── middleware.gleam        # Request/response middleware pipeline
+    ├── json.gleam              # JSON serialization
+    └── apq.gleam               # Automatic Persisted Queries
 
 mochi_relay/                    # Relay-style cursor pagination
 └── src/mochi_relay/
@@ -351,8 +356,4 @@ mochi_codegen/                  # SDL + TypeScript + GraphiQL + CLI
     ├── config.gleam
     ├── gleam.gleam
     └── schema_gen.gleam
-
-mochi_apq/                      # Automatic Persisted Queries
-└── src/mochi_apq/
-    └── persisted_queries.gleam
 ```
