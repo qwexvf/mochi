@@ -21,7 +21,7 @@ import mochi/schema.{
 // ============================================================================
 
 /// A query definition with typed arguments and return value
-pub type QueryDef(args, result) {
+pub opaque type QueryDef(args, result) {
   QueryDef(
     name: String,
     description: Option(String),
@@ -30,11 +30,12 @@ pub type QueryDef(args, result) {
     result_encoder: fn(result) -> Dynamic,
     arg_definitions: List(ArgDef),
     return_type: FieldType,
+    guards: List(Guard),
   )
 }
 
 /// A mutation definition
-pub type MutationDef(args, result) {
+pub opaque type MutationDef(args, result) {
   MutationDef(
     name: String,
     description: Option(String),
@@ -43,11 +44,12 @@ pub type MutationDef(args, result) {
     result_encoder: fn(result) -> Dynamic,
     arg_definitions: List(ArgDef),
     return_type: FieldType,
+    guards: List(Guard),
   )
 }
 
 /// A subscription definition
-pub type SubscriptionDef(args, event) {
+pub opaque type SubscriptionDef(args, event) {
   SubscriptionDef(
     name: String,
     description: Option(String),
@@ -58,11 +60,12 @@ pub type SubscriptionDef(args, event) {
     event_encoder: fn(event) -> Dynamic,
     arg_definitions: List(ArgDef),
     return_type: FieldType,
+    guards: List(Guard),
   )
 }
 
 /// A field definition for extending types
-pub type FieldDef(parent, args, result) {
+pub opaque type FieldDef(parent, args, result) {
   FieldDef(
     name: String,
     description: Option(String),
@@ -72,6 +75,7 @@ pub type FieldDef(parent, args, result) {
     result_encoder: fn(result) -> Dynamic,
     arg_definitions: List(ArgDef),
     return_type: FieldType,
+    guards: List(Guard),
   )
 }
 
@@ -109,6 +113,7 @@ pub fn query(
     result_encoder: encoder,
     arg_definitions: [],
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -141,6 +146,7 @@ pub fn query_with_args(
     result_encoder: encoder,
     arg_definitions: arg_defs,
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -152,29 +158,19 @@ pub fn query_description(
   QueryDef(..q, description: Some(desc))
 }
 
-/// Add a guard to a query. The guard runs before the resolver — if it returns
-/// Error, the resolver is skipped and the error is returned.
-/// Multiple guards can be stacked by piping; the last guard added is checked
-/// first (outermost wrapper), so place the broadest checks last:
+/// Add a guard to a query. Guards run in the order they are added — the first
+/// piped guard runs first:
 ///
 /// ```gleam
-/// let my_posts = query.query_with_args(
-///   name: "myPosts", ...
-/// )
+/// query.query_with_args(name: "myPosts", ...)
+/// |> query.with_guard(require_auth)   // checked first
 /// |> query.with_guard(require_admin)  // checked second
-/// |> query.with_guard(require_auth)   // checked first (outermost)
 /// ```
 pub fn with_guard(
   q: QueryDef(args, result),
-  guard_fn: fn(ExecutionContext) -> Result(Nil, String),
+  guard_fn: Guard,
 ) -> QueryDef(args, result) {
-  let original = q.resolver
-  QueryDef(..q, resolver: fn(args, ctx) {
-    case guard_fn(ctx) {
-      Ok(Nil) -> original(args, ctx)
-      Error(msg) -> Error(msg)
-    }
-  })
+  QueryDef(..q, guards: list.append(q.guards, [guard_fn]))
 }
 
 // ============================================================================
@@ -210,6 +206,7 @@ pub fn mutation(
     result_encoder: encoder,
     arg_definitions: arg_defs,
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -221,20 +218,12 @@ pub fn mutation_description(
   MutationDef(..m, description: Some(desc))
 }
 
-/// Add a guard to a mutation. The guard runs before the resolver — if it returns
-/// Error, the resolver is skipped and the error is returned.
-/// Multiple guards can be stacked by piping; the last guard added is checked first.
+/// Add a guard to a mutation. Guards run in the order they are added.
 pub fn mutation_with_guard(
   m: MutationDef(args, result),
-  guard_fn: fn(ExecutionContext) -> Result(Nil, String),
+  guard_fn: Guard,
 ) -> MutationDef(args, result) {
-  let original = m.resolver
-  MutationDef(..m, resolver: fn(args, ctx) {
-    case guard_fn(ctx) {
-      Ok(Nil) -> original(args, ctx)
-      Error(msg) -> Error(msg)
-    }
-  })
+  MutationDef(..m, guards: list.append(m.guards, [guard_fn]))
 }
 
 // ============================================================================
@@ -256,6 +245,7 @@ pub fn subscription(
     event_encoder: encoder,
     arg_definitions: [],
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -288,6 +278,7 @@ pub fn subscription_with_args(
     event_encoder: encoder,
     arg_definitions: arg_defs,
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -299,20 +290,12 @@ pub fn subscription_description(
   SubscriptionDef(..s, description: Some(desc))
 }
 
-/// Add a guard to a subscription. The guard runs before the topic resolver —
-/// if it returns Error, the subscription is rejected.
-/// Multiple guards can be stacked by piping; the last guard added is checked first.
+/// Add a guard to a subscription. Guards run in the order they are added.
 pub fn subscription_with_guard(
   s: SubscriptionDef(args, event),
-  guard_fn: fn(ExecutionContext) -> Result(Nil, String),
+  guard_fn: Guard,
 ) -> SubscriptionDef(args, event) {
-  let original = s.topic_resolver
-  SubscriptionDef(..s, topic_resolver: fn(args, ctx) {
-    case guard_fn(ctx) {
-      Ok(Nil) -> original(args, ctx)
-      Error(msg) -> Error(msg)
-    }
-  })
+  SubscriptionDef(..s, guards: list.append(s.guards, [guard_fn]))
 }
 
 // ============================================================================
@@ -336,6 +319,7 @@ pub fn field(
     result_encoder: encoder,
     arg_definitions: [],
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -371,6 +355,7 @@ pub fn field_with_args(
     result_encoder: encoder,
     arg_definitions: arg_defs,
     return_type: return_type,
+    guards: [],
   )
 }
 
@@ -382,38 +367,60 @@ pub fn field_description(
   FieldDef(..f, description: Some(desc))
 }
 
-/// Add a guard to a field definition. The guard runs before the resolver — if it
-/// returns Error, the resolver is skipped and the error is returned.
-/// Multiple guards can be stacked by piping; the last guard added is checked first.
+/// Add a guard to a field. Guards run in the order they are added.
 pub fn field_with_guard(
   f: FieldDef(parent, args, result),
-  guard_fn: fn(ExecutionContext) -> Result(Nil, String),
+  guard_fn: Guard,
 ) -> FieldDef(parent, args, result) {
-  let original = f.resolver
-  FieldDef(..f, resolver: fn(parent, args, ctx) {
-    case guard_fn(ctx) {
-      Ok(Nil) -> original(parent, args, ctx)
-      Error(msg) -> Error(msg)
-    }
-  })
+  FieldDef(..f, guards: list.append(f.guards, [guard_fn]))
 }
 
 // ============================================================================
 // Guard Combinators
 // ============================================================================
 
-/// High-level guard type for the Code First API.
-pub type HighLevelGuard =
+// ============================================================================
+// Accessor functions (for inspection/testing of opaque Def types)
+// ============================================================================
+
+pub fn query_get_name(q: QueryDef(a, b)) -> String {
+  q.name
+}
+
+pub fn query_get_description(q: QueryDef(a, b)) -> Option(String) {
+  q.description
+}
+
+pub fn query_get_args(q: QueryDef(a, b)) -> List(ArgDef) {
+  q.arg_definitions
+}
+
+pub fn mutation_get_name(m: MutationDef(a, b)) -> String {
+  m.name
+}
+
+pub fn mutation_get_description(m: MutationDef(a, b)) -> Option(String) {
+  m.description
+}
+
+pub fn subscription_get_name(s: SubscriptionDef(a, b)) -> String {
+  s.name
+}
+
+// ============================================================================
+
+/// Guard type for the Code First API.
+pub type Guard =
   fn(ExecutionContext) -> Result(Nil, String)
 
 /// Combine guards with AND logic — all must pass (checked in list order).
-pub fn all_of(guard_fns: List(HighLevelGuard)) -> HighLevelGuard {
+pub fn all_of(guard_fns: List(Guard)) -> Guard {
   fn(ctx) { list.try_each(guard_fns, fn(g) { g(ctx) }) }
 }
 
 /// Combine guards with OR logic — at least one must pass.
 /// Fails with the last error if all fail.
-pub fn any_of(guard_fns: List(HighLevelGuard)) -> HighLevelGuard {
+pub fn any_of(guard_fns: List(Guard)) -> Guard {
   fn(ctx) {
     case guard_fns {
       [] -> Error("No guards provided")
@@ -423,7 +430,7 @@ pub fn any_of(guard_fns: List(HighLevelGuard)) -> HighLevelGuard {
 }
 
 fn try_any(
-  guards: List(HighLevelGuard),
+  guards: List(Guard),
   ctx: ExecutionContext,
   last_error: String,
 ) -> Result(Nil, String) {
@@ -435,6 +442,42 @@ fn try_any(
         Error(e) -> try_any(rest, ctx, e)
       }
   }
+}
+
+fn apply_op_guards(
+  guards: List(Guard),
+  resolver: fn(args, ExecutionContext) -> Result(result, String),
+) -> fn(args, ExecutionContext) -> Result(result, String) {
+  list.fold(list.reverse(guards), resolver, fn(inner, g) {
+    fn(args, ctx) {
+      use _ <- result.try(g(ctx))
+      inner(args, ctx)
+    }
+  })
+}
+
+fn apply_field_guards(
+  guards: List(Guard),
+  resolver: fn(parent, args, ExecutionContext) -> Result(result, String),
+) -> fn(parent, args, ExecutionContext) -> Result(result, String) {
+  list.fold(list.reverse(guards), resolver, fn(inner, g) {
+    fn(parent, args, ctx) {
+      use _ <- result.try(g(ctx))
+      inner(parent, args, ctx)
+    }
+  })
+}
+
+fn apply_topic_guards(
+  guards: List(Guard),
+  resolver: fn(args, ExecutionContext) -> Result(String, String),
+) -> fn(args, ExecutionContext) -> Result(String, String) {
+  list.fold(list.reverse(guards), resolver, fn(inner, g) {
+    fn(args, ctx) {
+      use _ <- result.try(g(ctx))
+      inner(args, ctx)
+    }
+  })
 }
 
 // ============================================================================
@@ -801,7 +844,7 @@ pub fn query_to_field_def(q: QueryDef(args, result)) -> FieldDefinition {
   schema.field_def(q.name, q.return_type)
   |> schema.resolver(build_op_resolver(
     q.args_decoder,
-    q.resolver,
+    apply_op_guards(q.guards, q.resolver),
     q.result_encoder,
   ))
   |> add_args_to_field(q.arg_definitions)
@@ -813,7 +856,7 @@ pub fn mutation_to_field_def(m: MutationDef(args, result)) -> FieldDefinition {
   schema.field_def(m.name, m.return_type)
   |> schema.resolver(build_op_resolver(
     m.args_decoder,
-    m.resolver,
+    apply_op_guards(m.guards, m.resolver),
     m.result_encoder,
   ))
   |> add_args_to_field(m.arg_definitions)
@@ -831,10 +874,11 @@ pub fn subscription_to_field_def(
     Error("Subscriptions must be executed through the subscription executor")
   }
 
+  let guarded_topic = apply_topic_guards(s.guards, s.topic_resolver)
   let topic_fn =
     Some(fn(raw_args: Dict(String, Dynamic), ctx: ExecutionContext) {
       case s.args_decoder(raw_args) {
-        Ok(decoded_args) -> s.topic_resolver(decoded_args, ctx)
+        Ok(decoded_args) -> guarded_topic(decoded_args, ctx)
         Error(e) -> Error("Failed to decode subscription args: " <> e)
       }
     })
@@ -848,6 +892,7 @@ pub fn subscription_to_field_def(
 
 /// Convert a FieldDef to a schema FieldDefinition
 pub fn field_def_to_schema(f: FieldDef(parent, args, result)) -> FieldDefinition {
+  let guarded_resolver = apply_field_guards(f.guards, f.resolver)
   let resolver: Resolver = fn(info: ResolverInfo) {
     use parent_dyn <- result.try(option.to_result(
       info.parent,
@@ -861,7 +906,7 @@ pub fn field_def_to_schema(f: FieldDef(parent, args, result)) -> FieldDefinition
       f.args_decoder(info.arguments)
       |> result.map_error(fn(e) { "Failed to decode arguments: " <> e }),
     )
-    use res <- result.map(f.resolver(parent, decoded_args, info.context))
+    use res <- result.map(guarded_resolver(parent, decoded_args, info.context))
     f.result_encoder(res)
   }
 

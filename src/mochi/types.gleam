@@ -255,6 +255,17 @@ pub fn id(
   })
 }
 
+/// Add a nullable ID field
+pub fn optional_id(
+  builder: TypeBuilder(a),
+  name: String,
+  extractor: fn(a) -> option.Option(String),
+) -> TypeBuilder(a) {
+  add_field(builder, name, None, schema.id_type(), fn(a) {
+    option(extractor(a))
+  })
+}
+
 /// Add an int field
 pub fn int(
   builder: TypeBuilder(a),

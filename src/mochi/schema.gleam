@@ -35,6 +35,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/string
 import mochi/dataloader.{type DataLoader}
 import mochi/document_cache
 
@@ -310,6 +311,28 @@ pub fn execution_context(user_context: Dynamic) -> ExecutionContext {
     telemetry: None,
     telemetry_fn: None,
   )
+}
+
+/// Create a typed accessor for `user_context`. Define once per app, use in every resolver.
+///
+/// ```gleam
+/// // context.gleam
+/// pub const get_user_id = schema.context_accessor(decode.optional(decode.string))
+///
+/// // resolver
+/// let auth = ctx |> context.get_user_id |> require_auth
+/// use uid <- result.try(auth)
+/// ```
+pub fn context_accessor(
+  decoder: decode.Decoder(a),
+) -> fn(ExecutionContext) -> Result(a, String) {
+  fn(ctx: ExecutionContext) {
+    decode.run(ctx.user_context, decoder)
+    |> result.map_error(fn(errs) {
+      list.map(errs, fn(e) { e.expected <> " at " <> string.inspect(e.path) })
+      |> string.join(", ")
+    })
+  }
 }
 
 /// Create an execution context with a middleware function

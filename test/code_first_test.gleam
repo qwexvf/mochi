@@ -182,7 +182,7 @@ pub fn query_simple_test() {
       fn(_) { types.to_dynamic([]) },
     )
 
-  case users_query.name == "users" {
+  case query.query_get_name(users_query) == "users" {
     True -> Nil
     False -> panic as "Query name should be 'users'"
   }
@@ -198,7 +198,7 @@ pub fn query_with_description_test() {
     )
     |> query.query_description("Get all users")
 
-  case users_query.description {
+  case query.query_get_description(users_query) {
     Some("Get all users") -> Nil
     _ -> panic as "Query description should be set"
   }
@@ -220,12 +220,12 @@ pub fn query_with_args_test() {
       fn(u) { types.to_dynamic(u) },
     )
 
-  case user_query.name == "user" {
+  case query.query_get_name(user_query) == "user" {
     True -> Nil
     False -> panic as "Query name should be 'user'"
   }
 
-  case user_query.arg_definitions {
+  case query.query_get_args(user_query) {
     [arg] ->
       case arg.name == "id" {
         True -> Nil
@@ -246,7 +246,7 @@ pub fn mutation_test() {
       fn(u) { types.to_dynamic(u) },
     )
 
-  case create_user.name == "createUser" {
+  case query.mutation_get_name(create_user) == "createUser" {
     True -> Nil
     False -> panic as "Mutation name should be 'createUser'"
   }
@@ -264,7 +264,7 @@ pub fn mutation_with_description_test() {
     )
     |> query.mutation_description("Create a new user")
 
-  case create_user.description {
+  case query.mutation_get_description(create_user) {
     Some("Create a new user") -> Nil
     _ -> panic as "Mutation description should be set"
   }
