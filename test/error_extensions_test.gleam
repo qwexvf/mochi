@@ -2,7 +2,9 @@ import gleam/dict
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/result
 import gleam/string
+import gleeunit/should
 import mochi/error
 import mochi/executor
 import mochi/query
@@ -204,5 +206,86 @@ pub fn rich_resolver_ok_path_works_test() {
   case result.data {
     Some(_) -> Nil
     None -> panic as "expected data"
+  }
+}
+
+pub fn rich_resolver_error_path_uses_executor_path_test() {
+  let user_type =
+    types.object("User")
+    |> types.id("id", fn(u: #(String, String)) { u.0 })
+    |> types.string("name", fn(u: #(String, String)) { u.1 })
+    |> types.build(fn(_) { Ok(#("1", "Test")) })
+
+  let user_schema =
+    query.new()
+    |> query.add_rich_query(
+      "user",
+      [],
+      schema.named_type("User"),
+      fn(_) { Ok(Nil) },
+      fn(_, _) {
+        Error(
+          error.error("Fail")
+          |> error.with_error_code(error.NotFound)
+          |> error.to_payload,
+        )
+      },
+      types.to_dynamic,
+    )
+    |> query.add_type(user_type)
+    |> query.build
+
+  let result = executor.execute_query(user_schema, "{ user { id } }")
+
+  case result.errors {
+    [err] -> {
+      let gql = response.execution_error_to_graphql_error(err)
+      case gql.path {
+        Some([error.FieldSegment("user")]) -> Nil
+        Some(path) ->
+          panic as { "expected path [user], got: " <> string.inspect(path) }
+        None -> panic as "expected path to be set"
+      }
+    }
+    _ -> panic as "expected exactly one error"
+  }
+}
+
+pub fn with_extension_merges_with_existing_extensions_test() {
+  let err =
+    error.error("Err")
+    |> error.with_code("CODE_A")
+    |> error.with_extension("extra", types.to_dynamic("val"))
+
+  case err.extensions {
+    Some(ext) -> {
+      should.be_true(dict.has_key(ext, "code"))
+      should.be_true(dict.has_key(ext, "extra"))
+    }
+    None -> panic as "extensions should not be None"
+  }
+}
+
+pub fn with_extensions_replaces_all_extensions_test() {
+  let err =
+    error.error("Err")
+    |> error.with_code("OLD")
+    |> error.with_extensions(
+      dict.from_list([#("code", types.to_dynamic("NEW"))]),
+    )
+
+  case err.extensions {
+    Some(ext) ->
+      case
+        decode.run(
+          dict.get(ext, "code") |> result.unwrap(types.to_dynamic(Nil)),
+          decode.string,
+        )
+      {
+        Ok("NEW") -> Nil
+        Ok(other) -> panic as { "expected NEW, got: " <> other }
+        Error(_) -> panic as "code not a string"
+      }
+    None -> panic as "extensions should not be None"
   }
 }
