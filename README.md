@@ -1,8 +1,5 @@
 # mochi - Code First GraphQL for Gleam
 
-> **Under development** — APIs may change, use main branch.
-
-
 **mochi** is a type-safe, Code First GraphQL library for Gleam. Define your GraphQL schemas using Gleam types and automatically generate TypeScript types and GraphQL SDL.
 
 Inspired by:
@@ -47,11 +44,11 @@ fn user_type() -> schema.ObjectType {
 // 3. Define queries
 fn users_query() {
   query.query(
-    "users",
-    schema.list_type(schema.named_type("User")),
-    fn(_ctx) { Ok(get_users()) },
-    fn(users) { types.to_dynamic(users) },
+    name: "users",
+    returns: schema.list_type(schema.named_type("User")),
+    resolve: fn(_ctx) { Ok(get_users()) },
   )
+  |> query.with_encoder(types.to_dynamic)
 }
 
 fn user_query() {
@@ -430,7 +427,7 @@ let my_posts = query.query_with_args(name: "myPosts", ...)
   |> query.with_guard(require_auth)
 
 let create_post = query.mutation(name: "createPost", ...)
-  |> query.mutation_with_guard(require_auth)
+  |> query.with_guard(require_auth)
 
 // Low-level API: attach directly to field definitions
 schema.field_def("secret", schema.string_type())
@@ -460,7 +457,7 @@ GraphQL-spec compliant errors with extensions. See module docs for full API.
 ```gleam
 import mochi/error
 
-let err = error.error("Something went wrong")
+let err = error.new("Something went wrong")
   |> error.with_code("INTERNAL_ERROR")
   |> error.with_extension("retryAfter", types.to_dynamic(60))
 ```
@@ -705,12 +702,14 @@ fn post_type() -> schema.ObjectType {
 
 pub fn create_schema() -> schema.Schema {
   query.new()
-  |> query.add_query(query.query(
-    "users",
-    schema.list_type(schema.named_type("User")),
-    fn(_) { Ok([]) },
-    types.to_dynamic,
-  ))
+  |> query.add_query(
+    query.query(
+      name: "users",
+      returns: schema.list_type(schema.named_type("User")),
+      resolve: fn(_) { Ok([]) },
+    )
+    |> query.with_encoder(types.to_dynamic),
+  )
   |> query.add_type(user_type())
   |> query.add_type(post_type())
   |> query.build
@@ -725,11 +724,11 @@ pub type CreateUserInput {
 }
 
 fn create_user_mutation() {
-  query.mutation(
+  query.mutation_with_args(
     name: "createUser",
     args: [query.arg("input", schema.non_null(schema.named_type("CreateUserInput")))],
     returns: schema.named_type("User"),
-    resolve: fn(args, ctx) {
+    resolve: fn(args, _ctx) {
       use input <- result.try(query.decode_input(args, "input", input_decoder))
       let user = User(id: generate_id(), name: input.name, email: input.email)
       db.insert_user(user)

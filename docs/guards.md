@@ -58,17 +58,18 @@ to the user context, which is the right level of abstraction for most
 authorization checks.
 
 ```gleam
-// On queries
-query.with_guard(q, guard_fn)
+// On queries, mutations, and subscriptions — same function works for all Op types
+query.with_guard(op, guard_fn)
 
-// On mutations
-query.mutation_with_guard(m, guard_fn)
+// Pipe form (more common)
+query.query(name: "me", ...)
+  |> query.with_guard(require_auth)
 
-// On subscriptions (guards the topic resolver)
-query.subscription_with_guard(s, guard_fn)
+query.mutation(name: "deleteAccount", ...)
+  |> query.with_guard(require_auth)
 
-// On field definitions
-query.field_with_guard(f, guard_fn)
+query.subscription(name: "onUpdate", ...)
+  |> query.with_guard(require_auth)
 ```
 
 ### Low-level API (`mochi/schema`)
@@ -165,7 +166,7 @@ fn require_feature(flag: String) -> fn(schema.ExecutionContext) -> Result(Nil, S
 ### Resource ownership (low-level guard with args access)
 
 ```gleam
-fn require_owner() -> schema.Guard {
+fn require_owner() -> schema.FieldGuard {
   fn(info: schema.ResolverInfo) {
     let current_user = get_current_user(info.context)
     let requested_id = query.get_id(info.arguments, "userId")
