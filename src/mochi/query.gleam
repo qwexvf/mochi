@@ -942,7 +942,6 @@ pub fn with_cache(builder: SchemaBuilder) -> SchemaBuilder {
   SchemaBuilder(..builder, cache: True)
 }
 
-
 pub fn build(builder: SchemaBuilder) -> Schema {
   let query_type =
     list.fold(builder.queries, schema.object("Query"), fn(obj, field) {
