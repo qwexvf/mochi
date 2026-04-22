@@ -393,7 +393,7 @@ fn parse_type_extension(
       use #(name, parser) <- result.try(parse_name(parser))
       use #(interfaces, parser) <- result.try(parse_optional_implements(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(fields, parser) <- result.try(parse_fields_definition(parser))
+      use #(fields, parser) <- result.try(parse_optional_fields_definition(parser))
       Ok(#(
         sdl_ast.ObjectTypeExtension(
           name: name,
@@ -412,7 +412,7 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(fields, parser) <- result.try(parse_fields_definition(parser))
+      use #(fields, parser) <- result.try(parse_optional_fields_definition(parser))
       Ok(#(
         sdl_ast.InterfaceTypeExtension(
           name: name,
@@ -430,8 +430,16 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Equals, "="))
-      use #(members, parser) <- result.try(parse_union_member_types(parser))
+      use #(members, parser) <- result.try(case peek_token(parser) {
+        Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Equals, _)) -> {
+          use #(_, parser) <- result.try(
+            consume_token(parser)
+            |> result.map_error(fn(_) { UnexpectedEOF("=") }),
+          )
+          parse_union_member_types(parser)
+        }
+        _ -> Ok(#([], parser))
+      })
       Ok(#(
         sdl_ast.UnionTypeExtension(
           name: name,
@@ -449,7 +457,9 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(values, parser) <- result.try(parse_enum_values_definition(parser))
+      use #(values, parser) <- result.try(parse_optional_enum_values_definition(
+        parser,
+      ))
       Ok(#(
         sdl_ast.EnumTypeExtension(
           name: name,
@@ -467,7 +477,9 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(fields, parser) <- result.try(parse_input_fields_definition(parser))
+      use #(fields, parser) <- result.try(
+        parse_optional_input_fields_definition(parser),
+      )
       Ok(#(
         sdl_ast.InputObjectTypeExtension(
           name: name,
@@ -574,6 +586,36 @@ fn parse_fields_definition(
   use #(fields, parser) <- result.try(parse_field_definitions(parser, []))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.RightBrace, "}"))
   Ok(#(fields, parser))
+}
+
+fn parse_optional_fields_definition(
+  parser: SDLParser,
+) -> Result(#(List(sdl_ast.FieldDef), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBrace, _)) ->
+      parse_fields_definition(parser)
+    _ -> Ok(#([], parser))
+  }
+}
+
+fn parse_optional_enum_values_definition(
+  parser: SDLParser,
+) -> Result(#(List(sdl_ast.EnumValueDef), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBrace, _)) ->
+      parse_enum_values_definition(parser)
+    _ -> Ok(#([], parser))
+  }
+}
+
+fn parse_optional_input_fields_definition(
+  parser: SDLParser,
+) -> Result(#(List(sdl_ast.InputFieldDef), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBrace, _)) ->
+      parse_input_fields_definition(parser)
+    _ -> Ok(#([], parser))
+  }
 }
 
 fn parse_field_definitions(
