@@ -393,7 +393,24 @@ fn parse_type_extension(
       use #(name, parser) <- result.try(parse_name(parser))
       use #(interfaces, parser) <- result.try(parse_optional_implements(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(fields, parser) <- result.try(parse_optional_fields_definition(parser))
+      use #(fields, parser) <- result.try(parse_optional_fields_definition(
+        parser,
+      ))
+      use _ <- result.try(case interfaces, directives, fields {
+        [], [], [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend type '"
+                <> name
+                <> "' must have implements, directives, or fields",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _, _, _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.ObjectTypeExtension(
           name: name,
@@ -412,7 +429,22 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      use #(fields, parser) <- result.try(parse_optional_fields_definition(parser))
+      use #(fields, parser) <- result.try(parse_optional_fields_definition(
+        parser,
+      ))
+      use _ <- result.try(case directives, fields {
+        [], [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend interface '" <> name <> "' must have directives or fields",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _, _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.InterfaceTypeExtension(
           name: name,
@@ -440,6 +472,21 @@ fn parse_type_extension(
         }
         _ -> Ok(#([], parser))
       })
+      use _ <- result.try(case directives, members {
+        [], [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend union '"
+                <> name
+                <> "' must have directives or member types",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _, _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.UnionTypeExtension(
           name: name,
@@ -460,6 +507,19 @@ fn parse_type_extension(
       use #(values, parser) <- result.try(parse_optional_enum_values_definition(
         parser,
       ))
+      use _ <- result.try(case directives, values {
+        [], [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend enum '" <> name <> "' must have directives or values",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _, _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.EnumTypeExtension(
           name: name,
@@ -480,6 +540,19 @@ fn parse_type_extension(
       use #(fields, parser) <- result.try(
         parse_optional_input_fields_definition(parser),
       )
+      use _ <- result.try(case directives, fields {
+        [], [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend input '" <> name <> "' must have directives or fields",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _, _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.InputObjectTypeExtension(
           name: name,
@@ -497,6 +570,19 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use _ <- result.try(case directives {
+        [] ->
+          Error(
+            InvalidTypeDefinition(
+              "extend scalar '" <> name <> "' must have at least one directive",
+              case peek_token(parser) {
+                Ok(sdl_lexer.SDLTokenWithPosition(_, pos)) -> pos
+                _ -> sdl_lexer.Position(0, 0)
+              },
+            ),
+          )
+        _ -> Ok(Nil)
+      })
       Ok(#(
         sdl_ast.ScalarTypeExtension(name: name, directives: directives),
         parser,
