@@ -15,7 +15,7 @@ import mochi/types
 // ============================================================================
 
 pub fn simple_error_test() {
-  let err = error.error("Something went wrong")
+  let err = error.new("Something went wrong")
 
   case err.message == "Something went wrong" {
     True -> Nil
@@ -40,7 +40,7 @@ pub fn simple_error_test() {
 
 pub fn error_with_path_test() {
   let err =
-    error.error_with_path("Field not found", [
+    error.new_with_path("Field not found", [
       error.FieldSegment("user"),
       error.FieldSegment("email"),
     ])
@@ -52,7 +52,7 @@ pub fn error_with_path_test() {
 }
 
 pub fn error_at_test() {
-  let err = error.error_at("Invalid field", ["query", "users", "name"])
+  let err = error.new_at("Invalid field", ["query", "users", "name"])
 
   case err.path {
     Some([
@@ -70,7 +70,7 @@ pub fn error_at_test() {
 
 pub fn error_with_location_test() {
   let err =
-    error.error("Syntax error")
+    error.new("Syntax error")
     |> error.at_location(10, 5)
 
   case err.locations {
@@ -81,7 +81,7 @@ pub fn error_with_location_test() {
 
 pub fn error_with_multiple_locations_test() {
   let err =
-    error.error("Multiple errors")
+    error.new("Multiple errors")
     |> error.at_location(10, 5)
     |> error.at_location(15, 3)
 
@@ -94,7 +94,7 @@ pub fn error_with_multiple_locations_test() {
 pub fn error_with_locations_list_test() {
   let locs = [error.Location(1, 1), error.Location(2, 2), error.Location(3, 3)]
   let err =
-    error.error("Test")
+    error.new("Test")
     |> error.with_locations(locs)
 
   case err.locations {
@@ -115,7 +115,7 @@ pub fn error_with_locations_list_test() {
 
 pub fn error_with_extension_test() {
   let err =
-    error.error("Test error")
+    error.new("Test error")
     |> error.with_extension("code", types.to_dynamic("SOME_CODE"))
 
   case err.extensions {
@@ -131,7 +131,7 @@ pub fn error_with_extension_test() {
 
 pub fn error_with_multiple_extensions_test() {
   let err =
-    error.error("Test error")
+    error.new("Test error")
     |> error.with_extension("code", types.to_dynamic("ERROR_CODE"))
     |> error.with_extension("timestamp", types.to_dynamic(1_234_567_890))
     |> error.with_extension("requestId", types.to_dynamic("req-123"))
@@ -155,7 +155,7 @@ pub fn error_with_extensions_dict_test() {
     ])
 
   let err =
-    error.error("Test")
+    error.new("Test")
     |> error.with_extensions(extensions)
 
   case err.extensions {
@@ -171,7 +171,7 @@ pub fn error_with_extensions_dict_test() {
 
 pub fn error_with_category_test() {
   let err =
-    error.error("Test")
+    error.new("Test")
     |> error.with_category(error.ValidationErrorCategory)
 
   case err.extensions {
@@ -187,7 +187,7 @@ pub fn error_with_category_test() {
 
 pub fn error_with_code_test() {
   let err =
-    error.error("Test")
+    error.new("Test")
     |> error.with_code("CUSTOM_ERROR_CODE")
 
   case err.extensions {
@@ -304,7 +304,7 @@ pub fn internal_error_test() {
 // ============================================================================
 
 pub fn error_to_dynamic_basic_test() {
-  let err = error.error("Test message")
+  let err = error.new("Test message")
   let _dyn = error.to_dynamic(err)
 
   // Should produce a Dynamic value (we can't easily inspect it without FFI)
@@ -314,7 +314,7 @@ pub fn error_to_dynamic_basic_test() {
 
 pub fn error_to_dynamic_full_test() {
   let err =
-    error.error("Complete error")
+    error.new("Complete error")
     |> error.at_location(10, 5)
     |> error.with_path([
       error.FieldSegment("query"),
@@ -333,9 +333,9 @@ pub fn error_to_dynamic_full_test() {
 
 pub fn errors_to_dynamic_test() {
   let errors = [
-    error.error("Error 1"),
-    error.error("Error 2"),
-    error.error("Error 3"),
+    error.new("Error 1"),
+    error.new("Error 2"),
+    error.new("Error 3"),
   ]
 
   let _dyn = error.errors_to_dynamic(errors)
@@ -349,7 +349,7 @@ pub fn errors_to_dynamic_test() {
 // ============================================================================
 
 pub fn format_simple_error_test() {
-  let err = error.error("Simple error message")
+  let err = error.new("Simple error message")
   let formatted = error.format(err)
 
   case formatted == "Simple error message" {
@@ -359,7 +359,7 @@ pub fn format_simple_error_test() {
 }
 
 pub fn format_error_with_path_test() {
-  let err = error.error_at("Field error", ["user", "email"])
+  let err = error.new_at("Field error", ["user", "email"])
   let formatted = error.format(err)
 
   case formatted == "Field error at user.email" {
@@ -373,7 +373,7 @@ pub fn format_error_with_path_test() {
 
 pub fn format_error_with_index_path_test() {
   let err =
-    error.error_with_path("Array error", [
+    error.new_with_path("Array error", [
       error.FieldSegment("users"),
       error.IndexSegment(5),
       error.FieldSegment("name"),
@@ -391,7 +391,7 @@ pub fn format_error_with_index_path_test() {
 
 pub fn format_error_with_location_test() {
   let err =
-    error.error("Located error")
+    error.new("Located error")
     |> error.at_location(10, 5)
   let formatted = error.format(err)
 

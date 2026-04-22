@@ -347,7 +347,7 @@ pub fn guard_error_message_preserved_test() {
 // Schema Builders for Tests
 // ============================================================================
 
-fn build_schema_with_guard(guard_fn: schema.Guard) -> schema.Schema {
+fn build_schema_with_guard(guard_fn: schema.FieldGuard) -> schema.Schema {
   let user_type =
     schema.object("User")
     |> schema.id_field("id")
@@ -370,7 +370,7 @@ fn build_schema_with_guard(guard_fn: schema.Guard) -> schema.Schema {
   |> schema.add_type(schema.ObjectTypeDef(user_type))
 }
 
-fn build_schema_with_guards(guard_fns: List(schema.Guard)) -> schema.Schema {
+fn build_schema_with_guards(guard_fns: List(schema.FieldGuard)) -> schema.Schema {
   let user_type =
     schema.object("User")
     |> schema.id_field("id")
@@ -425,7 +425,7 @@ fn build_mutation_with_guard(
     |> types.build(decode_user)
 
   let create_user_mutation =
-    query.mutation(
+    query.mutation_with_args(
       name: "createUser",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("User"),

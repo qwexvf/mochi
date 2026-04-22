@@ -180,6 +180,24 @@ pub fn deprecated_no_reason(builder: TypeBuilder(a)) -> TypeBuilder(a) {
   }
 }
 
+pub fn field_description(
+  builder: TypeBuilder(a),
+  desc: String,
+) -> TypeBuilder(a) {
+  case builder.fields {
+    [] -> builder
+    [f, ..rest] ->
+      TypeBuilder(..builder, fields: [set_field_description(f, desc), ..rest])
+  }
+}
+
+fn set_field_description(field: TypeField(a), desc: String) -> TypeField(a) {
+  case field {
+    TypeField(..) -> TypeField(..field, description: Some(desc))
+    TypeFieldWithArgs(..) -> TypeFieldWithArgs(..field, description: Some(desc))
+  }
+}
+
 fn mark_deprecated(
   field: TypeField(a),
   is_deprecated: Bool,
@@ -232,18 +250,6 @@ pub fn string(
   })
 }
 
-/// Add a string field with description
-pub fn string_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> String,
-) -> TypeBuilder(a) {
-  add_field(builder, name, Some(desc), schema.string_type(), fn(a) {
-    to_dynamic(extractor(a))
-  })
-}
-
 /// Add an ID field
 pub fn id(
   builder: TypeBuilder(a),
@@ -273,18 +279,6 @@ pub fn int(
   extractor: fn(a) -> Int,
 ) -> TypeBuilder(a) {
   add_field(builder, name, None, schema.int_type(), fn(a) {
-    to_dynamic(extractor(a))
-  })
-}
-
-/// Add an int field with description
-pub fn int_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> Int,
-) -> TypeBuilder(a) {
-  add_field(builder, name, Some(desc), schema.int_type(), fn(a) {
     to_dynamic(extractor(a))
   })
 }
@@ -653,22 +647,6 @@ pub fn non_null_string(
   })
 }
 
-/// Add a non-null string field with description
-pub fn non_null_string_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> String,
-) -> TypeBuilder(a) {
-  add_field(
-    builder,
-    name,
-    Some(desc),
-    schema.non_null(schema.string_type()),
-    fn(a) { to_dynamic(extractor(a)) },
-  )
-}
-
 /// Add a non-null int field
 pub fn non_null_int(
   builder: TypeBuilder(a),
@@ -678,22 +656,6 @@ pub fn non_null_int(
   add_field(builder, name, None, schema.non_null(schema.int_type()), fn(a) {
     to_dynamic(extractor(a))
   })
-}
-
-/// Add a non-null int field with description
-pub fn non_null_int_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> Int,
-) -> TypeBuilder(a) {
-  add_field(
-    builder,
-    name,
-    Some(desc),
-    schema.non_null(schema.int_type()),
-    fn(a) { to_dynamic(extractor(a)) },
-  )
 }
 
 /// Add a non-null float field
@@ -707,22 +669,6 @@ pub fn non_null_float(
   })
 }
 
-/// Add a non-null float field with description
-pub fn non_null_float_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> Float,
-) -> TypeBuilder(a) {
-  add_field(
-    builder,
-    name,
-    Some(desc),
-    schema.non_null(schema.float_type()),
-    fn(a) { to_dynamic(extractor(a)) },
-  )
-}
-
 /// Add a non-null bool field
 pub fn non_null_bool(
   builder: TypeBuilder(a),
@@ -732,22 +678,6 @@ pub fn non_null_bool(
   add_field(builder, name, None, schema.non_null(schema.boolean_type()), fn(a) {
     to_dynamic(extractor(a))
   })
-}
-
-/// Add a non-null bool field with description
-pub fn non_null_bool_with_desc(
-  builder: TypeBuilder(a),
-  name: String,
-  desc: String,
-  extractor: fn(a) -> Bool,
-) -> TypeBuilder(a) {
-  add_field(
-    builder,
-    name,
-    Some(desc),
-    schema.non_null(schema.boolean_type()),
-    fn(a) { to_dynamic(extractor(a)) },
-  )
 }
 
 // ============================================================================
@@ -905,8 +835,8 @@ fn apply_deprecation(
     False -> field
     True ->
       case deprecation_reason {
-        Some(reason) -> schema.deprecate(field, reason)
-        None -> schema.deprecate_field(field)
+        Some(reason) -> schema.deprecated(field, reason)
+        None -> schema.deprecated_no_reason(field)
       }
   }
 }

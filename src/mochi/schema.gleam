@@ -335,49 +335,6 @@ pub fn context_accessor(
   }
 }
 
-/// Create an execution context with a middleware function
-pub fn execution_context_with_middleware(
-  user_context: Dynamic,
-  middleware: MiddlewareFn,
-) -> ExecutionContext {
-  ExecutionContext(
-    user_context: user_context,
-    data_loaders: dict.new(),
-    middleware_fn: Some(middleware),
-    telemetry: None,
-    telemetry_fn: None,
-  )
-}
-
-/// Create an execution context with telemetry (legacy opaque context)
-pub fn execution_context_with_telemetry(
-  user_context: Dynamic,
-  telemetry: TelemetryContext,
-) -> ExecutionContext {
-  ExecutionContext(
-    user_context: user_context,
-    data_loaders: dict.new(),
-    middleware_fn: None,
-    telemetry: Some(telemetry),
-    telemetry_fn: None,
-  )
-}
-
-/// Create a full execution context with all options
-pub fn full_execution_context(
-  user_context: Dynamic,
-  middleware: Option(MiddlewareFn),
-  telemetry: Option(TelemetryContext),
-) -> ExecutionContext {
-  ExecutionContext(
-    user_context: user_context,
-    data_loaders: dict.new(),
-    middleware_fn: middleware,
-    telemetry: telemetry,
-    telemetry_fn: None,
-  )
-}
-
 /// Set middleware function on an execution context
 pub fn with_middleware(
   context: ExecutionContext,
@@ -394,8 +351,7 @@ pub fn with_telemetry(
   ExecutionContext(..context, telemetry: Some(telemetry))
 }
 
-/// Add a DataLoader to the execution context
-pub fn add_data_loader(
+pub fn with_loader(
   context: ExecutionContext,
   name: String,
   loader: DataLoader(Dynamic, Dynamic),
@@ -481,7 +437,7 @@ pub fn with_loaders(
 ) -> ExecutionContext {
   list.fold(loaders, context, fn(ctx, loader_pair) {
     let #(name, loader) = loader_pair
-    add_data_loader(ctx, name, loader)
+    with_loader(ctx, name, loader)
   })
 }
 
@@ -654,8 +610,7 @@ pub fn field_def(name: String, field_type: FieldType) -> FieldDefinition {
   )
 }
 
-/// Mark a field as deprecated
-pub fn deprecate(field: FieldDefinition, reason: String) -> FieldDefinition {
+pub fn deprecated(field: FieldDefinition, reason: String) -> FieldDefinition {
   FieldDefinition(
     ..field,
     is_deprecated: True,
@@ -663,8 +618,7 @@ pub fn deprecate(field: FieldDefinition, reason: String) -> FieldDefinition {
   )
 }
 
-/// Mark a field as deprecated without a reason
-pub fn deprecate_field(field: FieldDefinition) -> FieldDefinition {
+pub fn deprecated_no_reason(field: FieldDefinition) -> FieldDefinition {
   FieldDefinition(..field, is_deprecated: True, deprecation_reason: None)
 }
 
@@ -705,14 +659,14 @@ pub fn rich_resolver_fn(
 
 /// A guard function that runs before the resolver.
 /// Returns Ok(Nil) to allow the resolver to proceed, or Error(message) to reject.
-pub type Guard =
+pub type FieldGuard =
   fn(ResolverInfo) -> Result(Nil, String)
 
 /// Add a guard to a field definition.
 /// The guard runs before the resolver — if it returns Error, the resolver is skipped.
 /// Multiple guards can be stacked by calling this function multiple times;
 /// each new guard wraps the previous resolver+guards, so all must pass.
-pub fn guard(field: FieldDefinition, guard_fn: Guard) -> FieldDefinition {
+pub fn guard(field: FieldDefinition, guard_fn: FieldGuard) -> FieldDefinition {
   case field.resolver {
     Some(current_resolver) -> {
       let guarded = fn(info: ResolverInfo) {
@@ -734,7 +688,10 @@ pub fn guard(field: FieldDefinition, guard_fn: Guard) -> FieldDefinition {
 ///   |> schema.guards([require_auth, require_admin])
 ///   // require_auth is checked first, then require_admin
 /// ```
-pub fn guards(field: FieldDefinition, guard_fns: List(Guard)) -> FieldDefinition {
+pub fn guards(
+  field: FieldDefinition,
+  guard_fns: List(FieldGuard),
+) -> FieldDefinition {
   // Apply in reverse so that the first guard in the list ends up as the
   // outermost wrapper and is therefore checked first.
   list.fold(list.reverse(guard_fns), field, fn(f, g) { guard(f, g) })
@@ -742,14 +699,14 @@ pub fn guards(field: FieldDefinition, guard_fns: List(Guard)) -> FieldDefinition
 
 /// Combine guards with AND logic — all must pass (checked in list order).
 /// Returns a single guard that fails with the first error encountered.
-pub fn all_guards(guard_fns: List(Guard)) -> Guard {
+pub fn all_guards(guard_fns: List(FieldGuard)) -> FieldGuard {
   fn(info: ResolverInfo) { list.try_each(guard_fns, fn(g) { g(info) }) }
 }
 
 /// Combine guards with OR logic — at least one must pass.
 /// Returns a single guard that succeeds if any guard passes,
 /// or fails with the last error if all fail.
-pub fn any_guard(guard_fns: List(Guard)) -> Guard {
+pub fn any_guard(guard_fns: List(FieldGuard)) -> FieldGuard {
   fn(info: ResolverInfo) {
     case guard_fns {
       [] -> Error("No guards provided")
@@ -759,7 +716,7 @@ pub fn any_guard(guard_fns: List(Guard)) -> Guard {
 }
 
 fn try_any_guard(
-  guards: List(Guard),
+  guards: List(FieldGuard),
   info: ResolverInfo,
   last_error: String,
 ) -> Result(Nil, String) {

@@ -52,7 +52,7 @@ fn build_mutation_schema(
   |> query.add_type(vm_type)
   |> query.add_type(create_user_payload)
   |> query.add_mutation(
-    query.mutation(
+    query.mutation_with_args(
       name: "createUser",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("CreateUserPayload"),

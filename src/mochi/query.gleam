@@ -178,8 +178,24 @@ pub fn query_with_args(
 // Mutation Builders
 // ============================================================================
 
-/// Define a mutation with arguments.
 pub fn mutation(
+  name name: String,
+  returns return_type: FieldType,
+  resolve resolver: fn(ExecutionContext) -> Result(result, GqlError),
+) -> MutationOp(result) {
+  Op(
+    name: name,
+    description: None,
+    op_resolver: SimpleResolver(fn(_, ctx) { resolver(ctx) }),
+    result_encoder: t.to_dynamic,
+    arg_definitions: [],
+    return_type: return_type,
+    guards: [],
+    kind: MutationKind,
+  )
+}
+
+pub fn mutation_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
@@ -735,7 +751,7 @@ fn add_args_to_field(
 // Schema Builder
 // ============================================================================
 
-pub type SchemaBuilder {
+pub opaque type SchemaBuilder {
   SchemaBuilder(
     queries: List(FieldDefinition),
     mutations: List(FieldDefinition),

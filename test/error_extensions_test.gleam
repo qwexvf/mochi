@@ -13,7 +13,7 @@ import mochi/types
 
 pub fn extensions_serialized_in_json_test() {
   let err =
-    error.error("Something failed")
+    error.new("Something failed")
     |> error.with_code("NOT_FOUND")
     |> error.with_extension("timestamp", types.to_dynamic(12_345))
 
@@ -25,7 +25,7 @@ pub fn extensions_serialized_in_json_test() {
 }
 
 pub fn no_extensions_omits_field_test() {
-  let err = error.error("Simple error")
+  let err = error.new("Simple error")
   let json = response.to_json(response.failure([err]))
 
   should.be_false(string.contains(json, "\"extensions\""))
@@ -33,7 +33,7 @@ pub fn no_extensions_omits_field_test() {
 
 pub fn with_code_helper_test() {
   let err =
-    error.error("Not found")
+    error.new("Not found")
     |> error.with_code("USER_NOT_FOUND")
 
   let assert Some(ext) = err.extensions
@@ -42,7 +42,7 @@ pub fn with_code_helper_test() {
 
 pub fn error_code_type_test() {
   let err =
-    error.error("Unauthorized")
+    error.new("Unauthorized")
     |> error.with_error_code(error.Unauthorized)
 
   let assert Some(ext) = err.extensions
@@ -67,7 +67,7 @@ pub fn code_to_string_covers_all_codes_test() {
 
 pub fn to_payload_preserves_message_and_extensions_test() {
   let err =
-    error.error("Test payload")
+    error.new("Test payload")
     |> error.with_code("TEST_CODE")
 
   let #(msg, extensions) = error.to_payload(err)
@@ -93,7 +93,7 @@ pub fn rich_resolver_surfaces_extensions_in_response_test() {
         returns: schema.named_type("User"),
         resolve: fn(_, _) {
           Error(
-            error.error("User not found")
+            error.new("User not found")
             |> error.with_error_code(error.NotFound),
           )
         },
@@ -155,7 +155,7 @@ pub fn rich_resolver_error_path_uses_executor_path_test() {
         args: [],
         returns: schema.named_type("User"),
         resolve: fn(_, _) {
-          Error(error.error("Fail") |> error.with_error_code(error.NotFound))
+          Error(error.new("Fail") |> error.with_error_code(error.NotFound))
         },
       ),
     )
@@ -171,7 +171,7 @@ pub fn rich_resolver_error_path_uses_executor_path_test() {
 
 pub fn with_extension_merges_with_existing_extensions_test() {
   let err =
-    error.error("Err")
+    error.new("Err")
     |> error.with_code("CODE_A")
     |> error.with_extension("extra", types.to_dynamic("val"))
 
@@ -182,7 +182,7 @@ pub fn with_extension_merges_with_existing_extensions_test() {
 
 pub fn with_extensions_replaces_all_extensions_test() {
   let err =
-    error.error("Err")
+    error.new("Err")
     |> error.with_code("OLD")
     |> error.with_extensions(
       dict.from_list([#("code", types.to_dynamic("NEW"))]),

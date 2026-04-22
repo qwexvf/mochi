@@ -59,13 +59,7 @@ pub type ErrorCategory {
 // Error Builders
 // ============================================================================
 
-/// Create a simple error with just a message
-pub fn error(message: String) -> GraphQLError {
-  GraphQLError(message: message, locations: None, path: None, extensions: None)
-}
-
-/// Create an error with a path
-pub fn error_with_path(message: String, path: List(PathSegment)) -> GraphQLError {
+pub fn new_with_path(message: String, path: List(PathSegment)) -> GraphQLError {
   GraphQLError(
     message: message,
     locations: None,
@@ -74,8 +68,7 @@ pub fn error_with_path(message: String, path: List(PathSegment)) -> GraphQLError
   )
 }
 
-/// Create an error from string path segments (convenience)
-pub fn error_at(message: String, path: List(String)) -> GraphQLError {
+pub fn new_at(message: String, path: List(String)) -> GraphQLError {
   GraphQLError(
     message: message,
     locations: None,
@@ -174,32 +167,31 @@ pub fn to_payload(err: GraphQLError) -> #(String, Option(Dict(String, Dynamic)))
 
 /// Create a validation error
 pub fn validation_error(message: String, path: List(String)) -> GraphQLError {
-  error_at(message, path)
+  new_at(message, path)
   |> with_category(ValidationErrorCategory)
 }
 
 /// Create a resolver error
 pub fn resolver_error(message: String, path: List(String)) -> GraphQLError {
-  error_at(message, path)
+  new_at(message, path)
   |> with_category(ResolverErrorCategory)
 }
 
 /// Create a type error
 pub fn type_error(message: String, path: List(String)) -> GraphQLError {
-  error_at(message, path)
+  new_at(message, path)
   |> with_category(TypeErrorCategory)
 }
 
-/// Create an authentication error
 pub fn authentication_error(message: String) -> GraphQLError {
-  error(message)
+  new(message)
   |> with_category(AuthenticationErrorCategory)
   |> with_code("UNAUTHENTICATED")
 }
 
 /// Create an authorization error
 pub fn authorization_error(message: String, path: List(String)) -> GraphQLError {
-  error_at(message, path)
+  new_at(message, path)
   |> with_category(AuthorizationErrorCategory)
   |> with_code("FORBIDDEN")
 }
@@ -210,15 +202,14 @@ pub fn user_input_error(
   field: String,
   path: List(String),
 ) -> GraphQLError {
-  error_at(message, path)
+  new_at(message, path)
   |> with_category(UserInputErrorCategory)
   |> with_code("BAD_USER_INPUT")
   |> with_extension("field", types.to_dynamic(field))
 }
 
-/// Create an internal server error
 pub fn internal_error(message: String) -> GraphQLError {
-  error(message)
+  new(message)
   |> with_category(InternalErrorCategory)
   |> with_code("INTERNAL_SERVER_ERROR")
 }

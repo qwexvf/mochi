@@ -63,7 +63,7 @@ fn user_queries_schema() -> query.SchemaBuilder {
 
 fn user_mutations_schema() -> query.SchemaBuilder {
   let create_user =
-    query.mutation(
+    query.mutation_with_args(
       name: "createUser",
       args: [
         query.arg("name", schema.non_null(schema.string_type())),
@@ -78,7 +78,7 @@ fn user_mutations_schema() -> query.SchemaBuilder {
     )
 
   let update_user =
-    query.mutation(
+    query.mutation_with_args(
       name: "updateUser",
       args: [
         query.arg("id", schema.non_null(schema.id_type())),

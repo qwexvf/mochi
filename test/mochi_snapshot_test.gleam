@@ -254,7 +254,7 @@ pub fn json_nested_encoding_test() {
 @target(erlang)
 pub fn error_with_extensions_test() {
   let err =
-    error.error("Authentication required")
+    error.new("Authentication required")
     |> error.with_code("UNAUTHENTICATED")
     |> error.with_category(error.AuthenticationErrorCategory)
     |> error.with_extension("retryAfter", types.to_dynamic(60))
@@ -268,7 +268,7 @@ pub fn error_with_extensions_test() {
 @target(erlang)
 pub fn error_with_path_and_location_test() {
   let err =
-    error.error("Field 'email' is not valid")
+    error.new("Field 'email' is not valid")
     |> error.at_location(10, 15)
     |> error.with_path([
       error.FieldSegment("query"),
@@ -317,7 +317,7 @@ pub fn response_with_errors_test() {
   let data = dict.from_list([#("user", types.to_dynamic(Nil))])
 
   let errors = [
-    error.error("User not found")
+    error.new("User not found")
     |> error.with_path([error.FieldSegment("query"), error.FieldSegment("user")])
     |> error.with_code("NOT_FOUND"),
   ]

@@ -146,7 +146,7 @@ pub fn add_inputs_test() {
 
 pub fn add_mutations_batch_test() {
   let m1 =
-    query.mutation(
+    query.mutation_with_args(
       name: "doA",
       args: [query.arg("x", schema.non_null(schema.string_type()))],
       returns: schema.string_type(),
@@ -154,7 +154,7 @@ pub fn add_mutations_batch_test() {
     )
 
   let m2 =
-    query.mutation(
+    query.mutation_with_args(
       name: "doB",
       args: [query.arg("y", schema.non_null(schema.string_type()))],
       returns: schema.string_type(),

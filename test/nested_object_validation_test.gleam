@@ -971,7 +971,7 @@ pub fn mutation_returning_nested_type_with_siblings_test() {
     )
 
   let create_product =
-    query.mutation(
+    query.mutation_with_args(
       name: "createProduct",
       args: [query.arg("name", schema.non_null(schema.string_type()))],
       returns: schema.named_type("Product"),

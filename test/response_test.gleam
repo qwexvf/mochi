@@ -33,7 +33,7 @@ pub fn success_response_test() {
 }
 
 pub fn failure_response_test() {
-  let errors = [error.error("Something went wrong")]
+  let errors = [error.new("Something went wrong")]
   let resp = response.failure(errors)
 
   case response.has_data(resp) {
@@ -55,7 +55,7 @@ pub fn failure_response_test() {
 pub fn partial_response_test() {
   let data =
     types.to_dynamic(dict.from_list([#("partial", types.to_dynamic("data"))]))
-  let errors = [error.error("Partial error")]
+  let errors = [error.new("Partial error")]
   let resp = response.partial(data, errors)
 
   case response.has_data(resp) {
@@ -234,8 +234,8 @@ pub fn to_dynamic_success_test() {
 
 pub fn to_dynamic_failure_test() {
   let errors = [
-    error.error("Error 1"),
-    error.error("Error 2")
+    error.new("Error 1"),
+    error.new("Error 2")
       |> error.at_location(5, 10),
   ]
   let resp = response.failure(errors)
@@ -291,7 +291,7 @@ pub fn has_errors_empty_test() {
 }
 
 pub fn has_errors_with_errors_test() {
-  let resp = response.failure([error.error("error")])
+  let resp = response.failure([error.new("error")])
 
   case response.has_errors(resp) {
     True -> Nil
@@ -309,7 +309,7 @@ pub fn has_data_with_data_test() {
 }
 
 pub fn has_data_without_data_test() {
-  let resp = response.failure([error.error("error")])
+  let resp = response.failure([error.new("error")])
 
   case response.has_data(resp) {
     False -> Nil
@@ -328,9 +328,9 @@ pub fn error_count_zero_test() {
 
 pub fn error_count_multiple_test() {
   let errors = [
-    error.error("Error 1"),
-    error.error("Error 2"),
-    error.error("Error 3"),
+    error.new("Error 1"),
+    error.new("Error 2"),
+    error.new("Error 3"),
   ]
   let resp = response.failure(errors)
 
@@ -350,7 +350,7 @@ pub fn is_success_true_test() {
 }
 
 pub fn is_success_false_with_errors_test() {
-  let resp = response.failure([error.error("error")])
+  let resp = response.failure([error.new("error")])
 
   case response.is_success(resp) {
     False -> Nil
@@ -359,8 +359,7 @@ pub fn is_success_false_with_errors_test() {
 }
 
 pub fn is_partial_true_test() {
-  let resp =
-    response.partial(types.to_dynamic("data"), [error.error("warning")])
+  let resp = response.partial(types.to_dynamic("data"), [error.new("warning")])
 
   case response.is_partial(resp) {
     True -> Nil
@@ -393,7 +392,7 @@ pub fn format_success_test() {
 }
 
 pub fn format_failure_test() {
-  let resp = response.failure([error.error("error")])
+  let resp = response.failure([error.new("error")])
   let formatted = response.format(resp)
 
   case formatted {

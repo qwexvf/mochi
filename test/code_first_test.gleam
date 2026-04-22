@@ -64,10 +64,11 @@ pub fn types_with_description_test() {
   }
 }
 
-pub fn types_string_with_desc_test() {
+pub fn types_field_description_test() {
   let user_type =
     types.object("User")
-    |> types.string_with_desc("name", "The user's name", fn(u: User) { u.name })
+    |> types.string("name", fn(u: User) { u.name })
+    |> types.field_description("The user's name")
     |> types.build(decode_user)
 
   case dict.get(user_type.fields, "name") {
@@ -231,7 +232,7 @@ pub fn query_with_args_test() {
 
 pub fn mutation_test() {
   let create_user =
-    query.mutation(
+    query.mutation_with_args(
       "createUser",
       [query.arg("name", schema.non_null(schema.string_type()))],
       schema.named_type("User"),
@@ -246,9 +247,11 @@ pub fn mutation_test() {
 
 pub fn mutation_with_description_test() {
   let create_user =
-    query.mutation("createUser", [], schema.named_type("User"), fn(_args, _ctx) {
-      Ok(User("new", "Test", "test@example.com", 0))
-    })
+    query.mutation(
+      name: "createUser",
+      returns: schema.named_type("User"),
+      resolve: fn(_ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
+    )
     |> query.with_description("Create a new user")
 
   case query.get_description(create_user) {
@@ -302,9 +305,11 @@ pub fn schema_builder_test() {
 
 pub fn schema_with_mutation_test() {
   let create_user =
-    query.mutation("createUser", [], schema.named_type("User"), fn(_args, _ctx) {
-      Ok(User("new", "Test", "test@example.com", 0))
-    })
+    query.mutation(
+      name: "createUser",
+      returns: schema.named_type("User"),
+      resolve: fn(_ctx) { Ok(User("new", "Test", "test@example.com", 0)) },
+    )
 
   let built_schema =
     query.new()
@@ -360,7 +365,7 @@ pub fn schema_multiple_queries_test() {
 pub fn field_deprecation_test() {
   let field =
     schema.field_def("oldField", schema.string_type())
-    |> schema.deprecate("Use newField instead")
+    |> schema.deprecated("Use newField instead")
 
   case field.is_deprecated {
     True -> Nil
@@ -376,7 +381,7 @@ pub fn field_deprecation_test() {
 pub fn field_deprecation_no_reason_test() {
   let field =
     schema.field_def("oldField", schema.string_type())
-    |> schema.deprecate_field
+    |> schema.deprecated_no_reason
 
   case field.is_deprecated {
     True -> Nil
@@ -657,9 +662,8 @@ pub fn non_null_string_test() {
 pub fn non_null_string_with_desc_test() {
   let user_type =
     types.object("User")
-    |> types.non_null_string_with_desc("name", "User's full name", fn(u: User) {
-      u.name
-    })
+    |> types.non_null_string("name", fn(u: User) { u.name })
+    |> types.field_description("User's full name")
     |> types.build(decode_user)
 
   case dict.get(user_type.fields, "name") {

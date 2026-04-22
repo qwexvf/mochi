@@ -210,7 +210,7 @@ pub fn response_to_json_success_test() {
 }
 
 pub fn response_to_json_failure_test() {
-  let errors = [error.error("Something went wrong")]
+  let errors = [error.new("Something went wrong")]
   let resp = response.failure(errors)
   let result = response.to_json(resp)
   let assert True =
@@ -221,7 +221,7 @@ pub fn response_to_json_failure_test() {
 pub fn response_to_json_partial_test() {
   let data =
     types.to_dynamic(dict.from_list([#("partial", types.to_dynamic(True))]))
-  let errors = [error.error("Warning")]
+  let errors = [error.new("Warning")]
   let resp = response.partial(data, errors)
   let result = response.to_json(resp)
   let assert True =
@@ -344,7 +344,7 @@ pub fn encode_null_direct_test() {
 // ============================================================================
 
 pub fn error_with_path_json_test() {
-  let err = error.error_at("Field not found", ["user", "email"])
+  let err = error.new_at("Field not found", ["user", "email"])
   let errors = [err]
   let resp = response.failure(errors)
   let result = response.to_json(resp)
@@ -354,7 +354,7 @@ pub fn error_with_path_json_test() {
 
 pub fn error_with_location_json_test() {
   let err =
-    error.error("Syntax error")
+    error.new("Syntax error")
     |> error.at_location(10, 5)
   let errors = [err]
   let resp = response.failure(errors)
@@ -364,7 +364,7 @@ pub fn error_with_location_json_test() {
 
 pub fn error_with_extensions_json_test() {
   let err =
-    error.error("Custom error")
+    error.new("Custom error")
     |> error.with_code("CUSTOM_ERROR")
   let errors = [err]
   let resp = response.failure(errors)

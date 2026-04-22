@@ -67,7 +67,7 @@ fn book_schema() -> query.SchemaBuilder {
     )
 
   let add_book =
-    query.mutation(
+    query.mutation_with_args(
       name: "addBook",
       args: [
         query.arg("title", schema.non_null(schema.string_type())),
@@ -131,7 +131,7 @@ fn review_schema() -> query.SchemaBuilder {
     |> types.build(fn(_d) { Ok(Review("1", "1", 5, "Great")) })
 
   let add_review =
-    query.mutation(
+    query.mutation_with_args(
       name: "addReview",
       args: [
         query.arg("bookId", schema.non_null(schema.id_type())),
