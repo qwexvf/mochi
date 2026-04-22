@@ -115,6 +115,12 @@ fn parse_type_system_definition(
         )
       })
 
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _)) ->
+      parse_type_extension(parser)
+      |> result.map(fn(result) {
+        #(sdl_ast.TypeExtension(result.0), result.1)
+      })
+
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("type definition", token, position))
 
@@ -369,6 +375,120 @@ fn parse_input_object_type_definition(
     ),
     parser,
   ))
+}
+
+fn parse_type_extension(
+  parser: SDLParser,
+) -> Result(#(sdl_ast.TypeExtensionDef, SDLParser), SDLParseError) {
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    sdl_lexer.Extend,
+    "extend",
+  ))
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _)) -> {
+      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Type, "type"))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(interfaces, parser) <- result.try(parse_optional_implements(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use #(fields, parser) <- result.try(parse_fields_definition(parser))
+      Ok(#(
+        sdl_ast.ObjectTypeExtension(
+          name: name,
+          interfaces: interfaces,
+          directives: directives,
+          fields: fields,
+        ),
+        parser,
+      ))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Interface, _)) -> {
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Interface,
+        "interface",
+      ))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use #(fields, parser) <- result.try(parse_fields_definition(parser))
+      Ok(#(
+        sdl_ast.InterfaceTypeExtension(
+          name: name,
+          directives: directives,
+          fields: fields,
+        ),
+        parser,
+      ))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Union, _)) -> {
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Union,
+        "union",
+      ))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Equals, "="))
+      use #(members, parser) <- result.try(parse_union_member_types(parser))
+      Ok(#(
+        sdl_ast.UnionTypeExtension(
+          name: name,
+          directives: directives,
+          member_types: members,
+        ),
+        parser,
+      ))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _)) -> {
+      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Enum, "enum"))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use #(values, parser) <- result.try(parse_enum_values_definition(parser))
+      Ok(#(
+        sdl_ast.EnumTypeExtension(
+          name: name,
+          directives: directives,
+          values: values,
+        ),
+        parser,
+      ))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Input, _)) -> {
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Input,
+        "input",
+      ))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      use #(fields, parser) <- result.try(parse_input_fields_definition(parser))
+      Ok(#(
+        sdl_ast.InputObjectTypeExtension(
+          name: name,
+          directives: directives,
+          fields: fields,
+        ),
+        parser,
+      ))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Scalar, _)) -> {
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Scalar,
+        "scalar",
+      ))
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(directives, parser) <- result.try(parse_optional_directives(parser))
+      Ok(#(sdl_ast.ScalarTypeExtension(name: name, directives: directives), parser))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
+      Error(UnexpectedToken(
+        "type/interface/union/enum/input/scalar after extend",
+        token,
+        position,
+      ))
+    Error(_) -> Error(UnexpectedEOF("keyword after extend"))
+  }
 }
 
 // Helper parsing functions

@@ -11,8 +11,39 @@ pub type SDLDocument {
 /// Top-level type system definitions
 pub type TypeSystemDefinition {
   TypeDefinition(type_def: TypeDef)
+  TypeExtension(type_ext: TypeExtensionDef)
   DirectiveDefinition(directive_def: DirectiveDef)
   SchemaDefinition(schema_def: SchemaDef)
+}
+
+pub type TypeExtensionDef {
+  ObjectTypeExtension(
+    name: String,
+    interfaces: List(String),
+    directives: List(DirectiveUsage),
+    fields: List(FieldDef),
+  )
+  InterfaceTypeExtension(
+    name: String,
+    directives: List(DirectiveUsage),
+    fields: List(FieldDef),
+  )
+  UnionTypeExtension(
+    name: String,
+    directives: List(DirectiveUsage),
+    member_types: List(String),
+  )
+  EnumTypeExtension(
+    name: String,
+    directives: List(DirectiveUsage),
+    values: List(EnumValueDef),
+  )
+  InputObjectTypeExtension(
+    name: String,
+    directives: List(DirectiveUsage),
+    fields: List(InputFieldDef),
+  )
+  ScalarTypeExtension(name: String, directives: List(DirectiveUsage))
 }
 
 /// Type definitions (the main SDL constructs)
@@ -238,6 +269,17 @@ pub fn is_list_type(sdl_type: SDLType) -> Bool {
     ListType(_) -> True
     NonNullType(ListType(_)) -> True
     _ -> False
+  }
+}
+
+pub fn get_extension_name(ext: TypeExtensionDef) -> String {
+  case ext {
+    ObjectTypeExtension(name, _, _, _) -> name
+    InterfaceTypeExtension(name, _, _) -> name
+    UnionTypeExtension(name, _, _) -> name
+    EnumTypeExtension(name, _, _) -> name
+    InputObjectTypeExtension(name, _, _) -> name
+    ScalarTypeExtension(name, _) -> name
   }
 }
 

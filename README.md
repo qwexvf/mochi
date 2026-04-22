@@ -162,6 +162,7 @@ cd mochi_wisp/benchmark
 - **Batch Execution** - Execute multiple GraphQL requests in one call, with optional parallel dispatch
 - **TypeScript Codegen** - Generate `.d.ts` type definitions from your schema
 - **SDL Generation** - Generate `.graphql` schema files
+- **SDL Type Extensions** - Split schemas across multiple files using `extend type`, `extend union`, `extend enum`, etc.
 - **Operation Resolver Codegen** - Generate mochi resolver boilerplate from `.gql` client operation files
 - **Query Validation** - Validate GraphQL queries against your schema
 - **Custom Directives** - Define and execute custom directives with handlers
@@ -253,6 +254,45 @@ type Query {
   user(id: ID!): User
   "Get all users"
   users: [User]!
+}
+```
+
+## SDL Type Extensions
+
+Split large schemas across multiple files using GraphQL type extensions. The CLI merges all files and resolves extensions before codegen.
+
+```graphql
+# schema.graphql
+type Mutation {
+  login(email: String!, password: String!): String!
+}
+
+# tournament.graphql
+extend type Mutation {
+  finalizeTournament(tournamentId: ID!): Tournament!
+}
+```
+
+All six extension kinds are supported: `extend type`, `extend interface`, `extend union`, `extend enum`, `extend input`, `extend scalar`.
+
+**Rules:**
+- Extension fields are merged into the matching base type. Duplicate field names are ignored.
+- An extension with no matching base type is treated as a standalone type definition (orphan extension).
+- Multiple extensions for the same type are applied in file order.
+
+Configure multiple schema files in `mochi.config.json`:
+
+```json
+{
+  "schema": ["schema.graphql", "tournament.graphql"]
+}
+```
+
+Or use a glob pattern:
+
+```json
+{
+  "schema": ["graphql/**/*.graphql"]
 }
 ```
 

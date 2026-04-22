@@ -220,6 +220,25 @@ flowchart TD
     D --> E2
 ```
 
+## SDL Codegen Flow (multi-file with extend type)
+
+```
+*.graphql files
+    ↓ sdl_lexer.gleam
+Tokens (SDLToken list)
+    ↓ sdl_parser.gleam
+SDLDocument (may contain TypeExtension nodes)
+    ↓ cli.apply_extensions
+SDLDocument (all extensions merged into base types)
+    ↓ typescript.gleam / sdl.gleam / gleam.gleam
+TypeScript + SDL + Gleam resolver stubs
+```
+
+Extension merging rules:
+- Fields from `extend type Foo { … }` are appended to `type Foo { … }` (duplicates dropped)
+- Members from `extend union`, values from `extend enum`, fields from `extend input` follow the same rule
+- An orphan extension (no matching base) becomes its own type definition
+
 ## Subscription Flow
 
 ```mermaid
@@ -331,7 +350,10 @@ mochi/                          # Core GraphQL engine
     ├── telemetry.gleam         # Execution hooks
     ├── middleware.gleam        # Request/response middleware pipeline
     ├── json.gleam              # JSON serialization
-    └── apq.gleam               # Automatic Persisted Queries
+    ├── apq.gleam               # Automatic Persisted Queries
+    ├── sdl_lexer.gleam         # SDL tokenizer
+    ├── sdl_parser.gleam        # SDL parser (extend type support)
+    └── sdl_ast.gleam           # SDL AST types (TypeDef, TypeExtensionDef, …)
 
 mochi_relay/                    # Relay-style cursor pagination
 └── src/mochi_relay/
