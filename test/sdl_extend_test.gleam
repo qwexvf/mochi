@@ -88,7 +88,8 @@ pub fn extend_input_type_test() {
 }
 
 pub fn extend_scalar_type_test() {
-  let doc = parse_ok("extend scalar DateTime @specifiedBy(url: \"http://example.com\")")
+  let doc =
+    parse_ok("extend scalar DateTime @specifiedBy(url: \"http://example.com\")")
   case first_extension(doc) {
     sdl_ast.ScalarTypeExtension(name, directives) -> {
       let assert "DateTime" = name

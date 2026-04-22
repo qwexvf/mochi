@@ -117,9 +117,7 @@ fn parse_type_system_definition(
 
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _)) ->
       parse_type_extension(parser)
-      |> result.map(fn(result) {
-        #(sdl_ast.TypeExtension(result.0), result.1)
-      })
+      |> result.map(fn(result) { #(sdl_ast.TypeExtension(result.0), result.1) })
 
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("type definition", token, position))
@@ -387,7 +385,11 @@ fn parse_type_extension(
   ))
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Type, _)) -> {
-      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Type, "type"))
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Type,
+        "type",
+      ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(interfaces, parser) <- result.try(parse_optional_implements(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
@@ -440,7 +442,11 @@ fn parse_type_extension(
       ))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Enum, _)) -> {
-      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Enum, "enum"))
+      use #(_, parser) <- result.try(expect_token(
+        parser,
+        sdl_lexer.Enum,
+        "enum",
+      ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
       use #(values, parser) <- result.try(parse_enum_values_definition(parser))
@@ -479,7 +485,10 @@ fn parse_type_extension(
       ))
       use #(name, parser) <- result.try(parse_name(parser))
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
-      Ok(#(sdl_ast.ScalarTypeExtension(name: name, directives: directives), parser))
+      Ok(#(
+        sdl_ast.ScalarTypeExtension(name: name, directives: directives),
+        parser,
+      ))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken(
