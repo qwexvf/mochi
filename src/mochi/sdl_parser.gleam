@@ -6,7 +6,8 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import mochi/sdl_ast.{type SDLDocument, type TypeSystemDefinition}
 import mochi/sdl_lexer.{
-  type Position, type SDLLexerError, type SDLToken, type SDLTokenWithPosition,
+  type Position, type SDLLexerError, type SDLLexerState, type SDLToken,
+  type SDLTokenWithPosition,
 }
 
 pub type SDLParseError {
@@ -17,17 +18,28 @@ pub type SDLParseError {
 }
 
 pub type SDLParser {
-  SDLParser(tokens: List(SDLTokenWithPosition), position: Int)
+  SDLParser(
+    lexer: SDLLexerState,
+    current: Result(SDLTokenWithPosition, SDLLexerError),
+  )
+}
+
+fn advance(lexer: SDLLexerState) -> SDLParser {
+  case sdl_lexer.next_sdl_token(lexer) {
+    Ok(#(token, next_lexer)) -> SDLParser(lexer: next_lexer, current: Ok(token))
+    Error(err) -> SDLParser(lexer: lexer, current: Error(err))
+  }
 }
 
 /// Parse SDL string into an AST
 pub fn parse_sdl(input: String) -> Result(SDLDocument, SDLParseError) {
-  use tokens <- result.try(
-    sdl_lexer.tokenize_sdl(input) |> result.map_error(SDLLexError),
-  )
-  let parser = SDLParser(tokens: tokens, position: 0)
-  parse_document(parser)
-  |> result.map(fn(result) { result.0 })
+  let parser = advance(sdl_lexer.new_sdl_lexer(input))
+  case parser.current {
+    Error(err) -> Error(SDLLexError(err))
+    Ok(_) ->
+      parse_document(parser)
+      |> result.map(fn(result) { result.0 })
+  }
 }
 
 fn parse_document(
@@ -118,6 +130,12 @@ fn parse_type_system_definition(
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Extend, _)) ->
       parse_type_extension(parser)
       |> result.map(fn(result) { #(sdl_ast.TypeExtension(result.0), result.1) })
+
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Directive, _)) ->
+      parse_directive_definition(parser, description)
+      |> result.map(fn(result) {
+        #(sdl_ast.DirectiveDefinition(result.0), result.1)
+      })
 
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("type definition", token, position))
@@ -944,6 +962,13 @@ fn parse_value(
       )
       Ok(#(sdl_ast.BooleanValue(value), parser))
     }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("null"), _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("null value") }),
+      )
+      Ok(#(sdl_ast.NullValue, parser))
+    }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(name), _)) -> {
       use #(_, parser) <- result.try(
         consume_token(parser)
@@ -951,15 +976,133 @@ fn parse_value(
       )
       Ok(#(sdl_ast.EnumValue(name), parser))
     }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBracket, _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("list value") }),
+      )
+      use #(values, parser) <- result.try(parse_list_values(parser, []))
+      Ok(#(sdl_ast.ListValue(values), parser))
+    }
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBrace, _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("object value") }),
+      )
+      use #(fields, parser) <- result.try(parse_object_field_values(parser, []))
+      Ok(#(sdl_ast.ObjectValue(fields), parser))
+    }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("value", token, position))
     Error(_) -> Error(UnexpectedEOF("value"))
   }
 }
 
+fn parse_directive_definition(
+  parser: SDLParser,
+  description: Option(String),
+) -> Result(#(sdl_ast.DirectiveDef, SDLParser), SDLParseError) {
+  use #(_, parser) <- result.try(
+    expect_token(parser, sdl_lexer.Directive, "directive"),
+  )
+  use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.At, "@"))
+  use #(name, parser) <- result.try(parse_name(parser))
+  use #(arguments, parser) <- result.try(
+    parse_optional_arguments_definition(parser),
+  )
+  use parser <- result.try(case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("on"), _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("on") }),
+      )
+      skip_directive_location_list(parser)
+    }
+    _ -> Ok(parser)
+  })
+  Ok(#(
+    sdl_ast.DirectiveDef(
+      name: name,
+      description: description,
+      locations: [],
+      arguments: arguments,
+    ),
+    parser,
+  ))
+}
+
+fn skip_directive_location_list(
+  parser: SDLParser,
+) -> Result(SDLParser, SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _))
+    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("directive location") }),
+      )
+      skip_directive_location_list(parser)
+    }
+    _ -> Ok(parser)
+  }
+}
+
+fn parse_list_values(
+  parser: SDLParser,
+  acc: List(sdl_ast.SDLValue),
+) -> Result(#(List(sdl_ast.SDLValue), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBracket, _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("]") }),
+      )
+      Ok(#(list.reverse(acc), parser))
+    }
+    Ok(_) -> {
+      use #(value, parser) <- result.try(parse_value(parser))
+      parse_list_values(parser, [value, ..acc])
+    }
+    Error(_) -> Error(UnexpectedEOF("]"))
+  }
+}
+
+fn parse_object_field_values(
+  parser: SDLParser,
+  acc: List(sdl_ast.ObjectFieldValue),
+) -> Result(#(List(sdl_ast.ObjectFieldValue), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) -> {
+      use #(_, parser) <- result.try(
+        consume_token(parser)
+        |> result.map_error(fn(_) { UnexpectedEOF("}") }),
+      )
+      Ok(#(list.reverse(acc), parser))
+    }
+    Ok(_) -> {
+      use #(name, parser) <- result.try(parse_name(parser))
+      use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.Colon, ":"))
+      use #(value, parser) <- result.try(parse_value(parser))
+      parse_object_field_values(parser, [
+        sdl_ast.ObjectFieldValue(name: name, value: value),
+        ..acc
+      ])
+    }
+    Error(_) -> Error(UnexpectedEOF("}"))
+  }
+}
+
 fn parse_union_member_types(
   parser: SDLParser,
 ) -> Result(#(List(String), SDLParser), SDLParseError) {
+  let parser = case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) ->
+      case consume_token(parser) {
+        Ok(#(_, p)) -> p
+        Error(_) -> parser
+      }
+    _ -> parser
+  }
   use #(first_member, parser) <- result.try(parse_name(parser))
   parse_union_member_types_helper(parser, [first_member])
 }
@@ -1096,15 +1239,17 @@ fn parse_input_field_definition(
 // Utility functions
 
 fn peek_token(parser: SDLParser) -> Result(SDLTokenWithPosition, Nil) {
-  get_token_at(parser.tokens, parser.position)
+  case parser.current {
+    Ok(token) -> Ok(token)
+    Error(_) -> Error(Nil)
+  }
 }
 
 fn consume_token(
   parser: SDLParser,
 ) -> Result(#(SDLTokenWithPosition, SDLParser), Nil) {
-  case get_token_at(parser.tokens, parser.position) {
-    Ok(token) ->
-      Ok(#(token, SDLParser(..parser, position: parser.position + 1)))
+  case parser.current {
+    Ok(token) -> Ok(#(token, advance(parser.lexer)))
     Error(_) -> Error(Nil)
   }
 }
@@ -1121,24 +1266,5 @@ fn expect_token(
     Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), _)) ->
       Error(UnexpectedToken(description, token, position))
     Error(_) -> Error(UnexpectedEOF(description))
-  }
-}
-
-fn get_token_at(
-  tokens: List(SDLTokenWithPosition),
-  target_index: Int,
-) -> Result(SDLTokenWithPosition, Nil) {
-  get_token_at_helper(tokens, target_index, 0)
-}
-
-fn get_token_at_helper(
-  tokens: List(SDLTokenWithPosition),
-  target_index: Int,
-  current_index: Int,
-) -> Result(SDLTokenWithPosition, Nil) {
-  case tokens {
-    [] -> Error(Nil)
-    [first, ..] if current_index == target_index -> Ok(first)
-    [_, ..rest] -> get_token_at_helper(rest, target_index, current_index + 1)
   }
 }

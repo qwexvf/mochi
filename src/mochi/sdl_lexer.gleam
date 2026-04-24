@@ -64,11 +64,11 @@ pub type SDLLexerError {
 }
 
 pub type SDLLexerState {
-  SDLLexerState(input: String, position: Int, line: Int, column: Int)
+  SDLLexerState(remaining: String, line: Int, column: Int)
 }
 
 pub fn new_sdl_lexer(input: String) -> SDLLexerState {
-  SDLLexerState(input: input, position: 0, line: 1, column: 1)
+  SDLLexerState(remaining: input, line: 1, column: 1)
 }
 
 pub fn tokenize_sdl(
@@ -332,35 +332,27 @@ fn read_number(
 // Helper functions
 
 fn peek_char(lexer: SDLLexerState) -> Result(String, Nil) {
-  case string.slice(lexer.input, lexer.position, 1) {
-    "" -> Error(Nil)
-    char -> Ok(char)
+  case string.pop_grapheme(lexer.remaining) {
+    Ok(#(char, _)) -> Ok(char)
+    Error(_) -> Error(Nil)
   }
 }
 
 fn peek_string(lexer: SDLLexerState) -> String {
-  string.slice(lexer.input, lexer.position, 3)
+  string.slice(lexer.remaining, 0, 3)
 }
 
 fn peek_string_n(lexer: SDLLexerState, n: Int) -> String {
-  string.slice(lexer.input, lexer.position, n)
+  string.slice(lexer.remaining, 0, n)
 }
 
 fn advance_char(lexer: SDLLexerState) -> SDLLexerState {
-  case peek_char(lexer) {
-    Ok("\n") ->
-      SDLLexerState(
-        ..lexer,
-        position: lexer.position + 1,
-        line: lexer.line + 1,
-        column: 1,
-      )
-    _ ->
-      SDLLexerState(
-        ..lexer,
-        position: lexer.position + 1,
-        column: lexer.column + 1,
-      )
+  case string.pop_grapheme(lexer.remaining) {
+    Ok(#("\n", rest)) ->
+      SDLLexerState(remaining: rest, line: lexer.line + 1, column: 1)
+    Ok(#(_, rest)) ->
+      SDLLexerState(remaining: rest, line: lexer.line, column: lexer.column + 1)
+    Error(_) -> lexer
   }
 }
 
