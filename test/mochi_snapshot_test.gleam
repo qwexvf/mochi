@@ -242,6 +242,33 @@ pub fn directive_definition_captures_locations_test() {
   |> birdie.snap(title: "Directive definition captures locations")
 }
 
+@target(erlang)
+pub fn directive_variable_definition_location_test() {
+  let sdl = "directive @example on VARIABLE_DEFINITION"
+
+  sdl_parser.parse_sdl(sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Directive VARIABLE_DEFINITION location accepted")
+}
+
+@target(erlang)
+pub fn directive_repeatable_test() {
+  let sdl = "directive @tag repeatable on FIELD_DEFINITION"
+
+  sdl_parser.parse_sdl(sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Directive repeatable keyword parsed")
+}
+
+@target(erlang)
+pub fn directive_not_repeatable_test() {
+  let sdl = "directive @foo on FIELD_DEFINITION"
+
+  sdl_parser.parse_sdl(sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Directive without repeatable keyword")
+}
+
 // ============================================================================
 // JSON Serialization Snapshot Tests
 // ============================================================================

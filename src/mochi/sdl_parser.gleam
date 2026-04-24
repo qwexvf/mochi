@@ -963,6 +963,14 @@ fn parse_directive_definition(
   use #(arguments, parser) <- result.try(parse_optional_arguments_definition(
     parser,
   ))
+  // Optional `repeatable` keyword per spec, before `on`
+  use #(repeatable, parser) <- result.try(case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("repeatable"), _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser))
+      Ok(#(True, parser))
+    }
+    _ -> Ok(#(False, parser))
+  })
   use #(locations, parser) <- result.try(case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("on"), _)) -> {
       use #(_, parser) <- result.try(consume_token(parser))
@@ -976,6 +984,7 @@ fn parse_directive_definition(
       description: description,
       locations: locations,
       arguments: arguments,
+      repeatable: repeatable,
     ),
     parser,
   ))
@@ -1043,6 +1052,7 @@ fn directive_location_from_name(
     "FRAGMENT_DEFINITION" -> Ok(sdl_ast.FRAGMENTDEFINITION)
     "FRAGMENT_SPREAD" -> Ok(sdl_ast.FRAGMENTSPREAD)
     "INLINE_FRAGMENT" -> Ok(sdl_ast.INLINEFRAGMENT)
+    "VARIABLE_DEFINITION" -> Ok(sdl_ast.VARIABLEDEFINITION)
     "SCHEMA" -> Ok(sdl_ast.SCHEMA)
     "SCALAR" -> Ok(sdl_ast.SCALAR)
     "OBJECT" -> Ok(sdl_ast.OBJECT)

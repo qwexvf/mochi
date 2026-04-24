@@ -1,0 +1,7 @@
+---
+version: 1.5.5
+title: Directive repeatable keyword parsed
+file: ./test/mochi_snapshot_test.gleam
+test_name: directive_repeatable_test
+---
+Ok(SDLDocument([DirectiveDefinition(DirectiveDef("tag", None, [FIELDDEFINITION], [], True))]))

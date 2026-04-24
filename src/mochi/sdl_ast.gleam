@@ -186,6 +186,7 @@ pub type DirectiveDef {
     description: Option(String),
     locations: List(DirectiveLocation),
     arguments: List(ArgumentDef),
+    repeatable: Bool,
   )
 }
 
@@ -208,6 +209,7 @@ pub type DirectiveLocation {
   FRAGMENTDEFINITION
   FRAGMENTSPREAD
   INLINEFRAGMENT
+  VARIABLEDEFINITION
   // Type system locations
   SCHEMA
   SCALAR

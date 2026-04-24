@@ -1,0 +1,7 @@
+---
+version: 1.5.5
+title: Directive without repeatable keyword
+file: ./test/mochi_snapshot_test.gleam
+test_name: directive_not_repeatable_test
+---
+Ok(SDLDocument([DirectiveDefinition(DirectiveDef("foo", None, [FIELDDEFINITION], [], False))]))
