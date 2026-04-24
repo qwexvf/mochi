@@ -200,11 +200,46 @@ pub fn sdl_parsing_error_test() {
 
 @target(erlang)
 pub fn malformed_union_error_test() {
-  let invalid_sdl = "union SearchResult = | Post"
+  let invalid_sdl = "union SearchResult = Post |"
 
   sdl_parser.parse_sdl(invalid_sdl)
   |> string.inspect
   |> birdie.snap(title: "Malformed union type error")
+}
+
+@target(erlang)
+pub fn unterminated_string_mid_definition_test() {
+  // Regression test: a lex error mid-schema (unterminated string used as a
+  // description) must surface as SDLLexError, not silently truncate the
+  // document or map to UnexpectedEOF.
+  let invalid_sdl =
+    "
+    type A { id: ID! }
+    \"unterminated description
+    type B { id: ID! }
+    "
+
+  sdl_parser.parse_sdl(invalid_sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Lex error mid-document surfaces as SDLLexError")
+}
+
+@target(erlang)
+pub fn invalid_directive_location_test() {
+  let invalid_sdl = "directive @foo on NOT_A_REAL_LOCATION"
+
+  sdl_parser.parse_sdl(invalid_sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Invalid directive location rejected")
+}
+
+@target(erlang)
+pub fn directive_definition_captures_locations_test() {
+  let sdl = "directive @auth on FIELD_DEFINITION | OBJECT | INTERFACE"
+
+  sdl_parser.parse_sdl(sdl)
+  |> string.inspect
+  |> birdie.snap(title: "Directive definition captures locations")
 }
 
 // ============================================================================

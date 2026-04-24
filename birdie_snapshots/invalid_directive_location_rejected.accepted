@@ -1,0 +1,7 @@
+---
+version: 1.5.5
+title: Invalid directive location rejected
+file: ./test/mochi_snapshot_test.gleam
+test_name: invalid_directive_location_test
+---
+Error(InvalidTypeDefinition("Invalid directive location: NOT_A_REAL_LOCATION", Position(1, 19)))

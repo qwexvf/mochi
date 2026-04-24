@@ -62,7 +62,7 @@ fn parse_definitions(
       ))
       parse_definitions(parser, [definition, ..acc])
     }
-    Error(_) -> Ok(#(list.reverse(acc), parser))
+    Error(err) -> Error(err)
   }
 }
 
@@ -140,7 +140,7 @@ fn parse_type_system_definition(
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("type definition", token, position))
 
-    Error(_) -> Error(UnexpectedEOF("type definition"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -206,9 +206,7 @@ fn parse_optional_directive_arguments(
 ) -> Result(#(List(sdl_ast.DirectiveArgument), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftParen, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("(") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(arguments, parser) <- result.try(
         parse_directive_arguments_loop(parser, []),
       )
@@ -236,7 +234,7 @@ fn parse_directive_arguments_loop(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("argument or ')'", token, position))
-    Error(_) -> Error(UnexpectedEOF("argument or ')'"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -482,10 +480,7 @@ fn parse_type_extension(
       use #(directives, parser) <- result.try(parse_optional_directives(parser))
       use #(members, parser) <- result.try(case peek_token(parser) {
         Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Equals, _)) -> {
-          use #(_, parser) <- result.try(
-            consume_token(parser)
-            |> result.map_error(fn(_) { UnexpectedEOF("=") }),
-          )
+          use #(_, parser) <- result.try(consume_token(parser))
           parse_union_member_types(parser)
         }
         _ -> Ok(#([], parser))
@@ -612,7 +607,7 @@ fn parse_type_extension(
         token,
         position,
       ))
-    Error(_) -> Error(UnexpectedEOF("keyword after extend"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -628,7 +623,7 @@ fn parse_name(parser: SDLParser) -> Result(#(String, SDLParser), SDLParseError) 
         Ok(name) -> Ok(#(name, parser))
         Error(_) -> Error(UnexpectedToken("name", token, position))
       }
-    Error(_) -> Error(UnexpectedEOF("name"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -655,10 +650,7 @@ fn parse_optional_implements(
 ) -> Result(#(List(String), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Implements, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("implements") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       parse_implements_interfaces(parser, [])
     }
     _ -> Ok(#([], parser))
@@ -674,9 +666,7 @@ fn parse_implements_interfaces(
 
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Amp, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("&") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       parse_implements_interfaces(parser, new_acc)
     }
     _ -> Ok(#(list.reverse(new_acc), parser))
@@ -749,7 +739,7 @@ fn parse_field_definitions(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("field definition or '}'", token, position))
-    Error(_) -> Error(UnexpectedEOF("field definition or '}'"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -785,9 +775,7 @@ fn parse_type(
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBracket, _)) -> {
       // List type: [Type]
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("[") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(inner_type, parser) <- result.try(parse_type(parser))
       use #(_, parser) <- result.try(expect_token(
         parser,
@@ -800,10 +788,7 @@ fn parse_type(
       // Check for non-null modifier
       case peek_token(parser) {
         Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Bang, _)) -> {
-          use #(_, parser) <- result.try(
-            consume_token(parser)
-            |> result.map_error(fn(_) { UnexpectedEOF("!") }),
-          )
+          use #(_, parser) <- result.try(consume_token(parser))
           Ok(#(sdl_ast.NonNullType(list_type), parser))
         }
         _ -> Ok(#(list_type, parser))
@@ -811,19 +796,13 @@ fn parse_type(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(name), _)) -> {
       // Named type
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("name") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       let named_type = sdl_ast.NamedType(name)
 
       // Check for non-null modifier
       case peek_token(parser) {
         Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Bang, _)) -> {
-          use #(_, parser) <- result.try(
-            consume_token(parser)
-            |> result.map_error(fn(_) { UnexpectedEOF("!") }),
-          )
+          use #(_, parser) <- result.try(consume_token(parser))
           Ok(#(sdl_ast.NonNullType(named_type), parser))
         }
         _ -> Ok(#(named_type, parser))
@@ -831,7 +810,7 @@ fn parse_type(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("type", token, position))
-    Error(_) -> Error(UnexpectedEOF("type"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -840,9 +819,7 @@ fn parse_optional_arguments_definition(
 ) -> Result(#(List(sdl_ast.ArgumentDef), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftParen, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("(") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(arguments, parser) <- result.try(
         parse_argument_definitions(parser, []),
       )
@@ -885,7 +862,7 @@ fn parse_argument_definitions(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("argument definition or ')'", token, position))
-    Error(_) -> Error(UnexpectedEOF("argument definition or ')'"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -920,9 +897,7 @@ fn parse_optional_default_value(
 ) -> Result(#(option.Option(sdl_ast.SDLValue), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Equals, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("=") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(value, parser) <- result.try(parse_value(parser))
       Ok(#(option.Some(value), parser))
     }
@@ -935,66 +910,42 @@ fn parse_value(
 ) -> Result(#(sdl_ast.SDLValue, SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.IntValue(value), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("int value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.IntValue(value), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.FloatValue(value), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("float value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.FloatValue(value), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.StringValue(value), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("string value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.StringValue(value), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.BooleanValue(value), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("boolean value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.BooleanValue(value), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("null"), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("null value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.NullValue, parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(name), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("enum value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(sdl_ast.EnumValue(name), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBracket, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("list value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(values, parser) <- result.try(parse_list_values(parser, []))
       Ok(#(sdl_ast.ListValue(values), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.LeftBrace, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("object value") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(fields, parser) <- result.try(parse_object_field_values(parser, []))
       Ok(#(sdl_ast.ObjectValue(fields), parser))
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("value", token, position))
-    Error(_) -> Error(UnexpectedEOF("value"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -1002,48 +953,108 @@ fn parse_directive_definition(
   parser: SDLParser,
   description: Option(String),
 ) -> Result(#(sdl_ast.DirectiveDef, SDLParser), SDLParseError) {
-  use #(_, parser) <- result.try(
-    expect_token(parser, sdl_lexer.Directive, "directive"),
-  )
+  use #(_, parser) <- result.try(expect_token(
+    parser,
+    sdl_lexer.Directive,
+    "directive",
+  ))
   use #(_, parser) <- result.try(expect_token(parser, sdl_lexer.At, "@"))
   use #(name, parser) <- result.try(parse_name(parser))
-  use #(arguments, parser) <- result.try(
-    parse_optional_arguments_definition(parser),
-  )
-  use parser <- result.try(case peek_token(parser) {
+  use #(arguments, parser) <- result.try(parse_optional_arguments_definition(
+    parser,
+  ))
+  use #(locations, parser) <- result.try(case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name("on"), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("on") }),
-      )
-      skip_directive_location_list(parser)
+      use #(_, parser) <- result.try(consume_token(parser))
+      parse_directive_locations(parser)
     }
-    _ -> Ok(parser)
+    _ -> Ok(#([], parser))
   })
   Ok(#(
     sdl_ast.DirectiveDef(
       name: name,
       description: description,
-      locations: [],
+      locations: locations,
       arguments: arguments,
     ),
     parser,
   ))
 }
 
-fn skip_directive_location_list(
+fn parse_directive_locations(
   parser: SDLParser,
-) -> Result(SDLParser, SDLParseError) {
-  case peek_token(parser) {
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _))
-    | Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(_), _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("directive location") }),
-      )
-      skip_directive_location_list(parser)
+) -> Result(#(List(sdl_ast.DirectiveLocation), SDLParser), SDLParseError) {
+  // Optional leading pipe per spec: DirectiveLocations: `|`? DirectiveLocation (`|` DirectiveLocation)*
+  use parser <- result.try(case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser))
+      Ok(parser)
     }
     _ -> Ok(parser)
+  })
+  use #(first, parser) <- result.try(parse_directive_location(parser))
+  parse_directive_locations_tail(parser, [first])
+}
+
+fn parse_directive_locations_tail(
+  parser: SDLParser,
+  acc: List(sdl_ast.DirectiveLocation),
+) -> Result(#(List(sdl_ast.DirectiveLocation), SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser))
+      use #(location, parser) <- result.try(parse_directive_location(parser))
+      parse_directive_locations_tail(parser, [location, ..acc])
+    }
+    _ -> Ok(#(list.reverse(acc), parser))
+  }
+}
+
+fn parse_directive_location(
+  parser: SDLParser,
+) -> Result(#(sdl_ast.DirectiveLocation, SDLParser), SDLParseError) {
+  case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Name(name), position)) ->
+      case directive_location_from_name(name) {
+        Ok(location) -> {
+          use #(_, parser) <- result.try(consume_token(parser))
+          Ok(#(location, parser))
+        }
+        Error(_) ->
+          Error(InvalidTypeDefinition(
+            "Invalid directive location: " <> name,
+            position,
+          ))
+      }
+    Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
+      Error(UnexpectedToken("directive location", token, position))
+    Error(err) -> Error(err)
+  }
+}
+
+fn directive_location_from_name(
+  name: String,
+) -> Result(sdl_ast.DirectiveLocation, Nil) {
+  case name {
+    "QUERY" -> Ok(sdl_ast.QUERY)
+    "MUTATION" -> Ok(sdl_ast.MUTATION)
+    "SUBSCRIPTION" -> Ok(sdl_ast.SUBSCRIPTION)
+    "FIELD" -> Ok(sdl_ast.FIELD)
+    "FRAGMENT_DEFINITION" -> Ok(sdl_ast.FRAGMENTDEFINITION)
+    "FRAGMENT_SPREAD" -> Ok(sdl_ast.FRAGMENTSPREAD)
+    "INLINE_FRAGMENT" -> Ok(sdl_ast.INLINEFRAGMENT)
+    "SCHEMA" -> Ok(sdl_ast.SCHEMA)
+    "SCALAR" -> Ok(sdl_ast.SCALAR)
+    "OBJECT" -> Ok(sdl_ast.OBJECT)
+    "FIELD_DEFINITION" -> Ok(sdl_ast.FIELDDEFINITION)
+    "ARGUMENT_DEFINITION" -> Ok(sdl_ast.ARGUMENTDEFINITION)
+    "INTERFACE" -> Ok(sdl_ast.INTERFACE)
+    "UNION" -> Ok(sdl_ast.UNION)
+    "ENUM" -> Ok(sdl_ast.ENUM)
+    "ENUM_VALUE" -> Ok(sdl_ast.ENUMVALUE)
+    "INPUT_OBJECT" -> Ok(sdl_ast.INPUTOBJECT)
+    "INPUT_FIELD_DEFINITION" -> Ok(sdl_ast.INPUTFIELDDEFINITION)
+    _ -> Error(Nil)
   }
 }
 
@@ -1053,17 +1064,14 @@ fn parse_list_values(
 ) -> Result(#(List(sdl_ast.SDLValue), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBracket, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("]") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(list.reverse(acc), parser))
     }
     Ok(_) -> {
       use #(value, parser) <- result.try(parse_value(parser))
       parse_list_values(parser, [value, ..acc])
     }
-    Error(_) -> Error(UnexpectedEOF("]"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -1073,10 +1081,7 @@ fn parse_object_field_values(
 ) -> Result(#(List(sdl_ast.ObjectFieldValue), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.RightBrace, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser)
-        |> result.map_error(fn(_) { UnexpectedEOF("}") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       Ok(#(list.reverse(acc), parser))
     }
     Ok(_) -> {
@@ -1088,21 +1093,21 @@ fn parse_object_field_values(
         ..acc
       ])
     }
-    Error(_) -> Error(UnexpectedEOF("}"))
+    Error(err) -> Error(err)
   }
 }
 
 fn parse_union_member_types(
   parser: SDLParser,
 ) -> Result(#(List(String), SDLParser), SDLParseError) {
-  let parser = case peek_token(parser) {
-    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) ->
-      case consume_token(parser) {
-        Ok(#(_, p)) -> p
-        Error(_) -> parser
-      }
-    _ -> parser
-  }
+  // Optional leading pipe per spec
+  use parser <- result.try(case peek_token(parser) {
+    Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) -> {
+      use #(_, parser) <- result.try(consume_token(parser))
+      Ok(parser)
+    }
+    _ -> Ok(parser)
+  })
   use #(first_member, parser) <- result.try(parse_name(parser))
   parse_union_member_types_helper(parser, [first_member])
 }
@@ -1113,9 +1118,7 @@ fn parse_union_member_types_helper(
 ) -> Result(#(List(String), SDLParser), SDLParseError) {
   case peek_token(parser) {
     Ok(sdl_lexer.SDLTokenWithPosition(sdl_lexer.Pipe, _)) -> {
-      use #(_, parser) <- result.try(
-        consume_token(parser) |> result.map_error(fn(_) { UnexpectedEOF("|") }),
-      )
+      use #(_, parser) <- result.try(consume_token(parser))
       use #(member, parser) <- result.try(parse_name(parser))
       parse_union_member_types_helper(parser, [member, ..acc])
     }
@@ -1149,7 +1152,7 @@ fn parse_enum_values(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("enum value or '}'", token, position))
-    Error(_) -> Error(UnexpectedEOF("enum value or '}'"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -1206,7 +1209,7 @@ fn parse_input_fields(
     }
     Ok(sdl_lexer.SDLTokenWithPosition(token, position)) ->
       Error(UnexpectedToken("input field or '}'", token, position))
-    Error(_) -> Error(UnexpectedEOF("input field or '}'"))
+    Error(err) -> Error(err)
   }
 }
 
@@ -1238,19 +1241,19 @@ fn parse_input_field_definition(
 
 // Utility functions
 
-fn peek_token(parser: SDLParser) -> Result(SDLTokenWithPosition, Nil) {
+fn peek_token(parser: SDLParser) -> Result(SDLTokenWithPosition, SDLParseError) {
   case parser.current {
     Ok(token) -> Ok(token)
-    Error(_) -> Error(Nil)
+    Error(err) -> Error(SDLLexError(err))
   }
 }
 
 fn consume_token(
   parser: SDLParser,
-) -> Result(#(SDLTokenWithPosition, SDLParser), Nil) {
+) -> Result(#(SDLTokenWithPosition, SDLParser), SDLParseError) {
   case parser.current {
     Ok(token) -> Ok(#(token, advance(parser.lexer)))
-    Error(_) -> Error(Nil)
+    Error(err) -> Error(SDLLexError(err))
   }
 }
 
@@ -1259,12 +1262,11 @@ fn expect_token(
   expected: SDLToken,
   description: String,
 ) -> Result(#(SDLTokenWithPosition, SDLParser), SDLParseError) {
-  case consume_token(parser) {
-    Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), parser))
-      if token == expected
-    -> Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), parser))
-    Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), _)) ->
-      Error(UnexpectedToken(description, token, position))
-    Error(_) -> Error(UnexpectedEOF(description))
+  use #(sdl_lexer.SDLTokenWithPosition(token, position), next_parser) <- result.try(
+    consume_token(parser),
+  )
+  case token == expected {
+    True -> Ok(#(sdl_lexer.SDLTokenWithPosition(token, position), next_parser))
+    False -> Error(UnexpectedToken(description, token, position))
   }
 }

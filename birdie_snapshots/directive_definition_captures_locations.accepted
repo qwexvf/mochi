@@ -1,0 +1,7 @@
+---
+version: 1.5.5
+title: Directive definition captures locations
+file: ./test/mochi_snapshot_test.gleam
+test_name: directive_definition_captures_locations_test
+---
+Ok(SDLDocument([DirectiveDefinition(DirectiveDef("auth", None, [FIELDDEFINITION, OBJECT, INTERFACE], []))]))
