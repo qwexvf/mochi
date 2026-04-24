@@ -274,20 +274,18 @@ All six extension kinds are supported: `extend type`, `extend interface`, `exten
 - An extension with no matching base type is treated as a standalone type definition (orphan extension).
 - Multiple extensions for the same type are applied in file order.
 
-Configure multiple schema files in `mochi.config.json`:
+Configure multiple schema files in `mochi.config.yaml`:
 
-```json
-{
-  "schema": ["schema.graphql", "tournament.graphql"]
-}
+```yaml
+schema:
+  - "schema.graphql"
+  - "tournament.graphql"
 ```
 
 Or use a glob pattern:
 
-```json
-{
-  "schema": ["graphql/**/*.graphql"]
-}
+```yaml
+schema: "graphql/**/*.graphql"
 ```
 
 ## API Reference
