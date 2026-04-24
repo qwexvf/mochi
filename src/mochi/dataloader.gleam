@@ -1,7 +1,9 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
+import gleam/int
 import gleam/list
+import gleam/set
 
 pub type BatchLoadFn(key, value) =
   fn(List(key)) -> Result(List(Result(value, String)), String)
@@ -70,7 +72,7 @@ pub fn load_many(
           }
         })
 
-      let unique_uncached = list.unique(list.reverse(uncached))
+      let unique_uncached = dedup_preserving_order(list.reverse(uncached))
 
       case unique_uncached {
         [] -> {
@@ -90,11 +92,20 @@ pub fn load_many(
             list.try_map(chunks, fn(chunk) {
               case state.batch_load_fn(chunk) {
                 Error(e) -> Error("Batch load failed: " <> e)
-                Ok(results) ->
-                  case list.length(results) == list.length(chunk) {
-                    False -> Error("Batch returned wrong number of results")
+                Ok(results) -> {
+                  let expected = list.length(chunk)
+                  let got = list.length(results)
+                  case got == expected {
+                    False ->
+                      Error(
+                        "Batch returned wrong number of results: expected "
+                        <> int.to_string(expected)
+                        <> ", got "
+                        <> int.to_string(got),
+                      )
                     True -> Ok(list.zip(chunk, results))
                   }
+                }
               }
             })
           {
@@ -194,9 +205,27 @@ fn fetch_single(
       }
       #(DataLoader(DataLoaderState(..state, cache: new_cache)), result)
     }
-    Ok(_) -> #(loader, Error("Batch returned wrong number of results"))
+    Ok(other) -> #(
+      loader,
+      Error(
+        "Batch returned wrong number of results: expected 1, got "
+        <> int.to_string(list.length(other)),
+      ),
+    )
     Error(e) -> #(loader, Error("Batch load failed: " <> e))
   }
+}
+
+fn dedup_preserving_order(items: List(a)) -> List(a) {
+  let #(_, out) =
+    list.fold(items, #(set.new(), []), fn(acc, item) {
+      let #(seen, out) = acc
+      case set.contains(seen, item) {
+        True -> #(seen, out)
+        False -> #(set.insert(seen, item), [item, ..out])
+      }
+    })
+  list.reverse(out)
 }
 
 pub fn int_loader(

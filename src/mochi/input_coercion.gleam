@@ -43,6 +43,8 @@ pub type CoercionError {
   MissingRequiredField(path: List(String), field: String)
   /// Unknown field provided in input object
   UnknownField(path: List(String), field: String, type_name: String)
+  /// Unknown argument provided on a field
+  UnknownArgument(path: List(String), name: String)
   /// Null value provided for non-null type
   NullNotAllowed(path: List(String))
   /// Referenced type not found in schema
@@ -449,6 +451,9 @@ pub fn format_error(error: CoercionError) -> String {
       <> " at "
       <> format_path(path)
 
+    UnknownArgument(path, name) ->
+      "Unknown argument '" <> name <> "' at " <> format_path(path)
+
     NullNotAllowed(path) -> "Null value not allowed at " <> format_path(path)
 
     UnknownType(path, type_name) ->
@@ -526,17 +531,13 @@ fn coerce_provided_arguments(
     [arg, ..rest] -> {
       let arg_path = list.append(field_path, [arg.name])
 
-      // Get argument definition
+      // Get argument definition. Normally unknown arguments are caught by
+      // validation before reaching coercion, but return an error here so
+      // callers that skip validation still get a meaningful failure instead
+      // of a silent String-typed fallback.
       use arg_def <- result.try(case dict.get(arg_defs, arg.name) {
         Ok(def) -> Ok(def)
-        // Unknown arguments are caught by validation, allow them through here
-        Error(_) ->
-          Ok(schema.ArgumentDefinition(
-            name: arg.name,
-            description: None,
-            arg_type: schema.Named("String"),
-            default_value: None,
-          ))
+        Error(_) -> Error(UnknownArgument(arg_path, arg.name))
       })
 
       use coerced <- result.try(coerce_argument_value(
