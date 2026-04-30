@@ -1,4 +1,5 @@
 import gleam/dynamic/decode
+import gleam/string
 import mochi/decoders as md
 import mochi/types
 
@@ -22,8 +23,7 @@ pub fn build_with_ok_test() {
       types.field("id", "u1"),
       types.field("name", "Alice"),
     ])
-  let build = md.build_with(decode_user_inner(), "User")
-  case build(dyn) {
+  case md.build_with(decode_user_inner(), "User", dyn) {
     Ok(User(id: "u1", name: "Alice")) -> Nil
     Ok(_) -> panic as "Wrong values decoded"
     Error(e) -> panic as { "Should succeed: " <> e }
@@ -31,12 +31,38 @@ pub fn build_with_ok_test() {
 }
 
 pub fn build_with_error_includes_type_name_test() {
-  // Missing required field — inner decoder fails.
+  // Missing required field — inner decoder fails. The error string
+  // must mention the type name so logs are searchable. Asserting
+  // contains rather than equality so the inner error format can
+  // evolve without breaking this test.
   let dyn = types.record([types.field("id", "u1")])
-  let build = md.build_with(decode_user_inner(), "User")
-  case build(dyn) {
-    Error("Failed to decode User") -> Nil
-    Error(e) -> panic as { "Wrong error message: " <> e }
+  case md.build_with(decode_user_inner(), "User", dyn) {
+    Error(e) ->
+      case string.contains(e, "User") {
+        True -> Nil
+        False -> panic as { "Type name missing from error: " <> e }
+      }
+    Ok(_) -> panic as "Should fail on missing field"
+  }
+}
+
+pub fn build_with_error_surfaces_inner_detail_test() {
+  // A non-trivial decode failure should bubble at least one piece of
+  // the inner decoder's complaint into the user-visible string.
+  let dyn = types.record([types.field("id", "u1")])
+  case md.build_with(decode_user_inner(), "User", dyn) {
+    Error(e) ->
+      // Either the missing field name, the expected type, or the
+      // word "expected" should appear — any of these is enough to
+      // confirm the inner detail wasn't dropped.
+      case
+        string.contains(e, "name")
+        || string.contains(e, "expected")
+        || string.contains(e, "String")
+      {
+        True -> Nil
+        False -> panic as { "Inner detail missing from error: " <> e }
+      }
     Ok(_) -> panic as "Should fail on missing field"
   }
 }
@@ -93,7 +119,7 @@ fn decode_tag(dyn) -> Result(Tag, String) {
     use name <- decode.field("name", decode.string)
     decode.success(Tag(name: name))
   }
-  md.build_with(decoder, "Tag")(dyn)
+  md.build_with(decoder, "Tag", dyn)
 }
 
 pub type Post {

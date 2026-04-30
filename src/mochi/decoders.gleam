@@ -21,11 +21,21 @@
 //// use email <- md.optional_string("email")
 //// ```
 ////
+//// > **Output decoders only.** The `optional_*` helpers conflate
+//// > "field absent" with "field present but defaulted." That's
+//// > correct for `mochi/types.{build}` callbacks (mochi only invokes
+//// > them on schema-conforming output values) but wrong for input
+//// > validation — never use these to decode mutation arguments where
+//// > "user sent nothing" must differ from "user sent an empty value."
+//// > For input validation, use `gleam_stdlib`'s `decode.field` /
+//// > `decode.optional_field` directly so you control the default.
+////
 //// ## Example
 ////
 //// ```gleam
 //// import gleam/dynamic/decode
 //// import mochi/decoders as md
+//// import mochi/schema
 //// import mochi/types
 ////
 //// pub fn user_type() -> schema.ObjectType {
@@ -45,19 +55,28 @@
 ////     use friends <- md.list_filtering("friends", decode_user)
 ////     decode.success(User(id:, email:, age:, friends:))
 ////   }
-////   md.build_with(decoder, "User")(dyn)
+////   md.build_with(decoder, "User", dyn)
 //// }
 //// ```
 
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
+import gleam/string
 
-/// Wrap a `decode.Decoder(t)` and a type name into the
-/// `fn(Dynamic) -> Result(t, String)` shape that `mochi/types.{build}`
-/// expects. The `type_name` is used in the error message when the
-/// inner decode fails — keep it the same as the GraphQL object type
-/// (e.g. `"CapabilityGraph"`) so error logs are searchable.
+/// Run a `decode.Decoder(t)` against `dyn`, returning the
+/// `Result(t, String)` shape that `mochi/types.{build}` expects.
+/// `type_name` is interpolated into the error message — keep it the
+/// same as the GraphQL object type (e.g. `"CapabilityGraph"`) so
+/// error logs are searchable.
+///
+/// On failure, the first decoder error is included in the message
+/// so debugging doesn't degrade to "something failed somewhere in
+/// this 14-field record":
+///
+/// ```
+/// "Failed to decode User: expected String at name, got Int"
+/// ```
 ///
 /// Collapses the standard four-line wrap:
 ///
@@ -71,16 +90,29 @@ import gleam/list
 /// into a single call:
 ///
 /// ```gleam
-/// build_with(decoder, "CapabilityGraph")(dyn)
+/// build_with(decoder, "CapabilityGraph", dyn)
 /// ```
 pub fn build_with(
   decoder: decode.Decoder(t),
   type_name: String,
-) -> fn(Dynamic) -> Result(t, String) {
-  fn(dyn) {
-    case decode.run(dyn, decoder) {
-      Ok(v) -> Ok(v)
-      Error(_) -> Error("Failed to decode " <> type_name)
+  dyn: Dynamic,
+) -> Result(t, String) {
+  case decode.run(dyn, decoder) {
+    Ok(v) -> Ok(v)
+    Error(errors) ->
+      Error("Failed to decode " <> type_name <> describe_errors(errors))
+  }
+}
+
+fn describe_errors(errors: List(decode.DecodeError)) -> String {
+  case errors {
+    [] -> ""
+    [decode.DecodeError(expected:, found:, path:), ..] -> {
+      let where = case path {
+        [] -> ""
+        _ -> " at " <> string.join(path, ".")
+      }
+      ": expected " <> expected <> where <> ", got " <> found
     }
   }
 }
@@ -94,6 +126,9 @@ pub fn build_with(
 ///
 /// Equivalent to `decode.optional_field(name, "", decode.string, next)`
 /// but reads better at call sites that have many such fields.
+///
+/// Output decoder only — see the module-level note. Don't use this
+/// for input validation where "absent" must differ from "empty".
 pub fn optional_string(
   name: String,
   next: fn(String) -> decode.Decoder(final),
@@ -102,6 +137,7 @@ pub fn optional_string(
 }
 
 /// Decode an optional integer field, defaulting to `0` when absent.
+/// Output decoder only — see the module-level note.
 pub fn optional_int(
   name: String,
   next: fn(Int) -> decode.Decoder(final),
@@ -110,6 +146,7 @@ pub fn optional_int(
 }
 
 /// Decode an optional bool field, defaulting to `False` when absent.
+/// Output decoder only — see the module-level note.
 pub fn optional_bool(
   name: String,
   next: fn(Bool) -> decode.Decoder(final),
@@ -119,8 +156,8 @@ pub fn optional_bool(
 
 /// Decode an optional list field where each item is a `Dynamic` that
 /// must be passed through a per-item decoder. Items that fail their
-/// per-item decode are silently dropped; missing or non-list values
-/// resolve to the empty list.
+/// per-item decode are **silently dropped**; missing or non-list
+/// values resolve to the empty list.
 ///
 /// Useful for top-level "list of object" GraphQL fields where one
 /// malformed row shouldn't kill the whole response. Behavior:
