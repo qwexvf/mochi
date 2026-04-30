@@ -21,6 +21,8 @@ mochi = { git = "https://github.com/qwexvf/mochi", ref = "main" }
 ## Quick Start
 
 ```gleam
+import gleam/dynamic/decode
+import mochi/decoders as md
 import mochi/query
 import mochi/schema
 import mochi/types
@@ -39,6 +41,20 @@ fn user_type() -> schema.ObjectType {
   |> types.string("email", fn(u: User) { u.email })
   |> types.int("age", fn(u: User) { u.age })
   |> types.build(decode_user)
+}
+
+// 2a. Decoder for the build callback. mochi round-trips field values
+//     through Dynamic during execution; the helpers in mochi/decoders
+//     collapse the common boilerplate.
+fn decode_user(dyn) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use name <- decode.field("name", decode.string)
+    use email <- md.optional_string("email")
+    use age <- md.optional_int("age")
+    decode.success(User(id:, name:, email:, age:))
+  }
+  md.build_with(decoder, "User", dyn)
 }
 
 // 3. Define queries
@@ -365,6 +381,35 @@ query.get_optional_int(args, "limit")      // -> Option(Int)
 query.get_string_list(args, "tags")  // -> Result(List(String), String)
 query.get_int_list(args, "ids")      // -> Result(List(Int), String)
 ```
+
+### Decoder Helpers (`mochi/decoders`)
+
+Small helpers that collapse boilerplate in the `types.build(decoder)` callback. mochi round-trips field values through `Dynamic` during execution, so every `ObjectType` needs a `fn(Dynamic) -> Result(t, String)` decoder; the helpers below shrink the most common cases. They follow `gleam_stdlib`'s continuation-passing convention so they compose with `use`-bindings.
+
+```gleam
+import gleam/dynamic/decode
+import mochi/decoders as md
+
+fn decode_user(dyn) {
+  let decoder = {
+    use id <- decode.field("id", decode.string)
+    use email <- md.optional_string("email")        // default ""
+    use age <- md.optional_int("age")               // default 0
+    use enabled <- md.optional_bool("enabled")      // default False
+    use friends <- md.list_filtering("friends", decode_user)
+    decode.success(User(id:, email:, age:, enabled:, friends:))
+  }
+  md.build_with(decoder, "User", dyn)
+}
+```
+
+| Helper | Use case |
+|---|---|
+| `build_with(decoder, type_name, dyn)` | Run a stdlib decoder + tag the error with the GraphQL type name. The first inner `DecodeError` (expected/found/path) is included in the message. |
+| `optional_string(name)` / `optional_int(name)` / `optional_bool(name)` | Common output-decoder fallbacks. Continuation-passing form for `use`-binding. |
+| `list_filtering(name, item)` | Optional list field whose items are decoded via a per-item callback; malformed items are silently dropped, missing field defaults to `[]`. |
+
+> **Output decoders only.** The `optional_*` helpers conflate "field absent" with "field present but defaulted." That's correct for `types.build` callbacks (mochi only invokes them on schema-conforming output values) but wrong for input validation — never use these for mutation arguments where "user sent nothing" must differ from "user sent an empty value."
 
 ### Schema Module (`mochi/schema`)
 
