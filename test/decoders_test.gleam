@@ -141,8 +141,7 @@ pub fn list_filtering_drops_malformed_test() {
     ])
   case decode.run(dyn, decode_post()) {
     Ok(Post(title: "Hello", tags: [Tag("gleam")])) -> Nil
-    Ok(p) ->
-      panic as { "Wrong filter result, got " <> string_of_post(p) }
+    Ok(p) -> panic as { "Wrong filter result, got " <> string_of_post(p) }
     Error(_) -> panic as "Should succeed with partial valid items"
   }
 }
