@@ -6,7 +6,6 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -346,61 +345,4 @@ fn escape_string(s: String) -> String {
   |> string.replace("\n", "\\n")
   |> string.replace("\r", "\\r")
   |> string.replace("\t", "\\t")
-}
-
-/// Demo function to show schema printing capabilities
-pub fn demo_schema_printing() -> Nil {
-  io.println("=== GeQL Schema Printer Demo ===")
-  io.println("")
-
-  // Create a sample schema
-  let user_type =
-    schema.object("User")
-    |> schema.description("A user in the system")
-    |> schema.field(
-      schema.field_def("id", schema.non_null(schema.id_type()))
-      |> schema.field_description("Unique identifier"),
-    )
-    |> schema.field(
-      schema.field_def("name", schema.string_type())
-      |> schema.field_description("User's full name"),
-    )
-    |> schema.field(
-      schema.field_def("email", schema.non_null(schema.string_type()))
-      |> schema.field_description("User's email address"),
-    )
-
-  let post_type =
-    schema.object("Post")
-    |> schema.description("A blog post")
-    |> schema.field(schema.field_def("id", schema.non_null(schema.id_type())))
-    |> schema.field(schema.field_def(
-      "title",
-      schema.non_null(schema.string_type()),
-    ))
-    |> schema.field(schema.field_def("content", schema.string_type()))
-
-  let query_type =
-    schema.object("Query")
-    |> schema.field(
-      schema.field_def("user", schema.named_type("User"))
-      |> schema.argument(schema.arg("id", schema.non_null(schema.id_type()))),
-    )
-    |> schema.field(schema.field_def(
-      "posts",
-      schema.list_type(schema.non_null(schema.named_type("Post"))),
-    ))
-
-  let complete_schema =
-    schema.schema()
-    |> schema.query(query_type)
-    |> schema.add_type(schema.ObjectTypeDef(user_type))
-    |> schema.add_type(schema.ObjectTypeDef(post_type))
-
-  io.println("📄 Generated SDL:")
-  io.println("=================")
-  io.println(print_schema(complete_schema))
-
-  io.println("")
-  io.println("✨ Schema printing complete!")
 }

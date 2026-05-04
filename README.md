@@ -12,10 +12,8 @@ Inspired by:
 
 ## Installation
 
-Add to your `gleam.toml`:
-
-```toml
-mochi = { git = "https://github.com/qwexvf/mochi", ref = "main" }
+```sh
+gleam add mochi
 ```
 
 ## Quick Start
@@ -478,16 +476,18 @@ schema.field_def("secret", schema.string_type())
   |> schema.guards([require_auth_guard, require_admin_guard])
 ```
 
-### Subscriptions (`mochi_websocket`)
+### Subscriptions (`mochi_transport`)
 
-Real-time updates with a PubSub pattern over WebSocket. Requires the `mochi_websocket` package.
+Real-time updates with a PubSub pattern over WebSocket or SSE. Provided by the
+[`mochi_transport`](https://github.com/qwexvf/mochi_transport) package.
 
 ```gleam
-import mochi_websocket
+import mochi_transport/subscription
+import mochi_transport/websocket
 
-let pubsub = mochi_websocket.new_pubsub()
-let state = mochi_websocket.new_connection(schema, pubsub, ctx)
-mochi_websocket.publish(pubsub, mochi_websocket.topic("user:created"), user_data)
+let pubsub = subscription.new()
+let state = websocket.new_connection(schema, pubsub, ctx)
+subscription.publish(pubsub, subscription.topic("user:created"), user_data)
 ```
 
 ### Error Handling (`mochi/error`)
@@ -639,15 +639,17 @@ mochi_codegen.graphiql("/graphql")       // GraphiQL IDE
 mochi_codegen.apollo_sandbox("/graphql") // Apollo Sandbox
 ```
 
-### WebSocket Transport (`mochi_websocket`)
+### WebSocket / SSE Transport (`mochi_transport`)
 
-Real-time subscriptions over WebSocket using the graphql-ws protocol. Requires the `mochi_websocket` package.
+Real-time subscriptions over WebSocket (graphql-ws protocol) or Server-Sent
+Events. Provided by the
+[`mochi_transport`](https://github.com/qwexvf/mochi_transport) package.
 
 ```gleam
-import mochi_websocket
+import mochi_transport/websocket
 
-let state = mochi_websocket.new_connection(schema, pubsub, ctx)
-let result = mochi_websocket.handle_message(state, client_msg)
+let state = websocket.new_connection(schema, pubsub, ctx)
+let result = websocket.handle_message(state, client_msg)
 ```
 
 ### DataLoader (`mochi/dataloader`)
@@ -785,16 +787,23 @@ let schema = query.new()
 
 ## Package Structure
 
-Install only the packages you need — each is a separate repository:
+Install only the packages you need. `mochi` is on Hex; the companion packages
+will follow:
 
-```toml
-mochi = { git = "https://github.com/qwexvf/mochi", ref = "main" }                    # Core (required)
-mochi_relay = { git = "https://github.com/qwexvf/mochi_relay", ref = "main" }        # Relay-style cursor pagination
-mochi_websocket = { git = "https://github.com/qwexvf/mochi_websocket", ref = "main" } # WebSocket subscriptions (graphql-ws)
-mochi_upload = { git = "https://github.com/qwexvf/mochi_upload", ref = "main" }      # Multipart file uploads
-mochi_codegen = { git = "https://github.com/qwexvf/mochi_codegen", ref = "main" }    # SDL + TypeScript codegen + GraphiQL
-# mochi/apq is built into the core — no separate package needed
+```sh
+gleam add mochi          # Core (required) — published on Hex
 ```
+
+Companion packages (publishing to Hex soon — install via git in the meantime):
+
+| Package | Purpose |
+|---------|---------|
+| [`mochi_relay`](https://github.com/qwexvf/mochi_relay) | Relay-style cursor pagination |
+| [`mochi_transport`](https://github.com/qwexvf/mochi_transport) | WebSocket (graphql-ws) + SSE subscriptions |
+| [`mochi_upload`](https://github.com/qwexvf/mochi_upload) | Multipart file uploads |
+| [`mochi_codegen`](https://github.com/qwexvf/mochi_codegen) | SDL + TypeScript codegen + GraphiQL + CLI |
+
+Automatic Persisted Queries (`mochi/apq`) is built into the core — no separate package needed.
 
 ```
 mochi/                       # Core GraphQL engine
@@ -811,10 +820,9 @@ mochi/                       # Core GraphQL engine
 └── security.gleam           # Depth/complexity/alias limits
 
 mochi_relay/                 # Relay cursor pagination
-mochi_websocket/             # graphql-ws WebSocket transport + PubSub
+mochi_transport/             # graphql-ws WebSocket + SSE transports + PubSub
 mochi_upload/                # GraphQL multipart file uploads
 mochi_codegen/               # SDL + TypeScript + Gleam codegen + GraphiQL + CLI
-mochi_apq/                   # Automatic Persisted Queries (standalone)
 ```
 
 ## Running Tests
