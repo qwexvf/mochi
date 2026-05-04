@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0
+
+First stable release. Same code as 0.5.0 cleanup; promoted to 1.0 to mark
+the public API as stable for Hex.
+
+### Changed
+- Trimmed demo `main` and `create_demo_schema` from `mochi.gleam`; the
+  module now only re-exports `parse`, `execute`, and `new_schema`.
+- Removed `demo_schema_printing` from `mochi/schema_printer`.
+- Dropped unused FFI files (`mochi_ffi.erl`, `mochi_random_ffi.erl`) and the
+  internal `mochi_benchmark` script.
+
 ## 0.5.0
 
 ### Added
