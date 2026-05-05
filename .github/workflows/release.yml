@@ -1,0 +1,87 @@
+name: Release
+
+# Tag-triggered publish to Hex.pm.
+#
+# Push a `v<semver>` tag (e.g. `v2.0.1`) on `main` and this workflow will:
+#   1. run the test suite once more on the tagged commit, on a clean runner
+#   2. publish the package to Hex (uploads the tarball *and* hexdocs)
+#   3. create a GitHub Release with the matching section of CHANGELOG.md
+#
+# Setup once per repo:
+#   - In Settings → Secrets and variables → Actions, add a repository secret
+#     named `HEXPM_API_KEY` with a Hex API key that has `api` scope. Generate
+#     one with `mix hex.user key generate` or via the Hex dashboard.
+#   - The `GITHUB_TOKEN` available to actions/runners is enough for the
+#     release-creation step; no extra config needed.
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Manual fallback: re-run a release from the Actions tab without retagging.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v2.0.1). Required for manual runs."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.3"
+          gleam-version: "1.15.4"
+          rebar3-version: "3"
+
+      - name: Verify tag matches gleam.toml version
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          declared=$(grep -E '^version' gleam.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "$version" != "$declared" ]; then
+            echo "::error::tag $tag does not match gleam.toml version $declared"
+            exit 1
+          fi
+
+      - run: gleam deps download
+      - run: gleam format --check src test
+      - run: gleam test
+
+      - name: Publish to Hex
+        env:
+          HEXPM_API_KEY: ${{ secrets.HEXPM_API_KEY }}
+        run: gleam publish --yes
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          # Pull the section between `## <version>` and the next `## ` heading.
+          awk -v v="$version" '
+            $0 == "## " v {flag=1; next}
+            flag && /^## / {flag=0}
+            flag {print}
+          ' CHANGELOG.md > release-notes.md
+          # If empty, fall back to a one-liner.
+          if [ ! -s release-notes.md ]; then
+            echo "Release $tag." > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes-file release-notes.md
