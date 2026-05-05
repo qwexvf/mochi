@@ -1,5 +1,5 @@
 import gleam/list
-import mochi/lexer
+import mochi/internal/lexer
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

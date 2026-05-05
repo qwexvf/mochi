@@ -1,11 +1,11 @@
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import mochi/ast.{
+import mochi/internal/ast.{
   type Document, type Field, type Operation, type OperationType, type Selection,
   type SelectionSet,
 }
-import mochi/lexer.{
+import mochi/internal/lexer.{
   type LexerError, type Position, type Token, type TokenWithPosition,
 }
 

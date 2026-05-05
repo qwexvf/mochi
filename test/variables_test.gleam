@@ -3,8 +3,8 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{Some}
-import mochi/ast
 import mochi/executor
+import mochi/internal/ast
 import mochi/parser
 import mochi/query
 import mochi/schema

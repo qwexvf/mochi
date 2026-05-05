@@ -8,10 +8,14 @@
 @target(erlang)
 import birdie
 import gleam/dict
+@target(erlang)
+import gleam/dynamic
 import gleam/string
 import gleeunit
 @target(erlang)
 import mochi/error
+@target(erlang)
+import mochi/internal/sdl_parser
 @target(erlang)
 import mochi/json
 @target(erlang)
@@ -19,9 +23,13 @@ import mochi/response
 @target(erlang)
 import mochi/schema
 @target(erlang)
-import mochi/sdl_parser
-@target(erlang)
 import mochi/types
+
+@target(erlang)
+fn encode_pretty_or_panic(value: dynamic.Dynamic) -> String {
+  let assert Ok(s) = json.encode_pretty(value, 2)
+  s
+}
 
 pub fn main() {
   gleeunit.main()
@@ -210,7 +218,7 @@ pub fn malformed_union_error_test() {
 @target(erlang)
 pub fn unterminated_string_mid_definition_test() {
   // Regression test: a lex error mid-schema (unterminated string used as a
-  // description) must surface as SDLLexError, not silently truncate the
+  // description) must surface as SdlLexError, not silently truncate the
   // document or map to UnexpectedEOF.
   let invalid_sdl =
     "
@@ -221,7 +229,7 @@ pub fn unterminated_string_mid_definition_test() {
 
   sdl_parser.parse_sdl(invalid_sdl)
   |> string.inspect
-  |> birdie.snap(title: "Lex error mid-document surfaces as SDLLexError")
+  |> birdie.snap(title: "Lex error mid-document surfaces as SdlLexError")
 }
 
 @target(erlang)
@@ -284,7 +292,7 @@ pub fn json_object_encoding_test() {
 
   data
   |> types.to_dynamic
-  |> json.encode_pretty(2)
+  |> encode_pretty_or_panic
   |> birdie.snap(title: "JSON object encoding with mixed types")
 }
 
@@ -305,7 +313,7 @@ pub fn json_nested_encoding_test() {
 
   data
   |> types.to_dynamic
-  |> json.encode_pretty(2)
+  |> encode_pretty_or_panic
   |> birdie.snap(title: "JSON nested object and array encoding")
 }
 
@@ -323,7 +331,7 @@ pub fn error_with_extensions_test() {
 
   err
   |> error.to_dynamic
-  |> json.encode_pretty(2)
+  |> encode_pretty_or_panic
   |> birdie.snap(title: "GraphQL error with extensions")
 }
 
@@ -342,7 +350,7 @@ pub fn error_with_path_and_location_test() {
 
   err
   |> error.to_dynamic
-  |> json.encode_pretty(2)
+  |> encode_pretty_or_panic
   |> birdie.snap(title: "GraphQL error with path and location")
 }
 

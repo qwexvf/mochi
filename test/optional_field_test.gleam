@@ -39,34 +39,40 @@ fn profile_extractor() -> fn(Profile) -> dynamic.Dynamic {
 
 pub fn optional_string_some_serializes_as_string_test() {
   let dyn = types.option(Some("Alice"))
-  let assert True = json.encode(dyn) == "\"Alice\""
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "\"Alice\""
 }
 
 pub fn optional_string_none_serializes_as_null_test() {
   let opt: Option(String) = None
   let dyn = types.option(opt)
-  let assert True = json.encode(dyn) == "null"
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "null"
 }
 
 pub fn optional_int_some_serializes_as_int_test() {
   let dyn = types.option(Some(42))
-  let assert True = json.encode(dyn) == "42"
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "42"
 }
 
 pub fn optional_int_none_serializes_as_null_test() {
   let opt: Option(Int) = None
   let dyn = types.option(opt)
-  let assert True = json.encode(dyn) == "null"
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "null"
 }
 
 pub fn optional_float_some_serializes_as_float_test() {
   let dyn = types.option(Some(3.14))
-  let assert True = json.encode(dyn) == "3.14"
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "3.14"
 }
 
 pub fn optional_bool_some_serializes_as_bool_test() {
   let dyn = types.option(Some(True))
-  let assert True = json.encode(dyn) == "true"
+  let assert Ok(s) = json.encode(dyn)
+  let assert True = s == "true"
 }
 
 // =============================================================================
@@ -147,7 +153,7 @@ pub fn record_with_optional_fields_serializes_correctly_test() {
       #("name", types.option(Some("Alice"))),
       #("age", types.option(none_int)),
     ])
-  let result = json.encode(dyn)
+  let assert Ok(result) = json.encode(dyn)
   // dict ordering is not guaranteed — assert the relevant substrings instead
   let assert True = string.contains(result, "\"name\":\"Alice\"")
   let assert True = string.contains(result, "\"age\":null")

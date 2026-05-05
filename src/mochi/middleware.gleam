@@ -309,9 +309,13 @@ pub fn logging_middleware(log_fn: fn(String) -> Nil) -> MiddlewareDef {
   })
 }
 
-/// Authorization middleware that checks for a specific role in context
+/// Authorization middleware that checks for a specific role in context.
+///
+/// `role_extractor` receives a decoder-friendly view of the user context.
+/// The middleware decodes via the supplied decoder, then asks the
+/// extractor for the role string.
 pub fn auth_middleware(
-  role_extractor: fn(Dynamic) -> Option(String),
+  role_extractor: fn(schema.UserContext) -> Option(String),
   required_role: String,
 ) -> MiddlewareDef {
   middleware("auth", fn(resolution, next) {

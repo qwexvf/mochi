@@ -1,4 +1,4 @@
-import mochi/ast
+import mochi/internal/ast
 
 pub opaque type DocumentCache {
   DocumentCache(inner: CacheInner)

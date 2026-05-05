@@ -1,10 +1,12 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import mochi/output
 import mochi/schema
 import mochi/types
 
@@ -932,21 +934,23 @@ fn build_fields_introspection(
 }
 
 fn serialize_default_value(default_value: Option(Dynamic)) -> Dynamic {
+  // GraphQL introspection serializes default values as their printed
+  // representation: strings stay strings, ints/bools become their
+  // textual form, anything else becomes null.
   case default_value {
     None -> types.to_dynamic(Nil)
     Some(v) ->
-      case decode.run(v, decode.string) {
-        Ok(s) -> types.to_dynamic(s)
-        Error(_) ->
-          case decode.run(v, decode.int) {
-            Ok(i) -> types.to_dynamic(int.to_string(i))
-            Error(_) ->
-              case decode.run(v, decode.bool) {
-                Ok(True) -> types.to_dynamic("true")
-                Ok(False) -> types.to_dynamic("false")
-                Error(_) -> types.to_dynamic(Nil)
-              }
-          }
+      case output.from_dynamic(v) {
+        Ok(output.VString(s)) -> types.to_dynamic(s)
+        Ok(output.VInt(i)) -> types.to_dynamic(int.to_string(i))
+        Ok(output.VFloat(f)) -> types.to_dynamic(float.to_string(f))
+        Ok(output.VBool(True)) -> types.to_dynamic("true")
+        Ok(output.VBool(False)) -> types.to_dynamic("false")
+        Ok(output.VNull) -> types.to_dynamic(Nil)
+        // Lists/objects don't have a stable printed-form here — fall back
+        // to null. Schema-level typing of defaults will fix this.
+        Ok(_) -> types.to_dynamic(Nil)
+        Error(_) -> types.to_dynamic(Nil)
       }
   }
 }

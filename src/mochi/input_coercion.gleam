@@ -29,7 +29,7 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/set
 import gleam/string
-import mochi/ast
+import mochi/internal/ast
 import mochi/schema.{type FieldType, type Schema}
 import mochi/types
 

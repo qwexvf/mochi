@@ -13,8 +13,8 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/set.{type Set}
 import gleam/string
-import mochi/ast.{type Document}
-import mochi/lexer
+import mochi/internal/ast.{type Document}
+import mochi/internal/lexer
 import mochi/parser.{type ParseError}
 import mochi/schema.{type FieldDefinition, type ObjectType, type Schema}
 

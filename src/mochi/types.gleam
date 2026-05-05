@@ -39,12 +39,13 @@
 //// }
 //// ```
 
-import gleam/dict.{type Dict}
+import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode as dynamic_decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import mochi/args as args_mod
 import mochi/schema.{
   type ArgumentDefinition, type ExecutionContext, type FieldDefinition,
   type FieldType, type ObjectType, type ResolverInfo,
@@ -139,8 +140,7 @@ pub type TypeField(a) {
     description: Option(String),
     field_type: FieldType,
     args: List(ArgumentDefinition),
-    resolver: fn(a, Dict(String, Dynamic), ExecutionContext) ->
-      Result(Dynamic, String),
+    resolver: fn(a, args_mod.Args, ExecutionContext) -> Result(Dynamic, String),
     is_deprecated: Bool,
     deprecation_reason: Option(String),
   )
@@ -705,7 +705,7 @@ pub fn field_with_args(
   returns field_type: FieldType,
   args args: List(ArgumentDefinition),
   desc description: String,
-  resolve resolver: fn(a, Dict(String, Dynamic), ExecutionContext) ->
+  resolve resolver: fn(a, args_mod.Args, ExecutionContext) ->
     Result(Dynamic, String),
 ) -> TypeBuilder(a) {
   let field =
@@ -879,11 +879,7 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) ->
-            field_resolver(
-              unsafe_coerce(parent_dyn),
-              info.arguments,
-              info.context,
-            )
+            field_resolver(unsafe_coerce(parent_dyn), info.args, info.context)
           None -> Error("No parent value")
         }
       }
@@ -959,7 +955,7 @@ fn to_field_def(
         case info.parent {
           Some(parent_dyn) ->
             result.try(decoder(parent_dyn), fn(parent) {
-              field_resolver(parent, info.arguments, info.context)
+              field_resolver(parent, info.args, info.context)
             })
           None -> Error("No parent value")
         }

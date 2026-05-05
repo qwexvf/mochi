@@ -4,4 +4,4 @@ title: Input type SDL parsing
 file: ./test/mochi_snapshot_test.gleam
 test_name: input_type_parsing_test
 ---
-Ok(SDLDocument([TypeDefinition(InputObjectTypeDefinition(InputObjectTypeDef("CreateUserInput", None, [], [InputFieldDef("name", None, NonNullType(NamedType("String")), None, []), InputFieldDef("email", None, NonNullType(NamedType("String")), None, []), InputFieldDef("age", None, NamedType("Int"), None, [])])))]))
+Ok(SdlDocument([TypeDefinition(InputObjectTypeDefinition(InputObjectTypeDef("CreateUserInput", None, [], [InputFieldDef("name", None, NonNullType(NamedType("String")), None, []), InputFieldDef("email", None, NonNullType(NamedType("String")), None, []), InputFieldDef("age", None, NamedType("Int"), None, [])])))]))

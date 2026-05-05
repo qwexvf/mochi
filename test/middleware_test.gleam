@@ -6,8 +6,9 @@ import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{None, Some}
 import gleeunit/should
-import mochi/ast
+import mochi/args
 import mochi/executor
+import mochi/internal/ast
 import mochi/middleware
 import mochi/parser
 import mochi/query
@@ -346,6 +347,7 @@ pub fn middleware_to_executor_fn_wraps_pipeline_test() {
     schema.ResolverInfo(
       parent: None,
       arguments: dict.new(),
+      args: args.from_dict(dict.new()),
       context: schema.execution_context(types.to_dynamic(Nil)),
       info: types.to_dynamic(Nil),
     )

@@ -36,6 +36,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import mochi/args
 import mochi/dataloader.{type DataLoader}
 import mochi/document_cache
 
@@ -174,9 +175,7 @@ pub type FieldDefinition {
     deprecation_reason: Option(String),
     /// Optional topic resolver for subscription fields.
     /// Maps resolved arguments + context to a pub/sub topic string.
-    topic_fn: Option(
-      fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, String),
-    ),
+    topic_fn: Option(fn(args.Args, ExecutionContext) -> Result(String, String)),
     rich_resolver: Option(RichResolver),
   )
 }
@@ -273,11 +272,48 @@ pub type RichResolverPayload =
 pub type RichResolver =
   fn(ResolverInfo) -> Result(Dynamic, RichResolverPayload)
 
+/// Opaque holder for user-provided execution context data.
+///
+/// Resolvers expect a *specific* user context type — the one their app
+/// configured. Exposing the raw `Dynamic` in `ExecutionContext` lied about
+/// that: it advertised "any data here" when in fact the system requires
+/// the app's chosen type. `UserContext` keeps the runtime erasure
+/// (necessary because the executor doesn't know the app's type) but stops
+/// the lie at the type level.
+///
+/// Use [`user_context`](#user_context) to wrap a value, and either
+/// [`context_accessor`](#context_accessor) for typed reads, or
+/// [`read_user_context`](#read_user_context) for one-off reads.
+pub opaque type UserContext {
+  UserContext(inner: Dynamic)
+}
+
+/// Wrap an app-defined value so it can be carried through the executor.
+pub fn user_context(value: a) -> UserContext {
+  UserContext(coerce_to_dynamic(value))
+}
+
+/// Read the wrapped value back, decoding into an app-defined type.
+pub fn read_user_context(
+  uc: UserContext,
+  decoder: decode.Decoder(a),
+) -> Result(a, String) {
+  decode.run(uc.inner, decoder)
+  |> result.map_error(fn(errs) {
+    list.map(errs, fn(e) { e.expected <> " at " <> string.inspect(e.path) })
+    |> string.join(", ")
+  })
+}
+
+@external(erlang, "gleam_stdlib", "identity")
+fn coerce_to_dynamic(value: a) -> Dynamic
+
 /// Context for GraphQL execution, including DataLoader instances
 pub type ExecutionContext {
   ExecutionContext(
-    /// Custom user context data
-    user_context: Dynamic,
+    /// Custom user context data. Construct via `schema.user_context(value)`,
+    /// read via `schema.context_accessor` or `schema.read_user_context`.
+    user_context: UserContext,
     /// DataLoader instances for batching and caching
     data_loaders: Dict(String, DataLoader(Dynamic, Dynamic)),
     /// Optional middleware function for field resolution
@@ -290,11 +326,17 @@ pub type ExecutionContext {
   )
 }
 
-/// Information passed to field resolvers
+/// Information passed to field resolvers.
+///
+/// `args` is the typed view; `arguments` is the legacy raw dict. New
+/// resolvers should read via `args.get_string(info.args, "id")` etc.
+/// `arguments` is kept so existing resolvers keep compiling, and so
+/// callers that need to forward the raw dict can.
 pub type ResolverInfo {
   ResolverInfo(
     parent: Option(Dynamic),
     arguments: Dict(String, Dynamic),
+    args: args.Args,
     context: ExecutionContext,
     info: Dynamic,
   )
@@ -302,10 +344,12 @@ pub type ResolverInfo {
 
 // Execution Context helpers
 
-/// Create a new execution context
-pub fn execution_context(user_context: Dynamic) -> ExecutionContext {
+/// Create a new execution context. The `user_context` value can be any
+/// app-defined type; it is wrapped opaquely and surfaced to resolvers via
+/// `context_accessor` / `read_user_context`.
+pub fn execution_context(user_context user_context_value: a) -> ExecutionContext {
   ExecutionContext(
-    user_context: user_context,
+    user_context: UserContext(coerce_to_dynamic(user_context_value)),
     data_loaders: dict.new(),
     middleware_fn: None,
     telemetry: None,
@@ -326,13 +370,7 @@ pub fn execution_context(user_context: Dynamic) -> ExecutionContext {
 pub fn context_accessor(
   decoder: decode.Decoder(a),
 ) -> fn(ExecutionContext) -> Result(a, String) {
-  fn(ctx: ExecutionContext) {
-    decode.run(ctx.user_context, decoder)
-    |> result.map_error(fn(errs) {
-      list.map(errs, fn(e) { e.expected <> " at " <> string.inspect(e.path) })
-      |> string.join(", ")
-    })
-  }
+  fn(ctx: ExecutionContext) { read_user_context(ctx.user_context, decoder) }
 }
 
 /// Set middleware function on an execution context

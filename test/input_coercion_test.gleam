@@ -1,7 +1,7 @@
 import gleam/dict
 import gleeunit/should
-import mochi/ast
 import mochi/input_coercion
+import mochi/internal/ast
 import mochi/schema
 import mochi/types
 
