@@ -100,7 +100,7 @@ pub fn main() {
 
 Mochi is built for performance on the BEAM VM.
 
-**Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · all servers in Docker
+**Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · all servers in Docker · mochi v2.0.0
 
 All servers run in Docker on the same bridge network. wrk runs on the host and hits each container via its mapped port.
 
@@ -110,21 +110,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **22,910** | **4.37ms** |
-| bun + yoga | Bun | 13,412 | 7.44ms |
-| yoga (node) | Node.js | 9,927 | 12.36ms |
-| mercurius | Node.js + Fastify | 4,612 | 30.49ms |
-| apollo | Node.js | 3,487 | 38.74ms |
+| **mochi** | Gleam / BEAM | **17,910** | **5.57ms** |
+| bun + yoga | Bun | 14,017 | 7.12ms |
+| yoga (node) | Node.js | 10,656 | 11.13ms |
+| mercurius | Node.js + Fastify | 5,050 | 29.80ms |
+| apollo | Node.js | 3,963 | 35.29ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **11,647** | **8.56ms** |
-| bun + yoga | Bun | 7,303 | 13.66ms |
-| yoga (node) | Node.js | 4,747 | 24.74ms |
-| mercurius | Node.js + Fastify | 2,719 | 50.89ms |
-| apollo | Node.js | 1,880 | 72.53ms |
+| **mochi** | Gleam / BEAM | **8,967** | **11.12ms** |
+| bun + yoga | Bun | 7,395 | 13.49ms |
+| yoga (node) | Node.js | 5,252 | 22.20ms |
+| mercurius | Node.js + Fastify | 2,891 | 72.57ms |
+| apollo | Node.js | 2,047 | 64.96ms |
 
 ### With document cache — skip parse + validate on repeated queries
 
@@ -132,21 +132,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **19,046** | **5.25ms** |
-| bun + yoga | Bun | 11,037 | 9.04ms |
-| mercurius | Node.js + Fastify | 9,497 | 15.15ms |
-| yoga (node) | Node.js | 8,993 | 11.25ms |
-| apollo | Node.js | 6,778 | 18.29ms |
+| **mochi** | Gleam / BEAM | **16,549** | **6.03ms** |
+| bun + yoga | Bun | 13,248 | 7.54ms |
+| mercurius | Node.js + Fastify | 11,451 | 13.98ms |
+| yoga (node) | Node.js | 10,279 | 11.60ms |
+| apollo | Node.js | 7,491 | 16.61ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **10,601** | **9.41ms** |
-| bun + yoga | Bun | 6,954 | 14.35ms |
-| mercurius | Node.js + Fastify | 4,692 | 25.02ms |
-| yoga (node) | Node.js | 4,618 | 25.42ms |
-| apollo | Node.js | 2,628 | 49.00ms |
+| **mochi** | Gleam / BEAM | **8,654** | **11.46ms** |
+| bun + yoga | Bun | 7,513 | 13.28ms |
+| yoga (node) | Node.js | 5,115 | 23.26ms |
+| mercurius | Node.js + Fastify | 4,904 | 34.59ms |
+| apollo | Node.js | 2,815 | 69.90ms |
 
 ### Why mochi is fast
 
