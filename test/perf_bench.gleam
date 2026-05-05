@@ -702,6 +702,65 @@ pub fn cache_vs_parse_bench_test() {
 }
 
 @target(erlang)
+@external(erlang, "perf_bench_ffi", "concurrent_throughput")
+fn concurrent_throughput(
+  workers: Int,
+  millis: Int,
+  body: fn() -> a,
+) -> Int
+
+@target(erlang)
+pub fn concurrent_cache_vs_parse_bench_test() {
+  io.println("\nconcurrent throughput — 100 workers × 2s")
+
+  let cache = document_cache.new()
+  let assert Ok(doc_small) = parser.parse(small_query)
+  document_cache.put(cache, small_query, doc_small)
+  let assert Ok(doc_big) = parser.parse(big_query)
+  document_cache.put(cache, big_query, doc_big)
+
+  let small_parse_ops =
+    concurrent_throughput(100, 2000, fn() { parser.parse(small_query) })
+  io.println(
+    "  small re-parse  ops="
+    <> int.to_string(small_parse_ops)
+    <> "  ops/sec="
+    <> int.to_string(small_parse_ops / 2),
+  )
+
+  let small_cache_ops =
+    concurrent_throughput(100, 2000, fn() {
+      document_cache.get(cache, small_query)
+    })
+  io.println(
+    "  small cache hit ops="
+    <> int.to_string(small_cache_ops)
+    <> "  ops/sec="
+    <> int.to_string(small_cache_ops / 2),
+  )
+
+  let big_parse_ops =
+    concurrent_throughput(100, 2000, fn() { parser.parse(big_query) })
+  io.println(
+    "  big   re-parse  ops="
+    <> int.to_string(big_parse_ops)
+    <> "  ops/sec="
+    <> int.to_string(big_parse_ops / 2),
+  )
+
+  let big_cache_ops =
+    concurrent_throughput(100, 2000, fn() {
+      document_cache.get(cache, big_query)
+    })
+  io.println(
+    "  big   cache hit ops="
+    <> int.to_string(big_cache_ops)
+    <> "  ops/sec="
+    <> int.to_string(big_cache_ops / 2),
+  )
+}
+
+@target(erlang)
 fn bench_one(label: String, query: String) {
   io.println(
     "\ncache hit vs re-parse — "

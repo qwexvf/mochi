@@ -156,12 +156,16 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 **Flat execution path.** Gleam pattern matching on union types compiles to native BEAM tagged-tuple dispatch. There are no promise chains, middleware stacks, or resolver-wrapping layers.
 
-**Note on the cache results.** The Node.js servers gain 2–3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput is roughly flat with cache enabled — and on these tiny fixture queries can dip slightly. Two reasons:
+**Note on the cache results.** The Node.js servers gain 2–3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput barely moves with cache enabled, and direction can flip between query sizes — see the medians from a 5-run mochi-only sweep at 100 connections × 10s:
 
-1. **The lexer rewrite shrunk parse to ~3 µs on a 46-byte query.** The cache replaces a 3 µs parse with a 250 ns `ets:lookup`, but every hit copies the parsed AST out of ETS into the calling process — for a tiny AST that copy is comparable in cost to just re-parsing fresh.
-2. **Single hot key under 100 concurrent connections** puts every BEAM scheduler on the same ETS hash bucket. The lock contention erases the 3 µs saving.
+| Query | No cache (median) | With cache (median) | Δ |
+|-------|------|------|---|
+| simple (46 bytes) | 17,474 | 16,860 | **−3.5%** |
+| medium (50 bytes, heavier execution) | 7,903 | 8,264 | **+4.6%** |
 
-For a 700-byte query the picture flips: parse costs ~120 µs, ETS lookup is ~2 µs, and the cache is unambiguously a win. The wrk fixture happens to be at the size where caching is break-even. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
+Both gaps are at the edge of run-to-run variance. The reason cache barely helps mochi: after the lexer rewrite, parsing a small query takes ~3 µs out of a ~6 ms request — replacing it with a 250 ns `ets:lookup` saves 0.05% of request time, well below the wrk noise floor. As parse cost scales with query size and complexity, the saving grows; an in-process measurement on a 700-byte query shows parse 122 µs vs cached lookup 2 µs (60× difference) and the cache becomes an unambiguous win.
+
+The cache is therefore mostly useful in mochi for **large queries** (deeply nested, lots of fields, fragments) — exactly the cases where parsing actually costs something. For the small queries common in microservice traffic, mochi's parser is fast enough that caching is unnecessary. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
 
 ### Running the benchmarks
 
