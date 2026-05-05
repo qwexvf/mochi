@@ -100,7 +100,7 @@ pub fn main() {
 
 Mochi is built for performance on the BEAM VM.
 
-**Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · all servers in Docker
+**Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · all servers in Docker · mochi v2.0.0
 
 All servers run in Docker on the same bridge network. wrk runs on the host and hits each container via its mapped port.
 
@@ -110,21 +110,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **22,910** | **4.37ms** |
-| bun + yoga | Bun | 13,412 | 7.44ms |
-| yoga (node) | Node.js | 9,927 | 12.36ms |
-| mercurius | Node.js + Fastify | 4,612 | 30.49ms |
-| apollo | Node.js | 3,487 | 38.74ms |
+| **mochi** | Gleam / BEAM | **16,477** | **6.07ms** |
+| bun + yoga | Bun | 11,970 | 8.39ms |
+| yoga (node) | Node.js | 9,700 | 12.98ms |
+| apollo | Node.js | 3,576 | 43.81ms |
+| mercurius | Node.js + Fastify | 3,307 | 65.78ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **11,647** | **8.56ms** |
-| bun + yoga | Bun | 7,303 | 13.66ms |
-| yoga (node) | Node.js | 4,747 | 24.74ms |
-| mercurius | Node.js + Fastify | 2,719 | 50.89ms |
-| apollo | Node.js | 1,880 | 72.53ms |
+| **mochi** | Gleam / BEAM | **7,522** | **13.26ms** |
+| bun + yoga | Bun | 6,528 | 15.20ms |
+| yoga (node) | Node.js | 4,938 | 24.03ms |
+| mercurius | Node.js + Fastify | 2,834 | 50.33ms |
+| apollo | Node.js | 1,954 | 78.72ms |
 
 ### With document cache — skip parse + validate on repeated queries
 
@@ -132,21 +132,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **19,046** | **5.25ms** |
-| bun + yoga | Bun | 11,037 | 9.04ms |
-| mercurius | Node.js + Fastify | 9,497 | 15.15ms |
-| yoga (node) | Node.js | 8,993 | 11.25ms |
-| apollo | Node.js | 6,778 | 18.29ms |
+| **mochi** | Gleam / BEAM | **16,390** | **6.10ms** |
+| bun + yoga | Bun | 13,379 | 7.47ms |
+| mercurius | Node.js + Fastify | 10,658 | 12.94ms |
+| yoga (node) | Node.js | 8,689 | 13.49ms |
+| apollo | Node.js | 6,415 | 19.42ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **10,601** | **9.41ms** |
-| bun + yoga | Bun | 6,954 | 14.35ms |
-| mercurius | Node.js + Fastify | 4,692 | 25.02ms |
-| yoga (node) | Node.js | 4,618 | 25.42ms |
-| apollo | Node.js | 2,628 | 49.00ms |
+| **mochi** | Gleam / BEAM | **6,718** | **14.85ms** |
+| bun + yoga | Bun | 5,572 | 17.91ms |
+| yoga (node) | Node.js | 4,529 | 25.79ms |
+| mercurius | Node.js + Fastify | 3,773 | 47.90ms |
+| apollo | Node.js | 2,542 | 74.33ms |
 
 ### Why mochi is fast
 
@@ -156,7 +156,16 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 **Flat execution path.** Gleam pattern matching on union types compiles to native BEAM tagged-tuple dispatch. There are no promise chains, middleware stacks, or resolver-wrapping layers.
 
-**Note on the cache results.** The Node.js servers gain 2–3× throughput from document caching (parse/validate is expensive relative to their execution cost). Mochi's throughput is slightly *lower* with cache enabled under 100 concurrent connections — the ETS table becomes a contention point at that concurrency level. The cache pays off at lower concurrency or with a wider variety of unique queries.
+**Note on the cache results.** The Node.js servers gain 2–3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput barely moves with cache enabled, and direction can flip between query sizes — see the medians from a 5-run mochi-only sweep at 100 connections × 10s:
+
+| Query | No cache (median) | With cache (median) | Δ |
+|-------|------|------|---|
+| simple (46 bytes) | 17,474 | 16,860 | **−3.5%** |
+| medium (50 bytes, heavier execution) | 7,903 | 8,264 | **+4.6%** |
+
+Both gaps are at the edge of run-to-run variance. The reason cache barely helps mochi: after the lexer rewrite, parsing a small query takes ~3 µs out of a ~6 ms request — replacing it with a 250 ns `ets:lookup` saves 0.05% of request time, well below the wrk noise floor. As parse cost scales with query size and complexity, the saving grows; an in-process measurement on a 700-byte query shows parse 122 µs vs cached lookup 2 µs (60× difference) and the cache becomes an unambiguous win.
+
+The cache is therefore mostly useful in mochi for **large queries** (deeply nested, lots of fields, fragments) — exactly the cases where parsing actually costs something. For the small queries common in microservice traffic, mochi's parser is fast enough that caching is unnecessary. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
 
 ### Running the benchmarks
 

@@ -26,9 +26,13 @@ import gleam/list
 @target(erlang)
 import gleam/string
 @target(erlang)
+import mochi/document_cache
+@target(erlang)
 import mochi/internal/lexer
 @target(erlang)
 import mochi/json
+@target(erlang)
+import mochi/parser
 @target(erlang)
 import mochi/types
 
@@ -649,5 +653,135 @@ pub fn json_pretty_before_after_test() {
   time_ns("AFTER   structural walk    ", 50, fn() {
     let assert Ok(s) = json.encode_pretty(payload, 2)
     s
+  })
+}
+
+// ===========================================================================
+// Document cache vs re-parse — investigates the wrk benchmark's "cache slower"
+// observation. After the lexer rewrite, parsing a small query is ~30 µs.
+// An ets:lookup must copy the entire AST from the ets heap into the calling
+// process, which can be similar cost or more for compact queries.
+// ===========================================================================
+
+@target(erlang)
+const small_query = "{ users { id name email posts { id title } } }"
+
+@target(erlang)
+const big_query = "
+query Big {
+  users(limit: 100, offset: 0, orderBy: NAME, status: ACTIVE) {
+    id name email phone address city country zip
+    profile { bio avatar website company role joined }
+    posts(first: 20) {
+      edges {
+        cursor
+        node {
+          id title slug excerpt content publishedAt updatedAt
+          author { id name avatar }
+          comments(first: 10) {
+            edges {
+              cursor
+              node { id body createdAt author { id name } }
+            }
+          }
+          tags { id name slug }
+          reactions { likes loves laughs sads }
+        }
+      }
+    }
+    followers(first: 25) { edges { node { id name avatar } } }
+    following(first: 25) { edges { node { id name avatar } } }
+  }
+}
+"
+
+@target(erlang)
+pub fn cache_vs_parse_bench_test() {
+  bench_one("small", small_query)
+  bench_one("big  ", big_query)
+}
+
+@target(erlang)
+@external(erlang, "perf_bench_ffi", "concurrent_throughput")
+fn concurrent_throughput(workers: Int, millis: Int, body: fn() -> a) -> Int
+
+@target(erlang)
+pub fn concurrent_cache_vs_parse_bench_test() {
+  io.println("\nconcurrent throughput — 100 workers × 2s")
+
+  // min_size=0 so both queries actually go through the cache for this bench.
+  let cache = document_cache.new_with_min_size(1000, 0)
+  let assert Ok(doc_small) = parser.parse(small_query)
+  document_cache.put(cache, small_query, doc_small)
+  let assert Ok(doc_big) = parser.parse(big_query)
+  document_cache.put(cache, big_query, doc_big)
+
+  let small_parse_ops =
+    concurrent_throughput(100, 2000, fn() { parser.parse(small_query) })
+  io.println(
+    "  small re-parse  ops="
+    <> int.to_string(small_parse_ops)
+    <> "  ops/sec="
+    <> int.to_string(small_parse_ops / 2),
+  )
+
+  let small_cache_ops =
+    concurrent_throughput(100, 2000, fn() {
+      document_cache.get(cache, small_query)
+    })
+  io.println(
+    "  small cache hit ops="
+    <> int.to_string(small_cache_ops)
+    <> "  ops/sec="
+    <> int.to_string(small_cache_ops / 2),
+  )
+
+  let big_parse_ops =
+    concurrent_throughput(100, 2000, fn() { parser.parse(big_query) })
+  io.println(
+    "  big   re-parse  ops="
+    <> int.to_string(big_parse_ops)
+    <> "  ops/sec="
+    <> int.to_string(big_parse_ops / 2),
+  )
+
+  let big_cache_ops =
+    concurrent_throughput(100, 2000, fn() {
+      document_cache.get(cache, big_query)
+    })
+  io.println(
+    "  big   cache hit ops="
+    <> int.to_string(big_cache_ops)
+    <> "  ops/sec="
+    <> int.to_string(big_cache_ops / 2),
+  )
+}
+
+@target(erlang)
+fn bench_one(label: String, query: String) {
+  io.println(
+    "\ncache hit vs re-parse — "
+    <> label
+    <> " ("
+    <> int.to_string(string.byte_size(query))
+    <> " bytes)",
+  )
+  let _ = parser.parse(query)
+
+  // Construct cache with min_size = 0 so this bench measures the lookup
+  // path itself, not the threshold short-circuit.
+  let cache = document_cache.new_with_min_size(1000, 0)
+  let assert Ok(doc) = parser.parse(query)
+  document_cache.put(cache, query, doc)
+  let _ = document_cache.get(cache, query)
+
+  time_ns("  re-parse each request   ", 5000, fn() {
+    let assert Ok(d) = parser.parse(query)
+    d
+  })
+
+  time_ns("  ets cache hit each req  ", 5000, fn() {
+    let assert Ok(d) = document_cache.get(cache, query)
+    d
   })
 }
