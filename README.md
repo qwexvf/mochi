@@ -91,7 +91,9 @@ pub fn create_schema() -> schema.Schema {
 // 5. Execute queries
 pub fn main() {
   let my_schema = create_schema()
-  let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+  // `execution_context` takes any value — your app's typed context.
+  // Read it back inside resolvers via `schema.context_accessor`.
+  let ctx = schema.execution_context(Nil)
   let result = executor.execute(my_schema, ctx, "{ users { id name } }", dict.new(), option.None)
 }
 ```
@@ -177,7 +179,10 @@ cd examples/mochi_wisp/benchmark
 ## Features
 
 - **Code First Schema Definition** - Define GraphQL schemas using Gleam types with type-safe field extractors
-- **Parse Caching** - ETS-backed document cache avoids re-parsing repeated queries
+- **Typed argument access** - `Args` opaque + `query.get_*` helpers; no raw `Dict(String, Dynamic)` in resolver code
+- **Typed user context** - `schema.UserContext` + `context_accessor` so app context isn't `Dynamic`-shaped at the API level
+- **Fast parser** - byte-level `BitArray` lexer; 985-byte query tokenizes in ~30 µs on Erlang
+- **Parse Caching** - ETS-backed document cache with byte-size threshold; auto-skip for queries small enough that parsing is cheaper than lookup
 - **Batch Execution** - Execute multiple GraphQL requests in one call, with optional parallel dispatch
 - **TypeScript Codegen** - Generate `.d.ts` type definitions from your schema
 - **SDL Generation** - Generate `.graphql` schema files
@@ -372,24 +377,29 @@ let my_schema = query.new()
 
 ### Argument Parsing Helpers
 
-Convenient helpers for extracting arguments in resolvers:
+Resolvers receive arguments as a `mochi/args.Args` opaque type — typed access without exposing `Dict(String, Dynamic)` in your code. Every `query.get_*` helper accepts `Args` directly:
 
 ```gleam
 // Required arguments (return Result)
-query.get_string(args, "name")   // -> Result(String, String)
-query.get_id(args, "id")         // -> Result(String, String)
-query.get_int(args, "age")       // -> Result(Int, String)
-query.get_float(args, "price")   // -> Result(Float, String)
-query.get_bool(args, "active")   // -> Result(Bool, String)
+query.get_string(args, "name")   // -> Result(String, GqlError)
+query.get_id(args, "id")         // -> Result(String, GqlError)
+query.get_int(args, "age")       // -> Result(Int, GqlError)
+query.get_float(args, "price")   // -> Result(Float, GqlError)
+query.get_bool(args, "active")   // -> Result(Bool, GqlError)
 
 // Optional arguments (return Option)
 query.get_optional_string(args, "filter")  // -> Option(String)
 query.get_optional_int(args, "limit")      // -> Option(Int)
 
 // List arguments
-query.get_string_list(args, "tags")  // -> Result(List(String), String)
-query.get_int_list(args, "ids")      // -> Result(List(Int), String)
+query.get_string_list(args, "tags")  // -> Result(List(String), GqlError)
+query.get_int_list(args, "ids")      // -> Result(List(Int), GqlError)
+
+// Decode a nested input object via a stdlib decoder
+query.decode_input(args, "input", input_decoder)  // -> Result(a, GqlError)
 ```
+
+The same accessors are also available without the `GqlError` wrapping in `mochi/args` directly (returning a structured `ArgError`) — useful when you want to translate to your own error type.
 
 ### Decoder Helpers (`mochi/decoders`)
 
@@ -442,6 +452,26 @@ let search = schema.union("SearchResult")
   |> schema.union_member(user_type)
   |> schema.union_member(post_type)
 ```
+
+### User context (`schema.UserContext`)
+
+Resolvers expect a *specific* user-context type — the one your app configured. The execution context wraps that value opaquely so the API doesn't pretend to accept "any data here":
+
+```gleam
+// Construct: pass any app-defined value
+let ctx = schema.execution_context(MyAppContext(user_id: "u1", db: pool))
+
+// Read inside a resolver: define an accessor once, use everywhere
+pub const get_app_ctx = schema.context_accessor(my_app_context_decoder)
+
+fn some_resolver(args, ctx) {
+  use app <- result.try(get_app_ctx(ctx))
+  // app: MyAppContext
+  ...
+}
+```
+
+`schema.user_context(value)` and `schema.read_user_context(uc, decoder)` are the lower-level constructor/reader if you don't want a pre-bound accessor.
 
 ### Custom Directives
 
@@ -526,29 +556,39 @@ let json_string = response.to_json(resp)
 
 ### JSON Serialization (`mochi/json`)
 
-Built-in JSON encoding. See module docs for full API.
+Built-in JSON encoding. Returns `Result` so unsupported runtime shapes (tuples, functions, references, …) surface as errors rather than silently encoding as `null`.
 
 ```gleam
 import mochi/json
 
-let json_string = json.encode(dynamic_value)
+let assert Ok(json_string) = json.encode(dynamic_value)
+let assert Ok(pretty)      = json.encode_pretty(dynamic_value, 2)
+
+// Inspect failures
+case json.encode(value) {
+  Ok(s)    -> use_response(s)
+  Error(e) -> log_error(json.describe_error(e))
+}
 ```
 
 ### Parse Caching (`mochi/document_cache`)
 
-The document cache is enabled automatically when you build a schema with `query.build`. It stores parsed `ast.Document` values in an ETS table (Erlang) or `Map` (JavaScript) keyed by the query string. Repeated requests for the same query skip the parser entirely.
+The document cache is enabled automatically when you build a schema with `query.build`. Parsed `ast.Document` values are stored in an ETS table (Erlang) or `Map` (JavaScript) keyed by the query string. Repeated requests for the same query skip the parser entirely.
 
-The cache is bounded to 1000 entries by default. Once full, new unique queries fall back to parsing without caching.
+After the v2.0 lexer rewrite, parsing a small query (~50 bytes) takes ~3 µs. The cache only pays off when parse cost meaningfully exceeds the lookup + term-copy cost — so by default queries below **200 bytes bypass the cache** and just re-parse. Above the threshold, caching is unambiguously a win (a 700-byte query parses in ~120 µs vs ~2 µs for a hit).
+
+Defaults:
+- max size: **1000 entries** — when full, new unique queries fall back to parsing
+- min size: **200 bytes** — shorter queries skip the cache
 
 ```gleam
 import mochi/document_cache
 
 // Automatic (via query.build — recommended)
 let schema = query.new() |> ... |> query.build
-// Cache is live; no extra config needed
 
-// Manual size override via the low-level schema API
-let cache = document_cache.new_with_max(500)
+// Manual config — for example to cap entries lower or change the threshold
+let cache = document_cache.new_with_min_size(500, 0)  // size 500, no skip
 let schema = schema.schema()
   |> schema.with_document_cache(cache)
   |> ...
@@ -677,7 +717,7 @@ let pokemon_loader = dataloader.int_loader_result(
 )
 
 // Register loaders and load data
-let ctx = schema.execution_context(types.to_dynamic(dict.new()))
+let ctx = schema.execution_context(Nil)
   |> schema.with_loaders([#("pokemon", pokemon_loader)])
 
 let #(ctx, result) = schema.load_by_id(ctx, "pokemon", 25)
@@ -798,21 +838,23 @@ let schema = query.new()
 
 ## Package Structure
 
-Install only the packages you need. `mochi` is on Hex; the companion packages
-will follow:
+Install only the packages you need:
 
 ```sh
-gleam add mochi          # Core (required) — published on Hex
+gleam add mochi              # Core (required)
+gleam add mochi_codegen      # SDL/TS codegen + CLI
+gleam add mochi_relay        # Relay cursor pagination
+gleam add mochi_transport    # graphql-ws + SSE subscriptions
+gleam add mochi_upload       # Multipart file uploads
 ```
-
-Companion packages (publishing to Hex soon — install via git in the meantime):
 
 | Package | Purpose |
 |---------|---------|
-| [`mochi_relay`](https://github.com/qwexvf/mochi_relay) | Relay-style cursor pagination |
-| [`mochi_transport`](https://github.com/qwexvf/mochi_transport) | WebSocket (graphql-ws) + SSE subscriptions |
-| [`mochi_upload`](https://github.com/qwexvf/mochi_upload) | Multipart file uploads |
-| [`mochi_codegen`](https://github.com/qwexvf/mochi_codegen) | SDL + TypeScript codegen + GraphiQL + CLI |
+| [`mochi`](https://hex.pm/packages/mochi) | Core GraphQL engine |
+| [`mochi_codegen`](https://hex.pm/packages/mochi_codegen) | SDL + TypeScript codegen + GraphiQL + CLI |
+| [`mochi_relay`](https://hex.pm/packages/mochi_relay) | Relay-style cursor pagination |
+| [`mochi_transport`](https://hex.pm/packages/mochi_transport) | WebSocket (graphql-ws) + SSE subscriptions |
+| [`mochi_upload`](https://hex.pm/packages/mochi_upload) | Multipart file uploads |
 
 Automatic Persisted Queries (`mochi/apq`) is built into the core — no separate package needed.
 
@@ -820,7 +862,9 @@ Automatic Persisted Queries (`mochi/apq`) is built into the core — no separate
 mochi/                       # Core GraphQL engine
 ├── query.gleam              # Query/Mutation/Subscription builders
 ├── types.gleam              # Type builders (object, enum, fields)
-├── schema.gleam             # Core schema types and low-level API
+├── args.gleam               # Typed Args opaque + accessors
+├── output.gleam             # Typed Value tree used by JSON encoding
+├── schema.gleam             # Core schema types, ExecutionContext, UserContext
 ├── executor.gleam           # Query execution with null propagation
 ├── validation.gleam         # Query validation
 ├── document_cache.gleam     # ETS-backed parse cache (Erlang + JS)
@@ -828,7 +872,14 @@ mochi/                       # Core GraphQL engine
 ├── dataloader.gleam         # N+1 query prevention
 ├── error.gleam              # GraphQL-spec compliant errors
 ├── response.gleam           # Response serialization
-└── security.gleam           # Depth/complexity/alias limits
+├── security.gleam           # Depth/complexity/alias limits
+├── apq.gleam                # Automatic Persisted Queries
+└── internal/                # Parser/lexer/AST/SDL — undocumented surface
+    ├── ast.gleam
+    ├── lexer.gleam
+    ├── sdl_ast.gleam
+    ├── sdl_lexer.gleam
+    └── sdl_parser.gleam
 
 mochi_relay/                 # Relay cursor pagination
 mochi_transport/             # graphql-ws WebSocket + SSE transports + PubSub
