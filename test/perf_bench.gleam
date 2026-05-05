@@ -713,7 +713,8 @@ fn concurrent_throughput(
 pub fn concurrent_cache_vs_parse_bench_test() {
   io.println("\nconcurrent throughput — 100 workers × 2s")
 
-  let cache = document_cache.new()
+  // min_size=0 so both queries actually go through the cache for this bench.
+  let cache = document_cache.new_with_min_size(1000, 0)
   let assert Ok(doc_small) = parser.parse(small_query)
   document_cache.put(cache, small_query, doc_small)
   let assert Ok(doc_big) = parser.parse(big_query)
@@ -769,7 +770,9 @@ fn bench_one(label: String, query: String) {
   )
   let _ = parser.parse(query)
 
-  let cache = document_cache.new()
+  // Construct cache with min_size = 0 so this bench measures the lookup
+  // path itself, not the threshold short-circuit.
+  let cache = document_cache.new_with_min_size(1000, 0)
   let assert Ok(doc) = parser.parse(query)
   document_cache.put(cache, query, doc)
   let _ = document_cache.get(cache, query)

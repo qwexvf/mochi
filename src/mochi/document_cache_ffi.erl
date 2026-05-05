@@ -1,43 +1,42 @@
 -module(document_cache_ffi).
--export([new/1, get/2, put/3, size/1]).
+-export([new/2, get/2, put/3, size/1]).
 
-%% ETS-backed parsed-query cache.
+%% ETS-backed parsed-query cache, with a byte-size threshold.
 %%
-%% Tuned for the common case of many concurrent readers + rare writers
-%% (one write per unique query, then nothing). The flags below all matter
-%% under load:
-%%
-%%   read_concurrency       - per-bucket reader locks instead of one global
-%%   write_concurrency      - even though writes are rare, the option also
-%%                            enables fine-grained meta-info access at
-%%                            read time on modern OTP, removing a hot lock
-%%   decentralized_counters - avoids serializing the table size counter
-%%                            across schedulers (default is `false` for set
-%%                            tables; `true` is essentially free here)
-new(MaxSize) ->
+%% Cache hits are only ~3 µs cheaper than parsing on small queries (post
+%% lexer-rewrite parser). For queries below `MinSize` bytes the lookup
+%% overhead can match or exceed the saving, so we skip the cache entirely
+%% — both reads and writes — keeping the table populated only with
+%% entries where caching pays off.
+new(MaxSize, MinSize) ->
     Table = ets:new(mochi_document_cache, [
         set, public,
         {read_concurrency, true},
         {write_concurrency, true},
         {decentralized_counters, true}
     ]),
-    {document_cache, Table, MaxSize}.
+    {document_cache, Table, MaxSize, MinSize}.
 
-%% `lookup_element/4` returns the value directly and skips allocating the
-%% list+tuple wrapper that `lookup/2` produces on the calling process heap.
-%% On miss it returns the supplied default atom — no exception path.
-get({document_cache, Table, _MaxSize}, Key) ->
+get({document_cache, _Table, _MaxSize, MinSize}, Key)
+        when byte_size(Key) < MinSize ->
+    %% Below threshold — let the caller re-parse, it's faster than the
+    %% ets lookup + term copy.
+    {error, nil};
+get({document_cache, Table, _MaxSize, _MinSize}, Key) ->
     case ets:lookup_element(Table, Key, 2, '$cache_miss') of
         '$cache_miss' -> {error, nil};
         Value         -> {ok, Value}
     end.
 
-put({document_cache, Table, MaxSize}, Key, Value) ->
+put({document_cache, _Table, _MaxSize, MinSize}, Key, _Value)
+        when byte_size(Key) < MinSize ->
+    nil;
+put({document_cache, Table, MaxSize, _MinSize}, Key, Value) ->
     case ets:info(Table, size) < MaxSize of
         true  -> ets:insert(Table, {Key, Value});
         false -> ok
     end,
     nil.
 
-size({document_cache, Table, _MaxSize}) ->
+size({document_cache, Table, _MaxSize, _MinSize}) ->
     ets:info(Table, size).
