@@ -703,11 +703,7 @@ pub fn cache_vs_parse_bench_test() {
 
 @target(erlang)
 @external(erlang, "perf_bench_ffi", "concurrent_throughput")
-fn concurrent_throughput(
-  workers: Int,
-  millis: Int,
-  body: fn() -> a,
-) -> Int
+fn concurrent_throughput(workers: Int, millis: Int, body: fn() -> a) -> Int
 
 @target(erlang)
 pub fn concurrent_cache_vs_parse_bench_test() {
@@ -766,7 +762,9 @@ fn bench_one(label: String, query: String) {
   io.println(
     "\ncache hit vs re-parse — "
     <> label
-    <> " (" <> int.to_string(string.byte_size(query)) <> " bytes)",
+    <> " ("
+    <> int.to_string(string.byte_size(query))
+    <> " bytes)",
   )
   let _ = parser.parse(query)
 
