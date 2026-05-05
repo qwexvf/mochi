@@ -4,6 +4,9 @@
 
 Tighten the public API and rewrite the lexer + JSON hot paths.
 
+Thanks to [@lpil](https://github.com/lpil) for the reviews that drove
+these changes.
+
 ### Breaking
 
 - `json.encode` and `json.encode_pretty` return `Result(String, EncodeError)`.
