@@ -110,21 +110,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **17,910** | **5.57ms** |
-| bun + yoga | Bun | 14,017 | 7.12ms |
-| yoga (node) | Node.js | 10,656 | 11.13ms |
-| mercurius | Node.js + Fastify | 5,050 | 29.80ms |
-| apollo | Node.js | 3,963 | 35.29ms |
+| **mochi** | Gleam / BEAM | **16,477** | **6.07ms** |
+| bun + yoga | Bun | 11,970 | 8.39ms |
+| yoga (node) | Node.js | 9,700 | 12.98ms |
+| apollo | Node.js | 3,576 | 43.81ms |
+| mercurius | Node.js + Fastify | 3,307 | 65.78ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **8,967** | **11.12ms** |
-| bun + yoga | Bun | 7,395 | 13.49ms |
-| yoga (node) | Node.js | 5,252 | 22.20ms |
-| mercurius | Node.js + Fastify | 2,891 | 72.57ms |
-| apollo | Node.js | 2,047 | 64.96ms |
+| **mochi** | Gleam / BEAM | **7,522** | **13.26ms** |
+| bun + yoga | Bun | 6,528 | 15.20ms |
+| yoga (node) | Node.js | 4,938 | 24.03ms |
+| mercurius | Node.js + Fastify | 2,834 | 50.33ms |
+| apollo | Node.js | 1,954 | 78.72ms |
 
 ### With document cache — skip parse + validate on repeated queries
 
@@ -132,21 +132,21 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **16,549** | **6.03ms** |
-| bun + yoga | Bun | 13,248 | 7.54ms |
-| mercurius | Node.js + Fastify | 11,451 | 13.98ms |
-| yoga (node) | Node.js | 10,279 | 11.60ms |
-| apollo | Node.js | 7,491 | 16.61ms |
+| **mochi** | Gleam / BEAM | **16,390** | **6.10ms** |
+| bun + yoga | Bun | 13,379 | 7.47ms |
+| mercurius | Node.js + Fastify | 10,658 | 12.94ms |
+| yoga (node) | Node.js | 8,689 | 13.49ms |
+| apollo | Node.js | 6,415 | 19.42ms |
 
 #### Medium query: `{ users { id name email posts { id title } } }`
 
 | Server | Runtime | Req/sec | Latency |
 |--------|---------|---------|---------|
-| **mochi** | Gleam / BEAM | **8,654** | **11.46ms** |
-| bun + yoga | Bun | 7,513 | 13.28ms |
-| yoga (node) | Node.js | 5,115 | 23.26ms |
-| mercurius | Node.js + Fastify | 4,904 | 34.59ms |
-| apollo | Node.js | 2,815 | 69.90ms |
+| **mochi** | Gleam / BEAM | **6,718** | **14.85ms** |
+| bun + yoga | Bun | 5,572 | 17.91ms |
+| yoga (node) | Node.js | 4,529 | 25.79ms |
+| mercurius | Node.js + Fastify | 3,773 | 47.90ms |
+| apollo | Node.js | 2,542 | 74.33ms |
 
 ### Why mochi is fast
 
@@ -156,7 +156,12 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 **Flat execution path.** Gleam pattern matching on union types compiles to native BEAM tagged-tuple dispatch. There are no promise chains, middleware stacks, or resolver-wrapping layers.
 
-**Note on the cache results.** The Node.js servers gain 2–3× throughput from document caching (parse/validate is expensive relative to their execution cost). Mochi's throughput is slightly *lower* with cache enabled under 100 concurrent connections — the ETS table becomes a contention point at that concurrency level. The cache pays off at lower concurrency or with a wider variety of unique queries.
+**Note on the cache results.** The Node.js servers gain 2–3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput is roughly flat with cache enabled — and on these tiny fixture queries can dip slightly. Two reasons:
+
+1. **The lexer rewrite shrunk parse to ~3 µs on a 46-byte query.** The cache replaces a 3 µs parse with a 250 ns `ets:lookup`, but every hit copies the parsed AST out of ETS into the calling process — for a tiny AST that copy is comparable in cost to just re-parsing fresh.
+2. **Single hot key under 100 concurrent connections** puts every BEAM scheduler on the same ETS hash bucket. The lock contention erases the 3 µs saving.
+
+For a 700-byte query the picture flips: parse costs ~120 µs, ETS lookup is ~2 µs, and the cache is unambiguously a win. The wrk fixture happens to be at the size where caching is break-even. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
 
 ### Running the benchmarks
 
