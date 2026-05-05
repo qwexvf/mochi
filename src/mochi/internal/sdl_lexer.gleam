@@ -109,10 +109,7 @@ pub fn next_sdl_token(
     <<")":utf8, rest:bits>> ->
       Ok(#(SdlTokenWithPosition(RightParen, position), advance(lexer, rest, 1)))
     <<"[":utf8, rest:bits>> ->
-      Ok(#(
-        SdlTokenWithPosition(LeftBracket, position),
-        advance(lexer, rest, 1),
-      ))
+      Ok(#(SdlTokenWithPosition(LeftBracket, position), advance(lexer, rest, 1)))
     <<"]":utf8, rest:bits>> ->
       Ok(#(
         SdlTokenWithPosition(RightBracket, position),
@@ -132,16 +129,13 @@ pub fn next_sdl_token(
       Ok(#(SdlTokenWithPosition(Amp, position), advance(lexer, rest, 1)))
     <<"\"\"\"":utf8, rest:bits>> ->
       read_description(advance(lexer, rest, 3), position)
-    <<"\"":utf8, rest:bits>> ->
-      read_string(advance(lexer, rest, 1), position)
-    <<"#":utf8, rest:bits>> ->
-      read_comment(advance(lexer, rest, 1), position)
+    <<"\"":utf8, rest:bits>> -> read_string(advance(lexer, rest, 1), position)
+    <<"#":utf8, rest:bits>> -> read_comment(advance(lexer, rest, 1), position)
     <<"-":utf8, _:bits>> -> read_number(lexer, position)
     <<b, _:bits>> if b >= 48 && b <= 57 -> read_number(lexer, position)
     <<b, _:bits>> if b >= 97 && b <= 122 ->
       read_name_or_keyword(lexer, position)
-    <<b, _:bits>> if b >= 65 && b <= 90 ->
-      read_name_or_keyword(lexer, position)
+    <<b, _:bits>> if b >= 65 && b <= 90 -> read_name_or_keyword(lexer, position)
     <<95, _:bits>> -> read_name_or_keyword(lexer, position)
     <<b, _:bits>> -> Error(UnexpectedCharacter(byte_to_string(b), position))
     _ -> Error(UnexpectedCharacter("", position))
@@ -176,7 +170,11 @@ fn read_name_or_keyword(
   let assert Ok(slice) = bit_array.slice(lexer.remaining, 0, len)
   let assert Ok(name) = bit_array.to_string(slice)
   let new_lexer =
-    SdlLexerState(drop_bytes(lexer.remaining, len), lexer.line, lexer.column + len)
+    SdlLexerState(
+      drop_bytes(lexer.remaining, len),
+      lexer.line,
+      lexer.column + len,
+    )
   let token = case name {
     "type" -> Type
     "interface" -> Interface
@@ -259,10 +257,7 @@ fn read_description_loop(
   case lexer.remaining {
     <<"\"\"\"":utf8, rest:bits>> ->
       Ok(#(
-        SdlTokenWithPosition(
-          Description(string_tree.to_string(acc)),
-          position,
-        ),
+        SdlTokenWithPosition(Description(string_tree.to_string(acc)), position),
         advance(lexer, rest, 3),
       ))
     <<>> -> Error(UnterminatedDescription(position))

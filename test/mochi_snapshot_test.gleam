@@ -15,13 +15,13 @@ import gleeunit
 @target(erlang)
 import mochi/error
 @target(erlang)
+import mochi/internal/sdl_parser
+@target(erlang)
 import mochi/json
 @target(erlang)
 import mochi/response
 @target(erlang)
 import mochi/schema
-@target(erlang)
-import mochi/internal/sdl_parser
 @target(erlang)
 import mochi/types
 

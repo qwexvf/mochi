@@ -955,7 +955,6 @@ fn serialize_default_value(default_value: Option(Dynamic)) -> Dynamic {
   }
 }
 
-
 pub fn build_field_type_introspection(
   schema_def: schema.Schema,
   field_type: schema.FieldType,

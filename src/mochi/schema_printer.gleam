@@ -7,10 +7,10 @@ import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/string
 import mochi/output.{
   type Value, VBool, VFloat, VInt, VList, VNull, VObject, VString,
 }
-import gleam/string
 import mochi/schema
 
 /// Print a schema to SDL format

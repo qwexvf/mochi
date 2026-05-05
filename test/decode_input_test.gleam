@@ -47,7 +47,10 @@ pub fn decode_input_missing_test() {
 }
 
 pub fn get_dynamic_present_test() {
-  let args = args.from_dict(dict.from_list([#("file", types.to_dynamic("path/to/file"))]))
+  let args =
+    args.from_dict(
+      dict.from_list([#("file", types.to_dynamic("path/to/file"))]),
+    )
   case query.get_dynamic(args, "file") {
     Ok(_) -> Nil
     Error(e) -> panic as { "Should find dynamic value: " <> e.message }

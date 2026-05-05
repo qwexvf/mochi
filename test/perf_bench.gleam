@@ -26,9 +26,9 @@ import gleam/list
 @target(erlang)
 import gleam/string
 @target(erlang)
-import mochi/json
-@target(erlang)
 import mochi/internal/lexer
+@target(erlang)
+import mochi/json
 @target(erlang)
 import mochi/types
 
@@ -142,8 +142,7 @@ query LargeBenchQuery($id: ID!, $limit: Int = 50, $cursor: String) {
 pub fn lexer_tokenize_bench_test() {
   io.println("\nlexer.tokenize")
   io.println(
-    "  query bytes = "
-    <> int.to_string(string.byte_size(sample_query)),
+    "  query bytes = " <> int.to_string(string.byte_size(sample_query)),
   )
   // warmup
   let _ = lexer.tokenize(sample_query)
@@ -171,7 +170,10 @@ fn build_sample_response() -> dynamic.Dynamic {
       types.to_dynamic(
         dict.from_list([
           #("id", types.to_dynamic("c-" <> int.to_string(i))),
-          #("body", types.to_dynamic("This is comment number " <> int.to_string(i))),
+          #(
+            "body",
+            types.to_dynamic("This is comment number " <> int.to_string(i)),
+          ),
           #(
             "author",
             types.to_dynamic(
@@ -241,11 +243,7 @@ pub fn json_pretty_bench_test() {
   let payload = build_sample_response()
   let assert Ok(out) = json.encode_pretty(payload, 2)
   io.println("  output bytes = " <> int.to_string(string.byte_size(out)))
-  time_ns(
-    "encode_pretty",
-    200,
-    fn() { json.encode_pretty(payload, 2) },
-  )
+  time_ns("encode_pretty", 200, fn() { json.encode_pretty(payload, 2) })
 }
 
 // ===========================================================================
@@ -426,7 +424,8 @@ fn old_advance(s: OldState) -> OldState {
 @target(erlang)
 fn old_skip_ws(s: OldState) -> OldState {
   case old_peek(s) {
-    Ok(" ") | Ok("\t") | Ok("\n") | Ok("\r") | Ok(",") -> old_skip_ws(old_advance(s))
+    Ok(" ") | Ok("\t") | Ok("\n") | Ok("\r") | Ok(",") ->
+      old_skip_ws(old_advance(s))
     _ -> s
   }
 }
@@ -442,13 +441,68 @@ fn old_is_digit(c: String) -> Bool {
 @target(erlang)
 fn old_is_name_continue(c: String) -> Bool {
   case c {
-    "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
-    | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
-    | "u" | "v" | "w" | "x" | "y" | "z"
-    | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
-    | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
-    | "U" | "V" | "W" | "X" | "Y" | "Z"
-    | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o"
+    | "p"
+    | "q"
+    | "r"
+    | "s"
+    | "t"
+    | "u"
+    | "v"
+    | "w"
+    | "x"
+    | "y"
+    | "z"
+    | "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O"
+    | "P"
+    | "Q"
+    | "R"
+    | "S"
+    | "T"
+    | "U"
+    | "V"
+    | "W"
+    | "X"
+    | "Y"
+    | "Z"
+    | "0"
+    | "1"
+    | "2"
+    | "3"
+    | "4"
+    | "5"
+    | "6"
+    | "7"
+    | "8"
+    | "9"
     | "_" -> True
     _ -> False
   }
@@ -493,11 +547,31 @@ fn old_next(s: OldState) -> #(OldTok, OldState) {
     Error(_) -> #(OldEOF, s)
     Ok(c) ->
       case c {
-        "{" | "}" | "(" | ")" | "[" | "]" | ":" | "!" | "=" | "@" | "|" | "&"
+        "{"
+        | "}"
+        | "("
+        | ")"
+        | "["
+        | "]"
+        | ":"
+        | "!"
+        | "="
+        | "@"
+        | "|"
+        | "&"
         | "$" -> #(OldPunct(c), old_advance(s))
         "\"" -> old_read_string(old_advance(s), "")
-        c if c == "0" || c == "1" || c == "2" || c == "3" || c == "4"
-          || c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
+        c
+          if c == "0"
+          || c == "1"
+          || c == "2"
+          || c == "3"
+          || c == "4"
+          || c == "5"
+          || c == "6"
+          || c == "7"
+          || c == "8"
+          || c == "9"
         -> {
           let #(num_str, s2) = old_read_while(s, old_is_digit, "")
           case int.parse(num_str) {
@@ -537,11 +611,17 @@ fn old_tokenize_loop(s: OldState, acc: List(OldTok)) -> List(OldTok) {
 
 @target(erlang)
 pub fn lexer_before_after_test() {
-  io.println("\nlexer.tokenize  before/after on " <> int.to_string(string.byte_size(sample_query)) <> "-byte query")
+  io.println(
+    "\nlexer.tokenize  before/after on "
+    <> int.to_string(string.byte_size(sample_query))
+    <> "-byte query",
+  )
   let _ = old_tokenize(sample_query)
   let _ = lexer.tokenize(sample_query)
   time_ns("BEFORE  string.slice + <> ", 200, fn() { old_tokenize(sample_query) })
-  time_ns("AFTER   BitArray match     ", 200, fn() { lexer.tokenize(sample_query) })
+  time_ns("AFTER   BitArray match     ", 200, fn() {
+    lexer.tokenize(sample_query)
+  })
 }
 
 @target(erlang)
@@ -563,7 +643,9 @@ pub fn json_pretty_before_after_test() {
   let payload = build_sample_response()
   let _ = old_encode_pretty(payload, 2)
   let assert Ok(_) = json.encode_pretty(payload, 2)
-  time_ns("BEFORE  grapheme reparse   ", 50, fn() { old_encode_pretty(payload, 2) })
+  time_ns("BEFORE  grapheme reparse   ", 50, fn() {
+    old_encode_pretty(payload, 2)
+  })
   time_ns("AFTER   structural walk    ", 50, fn() {
     let assert Ok(s) = json.encode_pretty(payload, 2)
     s

@@ -11,12 +11,12 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import mochi/args
-import mochi/internal/ast
 import mochi/document_cache
 import mochi/error as graphql_error
 import mochi/input_coercion
-import mochi/introspection
+import mochi/internal/ast
 import mochi/internal/lexer
+import mochi/introspection
 import mochi/parser
 import mochi/schema
 import mochi/telemetry

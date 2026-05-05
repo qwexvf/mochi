@@ -3,8 +3,8 @@
 //// This module re-exports the most common entry points. See
 //// `mochi/query`, `mochi/types`, and `mochi/schema` for the full API.
 
-import mochi/internal/ast
 import mochi/executor
+import mochi/internal/ast
 import mochi/parser
 import mochi/query as mochi_query
 import mochi/schema

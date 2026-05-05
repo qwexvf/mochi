@@ -175,9 +175,7 @@ pub type FieldDefinition {
     deprecation_reason: Option(String),
     /// Optional topic resolver for subscription fields.
     /// Maps resolved arguments + context to a pub/sub topic string.
-    topic_fn: Option(
-      fn(args.Args, ExecutionContext) -> Result(String, String),
-    ),
+    topic_fn: Option(fn(args.Args, ExecutionContext) -> Result(String, String)),
     rich_resolver: Option(RichResolver),
   )
 }

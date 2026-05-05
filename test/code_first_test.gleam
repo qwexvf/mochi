@@ -514,7 +514,8 @@ pub fn aliased_duplicate_field_test() {
 // ============================================================================
 
 pub fn get_string_or_present_test() {
-  let args = args_mod.from_dict(dict.from_list([#("name", types.to_dynamic("Alice"))]))
+  let args =
+    args_mod.from_dict(dict.from_list([#("name", types.to_dynamic("Alice"))]))
   let result = query.get_string_or(args, "name", "Default")
   case result == "Alice" {
     True -> Nil
@@ -532,7 +533,8 @@ pub fn get_string_or_missing_test() {
 }
 
 pub fn get_int_or_present_test() {
-  let args = args_mod.from_dict(dict.from_list([#("limit", types.to_dynamic(25))]))
+  let args =
+    args_mod.from_dict(dict.from_list([#("limit", types.to_dynamic(25))]))
   let result = query.get_int_or(args, "limit", 10)
   case result == 25 {
     True -> Nil
@@ -550,7 +552,8 @@ pub fn get_int_or_missing_test() {
 }
 
 pub fn get_float_or_present_test() {
-  let args = args_mod.from_dict(dict.from_list([#("price", types.to_dynamic(19.99))]))
+  let args =
+    args_mod.from_dict(dict.from_list([#("price", types.to_dynamic(19.99))]))
   let result = query.get_float_or(args, "price", 0.0)
   case result == 19.99 {
     True -> Nil
@@ -568,7 +571,8 @@ pub fn get_float_or_missing_test() {
 }
 
 pub fn get_bool_or_present_test() {
-  let args = args_mod.from_dict(dict.from_list([#("active", types.to_dynamic(False))]))
+  let args =
+    args_mod.from_dict(dict.from_list([#("active", types.to_dynamic(False))]))
   let result = query.get_bool_or(args, "active", True)
   case result == False {
     True -> Nil
@@ -586,7 +590,8 @@ pub fn get_bool_or_missing_test() {
 }
 
 pub fn get_id_or_present_test() {
-  let args = args_mod.from_dict(dict.from_list([#("id", types.to_dynamic("user-123"))]))
+  let args =
+    args_mod.from_dict(dict.from_list([#("id", types.to_dynamic("user-123"))]))
   let result = query.get_id_or(args, "id", "default-id")
   case result == "user-123" {
     True -> Nil

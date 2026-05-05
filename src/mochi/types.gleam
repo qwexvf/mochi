@@ -140,8 +140,7 @@ pub type TypeField(a) {
     description: Option(String),
     field_type: FieldType,
     args: List(ArgumentDefinition),
-    resolver: fn(a, args_mod.Args, ExecutionContext) ->
-      Result(Dynamic, String),
+    resolver: fn(a, args_mod.Args, ExecutionContext) -> Result(Dynamic, String),
     is_deprecated: Bool,
     deprecation_reason: Option(String),
   )
@@ -880,11 +879,7 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
           Some(parent_dyn) ->
-            field_resolver(
-              unsafe_coerce(parent_dyn),
-              info.args,
-              info.context,
-            )
+            field_resolver(unsafe_coerce(parent_dyn), info.args, info.context)
           None -> Error("No parent value")
         }
       }

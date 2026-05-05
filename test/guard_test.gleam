@@ -2,10 +2,10 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import mochi/args
 import gleam/list
 import gleam/option.{None}
 import gleeunit/should
+import mochi/args
 import mochi/executor
 import mochi/query
 import mochi/schema

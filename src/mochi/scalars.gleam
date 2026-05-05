@@ -48,9 +48,7 @@ pub fn date_time() -> ScalarType {
         Error(_) -> False
       }
       let valid =
-        len > 0
-        && { string.contains(s, "T") || len == 10 }
-        && starts_with_digit
+        len > 0 && { string.contains(s, "T") || len == 10 } && starts_with_digit
       case valid {
         True -> Ok(s)
         False -> Error("DateTime must be a valid ISO 8601 string")

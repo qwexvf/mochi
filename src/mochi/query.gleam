@@ -155,8 +155,7 @@ pub fn query_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  resolve resolver: fn(Args, ExecutionContext) ->
-    Result(result, GqlError),
+  resolve resolver: fn(Args, ExecutionContext) -> Result(result, GqlError),
 ) -> QueryOp(result) {
   Op(
     name: name,
@@ -195,8 +194,7 @@ pub fn mutation_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  resolve resolver: fn(Args, ExecutionContext) ->
-    Result(result, GqlError),
+  resolve resolver: fn(Args, ExecutionContext) -> Result(result, GqlError),
 ) -> MutationOp(result) {
   Op(
     name: name,
@@ -237,8 +235,7 @@ pub fn subscription_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  topic topic_resolver: fn(Args, ExecutionContext) ->
-    Result(String, GqlError),
+  topic topic_resolver: fn(Args, ExecutionContext) -> Result(String, GqlError),
 ) -> SubscriptionOp(event) {
   Op(
     name: name,
@@ -360,8 +357,7 @@ fn try_any(
 
 fn apply_gql_guards(
   guards: List(Guard),
-  resolver: fn(Args, ExecutionContext) ->
-    Result(result, GqlError),
+  resolver: fn(Args, ExecutionContext) -> Result(result, GqlError),
 ) -> fn(Args, ExecutionContext) -> Result(result, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
@@ -375,8 +371,7 @@ fn apply_gql_guards(
 
 fn apply_topic_guards(
   guards: List(Guard),
-  resolver: fn(Args, ExecutionContext) ->
-    Result(String, GqlError),
+  resolver: fn(Args, ExecutionContext) -> Result(String, GqlError),
 ) -> fn(Args, ExecutionContext) -> Result(String, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
@@ -392,8 +387,7 @@ fn apply_parent_gql_guards(
   guards: List(Guard),
   resolver: fn(Option(Dynamic), Args, ExecutionContext) ->
     Result(result, GqlError),
-) -> fn(Option(Dynamic), Args, ExecutionContext) ->
-  Result(result, GqlError) {
+) -> fn(Option(Dynamic), Args, ExecutionContext) -> Result(result, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(parent, args, ctx) {
       case g(ctx) {
@@ -508,7 +502,10 @@ pub fn get_optional_bool(args: Args, key: String) -> Option(Bool) {
   args_mod.get_optional_bool(args, key)
 }
 
-pub fn get_string_list(args: Args, key: String) -> Result(List(String), GqlError) {
+pub fn get_string_list(
+  args: Args,
+  key: String,
+) -> Result(List(String), GqlError) {
   args_mod.get_string_list(args, key) |> result.map_error(arg_to_gql)
 }
 
@@ -558,8 +555,7 @@ pub fn get_bool_or(args: Args, key: String, default: Bool) -> Bool {
 // ============================================================================
 
 fn build_gql_resolver(
-  resolver: fn(Args, ExecutionContext) ->
-    Result(result, GqlError),
+  resolver: fn(Args, ExecutionContext) -> Result(result, GqlError),
   result_encoder: fn(result) -> Dynamic,
 ) -> schema.RichResolver {
   fn(info: ResolverInfo) {

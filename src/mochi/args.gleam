@@ -119,11 +119,7 @@ fn required(
   }
 }
 
-fn optional(
-  a: Args,
-  key: String,
-  decoder: decode.Decoder(b),
-) -> Option(b) {
+fn optional(a: Args, key: String, decoder: decode.Decoder(b)) -> Option(b) {
   case dict.get(a.inner, key) {
     Error(_) -> None
     Ok(value) ->

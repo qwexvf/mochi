@@ -7,8 +7,8 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleeunit/should
 import mochi/args
-import mochi/internal/ast
 import mochi/executor
+import mochi/internal/ast
 import mochi/middleware
 import mochi/parser
 import mochi/query

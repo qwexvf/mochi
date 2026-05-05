@@ -133,8 +133,7 @@ pub fn next_token(
     <<".":utf8, _:bits>> -> Error(UnexpectedCharacter(".", position))
     <<"\"\"\"":utf8, rest:bits>> ->
       read_block_string(advance(lexer, rest, 3), position)
-    <<"\"":utf8, rest:bits>> ->
-      read_string(advance(lexer, rest, 1), position)
+    <<"\"":utf8, rest:bits>> -> read_string(advance(lexer, rest, 1), position)
     <<"-":utf8, _:bits>> -> read_negative_number(lexer, position)
     <<b, _:bits>> if b >= 48 && b <= 57 -> read_number(lexer, position, "")
     // a-z | A-Z | _
@@ -152,14 +151,10 @@ pub fn next_token(
 
 fn skip_whitespace(lexer: LexerState) -> LexerState {
   case lexer.remaining {
-    <<" ":utf8, rest:bits>> ->
-      skip_whitespace(advance(lexer, rest, 1))
-    <<"\t":utf8, rest:bits>> ->
-      skip_whitespace(advance(lexer, rest, 1))
-    <<"\r":utf8, rest:bits>> ->
-      skip_whitespace(advance(lexer, rest, 1))
-    <<",":utf8, rest:bits>> ->
-      skip_whitespace(advance(lexer, rest, 1))
+    <<" ":utf8, rest:bits>> -> skip_whitespace(advance(lexer, rest, 1))
+    <<"\t":utf8, rest:bits>> -> skip_whitespace(advance(lexer, rest, 1))
+    <<"\r":utf8, rest:bits>> -> skip_whitespace(advance(lexer, rest, 1))
+    <<",":utf8, rest:bits>> -> skip_whitespace(advance(lexer, rest, 1))
     <<"\n":utf8, rest:bits>> ->
       skip_whitespace(LexerState(rest, lexer.line + 1, 1))
     <<"#":utf8, rest:bits>> ->
@@ -227,7 +222,8 @@ fn read_negative_number(
 ) -> Result(#(TokenWithPosition, LexerState), LexerError) {
   case lexer.remaining {
     <<"-":utf8, b, _:bits>> if b >= 48 && b <= 57 -> {
-      let assert Ok(rest) = bit_array.slice(lexer.remaining, 1, byte_size_of(lexer.remaining) - 1)
+      let assert Ok(rest) =
+        bit_array.slice(lexer.remaining, 1, byte_size_of(lexer.remaining) - 1)
       read_number(advance(lexer, rest, 1), position, "-")
     }
     _ -> Error(UnexpectedCharacter("-", position))
@@ -249,7 +245,11 @@ fn read_number(
       let frac_digits = scan_digits(drop_bytes(after_int, 1), 0)
       let assert Ok(frac_slice) = bit_array.slice(after_int, 1, frac_digits)
       let assert Ok(frac_str) = bit_array.to_string(frac_slice)
-      #("." <> frac_str, drop_bytes(after_int, 1 + frac_digits), 1 + frac_digits)
+      #(
+        "." <> frac_str,
+        drop_bytes(after_int, 1 + frac_digits),
+        1 + frac_digits,
+      )
     }
     _ -> #("", after_int, 0)
   }
@@ -312,7 +312,8 @@ fn read_exponent(input: BitArray, e_char: String) -> #(String, BitArray, Int) {
 
 fn scan_digits(b: BitArray, acc: Int) -> Int {
   case b {
-    <<byte, rest:bits>> if byte >= 48 && byte <= 57 -> scan_digits(rest, acc + 1)
+    <<byte, rest:bits>> if byte >= 48 && byte <= 57 ->
+      scan_digits(rest, acc + 1)
     _ -> acc
   }
 }
@@ -344,9 +345,17 @@ fn read_string_loop(
       let lexer = advance(lexer, rest, 1)
       case lexer.remaining {
         <<"\"":utf8, r:bits>> ->
-          read_string_loop(advance(lexer, r, 1), position, append_str(acc, "\""))
+          read_string_loop(
+            advance(lexer, r, 1),
+            position,
+            append_str(acc, "\""),
+          )
         <<"\\":utf8, r:bits>> ->
-          read_string_loop(advance(lexer, r, 1), position, append_str(acc, "\\"))
+          read_string_loop(
+            advance(lexer, r, 1),
+            position,
+            append_str(acc, "\\"),
+          )
         <<"/":utf8, r:bits>> ->
           read_string_loop(advance(lexer, r, 1), position, append_str(acc, "/"))
         <<"b":utf8, r:bits>> ->
@@ -362,11 +371,23 @@ fn read_string_loop(
             append_str(acc, "\u{000C}"),
           )
         <<"n":utf8, r:bits>> ->
-          read_string_loop(advance(lexer, r, 1), position, append_str(acc, "\n"))
+          read_string_loop(
+            advance(lexer, r, 1),
+            position,
+            append_str(acc, "\n"),
+          )
         <<"r":utf8, r:bits>> ->
-          read_string_loop(advance(lexer, r, 1), position, append_str(acc, "\r"))
+          read_string_loop(
+            advance(lexer, r, 1),
+            position,
+            append_str(acc, "\r"),
+          )
         <<"t":utf8, r:bits>> ->
-          read_string_loop(advance(lexer, r, 1), position, append_str(acc, "\t"))
+          read_string_loop(
+            advance(lexer, r, 1),
+            position,
+            append_str(acc, "\t"),
+          )
         <<"u":utf8, r:bits>> ->
           read_unicode_escape(advance(lexer, r, 1), position, acc)
         _ -> Error(UnterminatedString(position))
@@ -382,8 +403,7 @@ fn read_string_loop(
       // strings, but still cheap
       let #(new_line, new_col) =
         advance_line_col(slice, lexer.line, lexer.column)
-      let next =
-        LexerState(drop_bytes(lexer.remaining, run), new_line, new_col)
+      let next = LexerState(drop_bytes(lexer.remaining, run), new_line, new_col)
       read_string_loop(next, position, append_str(acc, text))
     }
   }
@@ -596,4 +616,3 @@ fn byte_to_string(b: Int) -> String {
     Error(_) -> ""
   }
 }
-
