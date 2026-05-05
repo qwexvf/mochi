@@ -6,7 +6,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
-import mochi/ast
+import mochi/internal/ast
 import mochi/executor
 import mochi/parser
 import mochi/query

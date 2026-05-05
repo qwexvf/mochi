@@ -3,11 +3,13 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
+import mochi/output.{
+  type Value, VBool, VFloat, VInt, VList, VNull, VObject, VString,
+}
 import gleam/string
 import mochi/schema
 
@@ -301,39 +303,39 @@ fn print_description_inline(desc: String) -> String {
   "# " <> desc
 }
 
-/// Print a Dynamic value in GraphQL SDL format
+/// Print a Dynamic value in GraphQL SDL format. Uses a single
+/// classification pass via `output.from_dynamic` instead of a cascade of
+/// decoders, and walks the typed value tree to produce SDL.
+///
+/// Unrepresentable runtime shapes degrade to `null` rather than panicking
+/// (SDL printing is best-effort here — it's only used for default-value
+/// rendering, where the worst case is a slightly less informative
+/// schema dump). The proper fix is to type the default-value field at
+/// the schema level, which is on the migration list in AGENTS.md.
 fn print_value(value: Dynamic) -> String {
-  // Try to decode as various types
-  case decode.run(value, decode.string) {
-    Ok(s) -> "\"" <> escape_string(s) <> "\""
-    Error(_) ->
-      case decode.run(value, decode.int) {
-        Ok(i) -> int.to_string(i)
-        Error(_) ->
-          case decode.run(value, decode.float) {
-            Ok(f) -> float.to_string(f)
-            Error(_) ->
-              case decode.run(value, decode.bool) {
-                Ok(True) -> "true"
-                Ok(False) -> "false"
-                Error(_) ->
-                  case decode.run(value, decode.optional(decode.dynamic)) {
-                    Ok(None) -> "null"
-                    _ ->
-                      case decode.run(value, decode.list(decode.dynamic)) {
-                        Ok(items) -> {
-                          let printed =
-                            list.map(items, print_value) |> string.join(", ")
-                          "[" <> printed <> "]"
-                        }
-                        Error(_) ->
-                          // Fallback for unrecognized types
-                          "null"
-                      }
-                  }
-              }
-          }
-      }
+  case output.from_dynamic(value) {
+    Ok(v) -> print_typed_value(v)
+    Error(_) -> "null"
+  }
+}
+
+fn print_typed_value(v: Value) -> String {
+  case v {
+    VString(s) -> "\"" <> escape_string(s) <> "\""
+    VInt(i) -> int.to_string(i)
+    VFloat(f) -> float.to_string(f)
+    VBool(True) -> "true"
+    VBool(False) -> "false"
+    VNull -> "null"
+    VList(items) ->
+      "[" <> string.join(list.map(items, print_typed_value), ", ") <> "]"
+    VObject(fields) ->
+      "{ "
+      <> string.join(
+        list.map(fields, fn(kv) { kv.0 <> ": " <> print_typed_value(kv.1) }),
+        ", ",
+      )
+      <> " }"
   }
 }
 

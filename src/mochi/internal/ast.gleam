@@ -1,5 +1,5 @@
 import gleam/option.{type Option}
-import mochi/lexer
+import mochi/internal/lexer
 
 pub type Document {
   Document(definitions: List(Definition))

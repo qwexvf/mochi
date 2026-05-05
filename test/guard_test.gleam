@@ -2,6 +2,7 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import mochi/args
 import gleam/list
 import gleam/option.{None}
 import gleeunit/should
@@ -502,7 +503,7 @@ pub fn subscription_guard_blocks_test() {
   // The topic_fn should fail when guard blocks
   case field_def.topic_fn {
     option.Some(topic_fn) -> {
-      let result = topic_fn(dict.new(), default_ctx())
+      let result = topic_fn(args.from_dict(dict.new()), default_ctx())
       should.be_error(result)
     }
     option.None -> panic as "expected topic_fn to be Some"
@@ -617,6 +618,7 @@ fn make_resolver_info() -> schema.ResolverInfo {
   schema.ResolverInfo(
     parent: option.None,
     arguments: dict.new(),
+    args: args.from_dict(dict.new()),
     context: default_ctx(),
     info: types.to_dynamic(dict.new()),
   )

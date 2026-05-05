@@ -1,3 +1,4 @@
+import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/result
@@ -19,22 +20,37 @@ fn validate_string(
   to_dynamic(validated)
 }
 
-fn is_digit_char(c: String) -> Bool {
-  case c {
-    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
-    _ -> False
+// All scalar formats accepted here are ASCII (ISO 8601 dates, UUIDs,
+// http(s) URLs, RFC 5322-ish emails). Operate on bytes directly via
+// `bit_array.byte_size` and byte access — `string.length` would walk the
+// UTF-8 to count graphemes, and `string.to_graphemes` would allocate a
+// list per character. Both are O(n) per check; the byte path is O(1) for
+// length and O(1) per indexed lookup.
+
+fn byte_at(bytes: BitArray, i: Int) -> Result(Int, Nil) {
+  case bit_array.slice(bytes, i, 1) {
+    Ok(<<b>>) -> Ok(b)
+    _ -> Error(Nil)
   }
+}
+
+fn is_digit_byte(b: Int) -> Bool {
+  b >= 48 && b <= 57
 }
 
 pub fn date_time() -> ScalarType {
   let validate = fn(value: Dynamic) -> Result(Dynamic, String) {
     validate_string(value, fn(s) {
+      let bytes = bit_array.from_string(s)
+      let len = bit_array.byte_size(bytes)
+      let starts_with_digit = case byte_at(bytes, 0) {
+        Ok(b) -> is_digit_byte(b)
+        Error(_) -> False
+      }
       let valid =
-        string.length(s) > 0
-        && { string.contains(s, "T") || string.length(s) == 10 }
-        && {
-          string.first(s) |> result.map(is_digit_char) |> result.unwrap(False)
-        }
+        len > 0
+        && { string.contains(s, "T") || len == 10 }
+        && starts_with_digit
       case valid {
         True -> Ok(s)
         False -> Error("DateTime must be a valid ISO 8601 string")
@@ -51,23 +67,14 @@ pub fn date_time() -> ScalarType {
 pub fn date() -> ScalarType {
   let validate = fn(value: Dynamic) -> Result(Dynamic, String) {
     validate_string(value, fn(s) {
-      let chars = string.to_graphemes(s)
-      case string.length(s) == 10 {
+      let bytes = bit_array.from_string(s)
+      case bit_array.byte_size(bytes) == 10 {
         False -> Error("Date must be in YYYY-MM-DD format")
-        True -> {
-          let dash4 = case chars |> drop(4) |> first_char() {
-            Ok(c) -> c == "-"
-            Error(_) -> False
+        True ->
+          case byte_at(bytes, 4), byte_at(bytes, 7) {
+            Ok(45), Ok(45) -> Ok(s)
+            _, _ -> Error("Date must be in YYYY-MM-DD format")
           }
-          let dash7 = case chars |> drop(7) |> first_char() {
-            Ok(c) -> c == "-"
-            Error(_) -> False
-          }
-          case dash4 && dash7 {
-            True -> Ok(s)
-            False -> Error("Date must be in YYYY-MM-DD format")
-          }
-        }
       }
     })
   }
@@ -76,21 +83,6 @@ pub fn date() -> ScalarType {
   |> schema.serialize(fn(value) { Ok(value) })
   |> schema.parse_value(validate)
   |> schema.parse_literal(validate)
-}
-
-fn drop(chars: List(String), n: Int) -> List(String) {
-  case n, chars {
-    0, rest -> rest
-    _, [] -> []
-    n, [_, ..rest] -> drop(rest, n - 1)
-  }
-}
-
-fn first_char(chars: List(String)) -> Result(String, Nil) {
-  case chars {
-    [c, ..] -> Ok(c)
-    [] -> Error(Nil)
-  }
 }
 
 pub fn json() -> ScalarType {
@@ -143,29 +135,26 @@ pub fn url() -> ScalarType {
 pub fn uuid() -> ScalarType {
   let validate = fn(value: Dynamic) -> Result(Dynamic, String) {
     validate_string(value, fn(s) {
-      let chars = string.to_graphemes(s)
-      let d8 = case chars |> drop(8) |> first_char() {
-        Ok(c) -> c == "-"
-        Error(_) -> False
-      }
-      let d13 = case chars |> drop(13) |> first_char() {
-        Ok(c) -> c == "-"
-        Error(_) -> False
-      }
-      let d18 = case chars |> drop(18) |> first_char() {
-        Ok(c) -> c == "-"
-        Error(_) -> False
-      }
-      let d23 = case chars |> drop(23) |> first_char() {
-        Ok(c) -> c == "-"
-        Error(_) -> False
-      }
-      case string.length(s) == 36 && d8 && d13 && d18 && d23 {
-        True -> Ok(s)
+      let bytes = bit_array.from_string(s)
+      case bit_array.byte_size(bytes) == 36 {
         False ->
           Error(
             "UUID must be 36 characters with dashes at positions 8, 13, 18, 23",
           )
+        True ->
+          case
+            byte_at(bytes, 8),
+            byte_at(bytes, 13),
+            byte_at(bytes, 18),
+            byte_at(bytes, 23)
+          {
+            // 45 is '-'
+            Ok(45), Ok(45), Ok(45), Ok(45) -> Ok(s)
+            _, _, _, _ ->
+              Error(
+                "UUID must be 36 characters with dashes at positions 8, 13, 18, 23",
+              )
+          }
       }
     })
   }

@@ -8,7 +8,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import mochi/ast
+import mochi/internal/ast
 import mochi/executor.{type ExecutionResult}
 import mochi/parser
 import mochi/schema.{type ExecutionContext, type Schema}

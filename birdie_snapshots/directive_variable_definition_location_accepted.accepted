@@ -4,4 +4,4 @@ title: Directive VARIABLE_DEFINITION location accepted
 file: ./test/mochi_snapshot_test.gleam
 test_name: directive_variable_definition_location_test
 ---
-Ok(SDLDocument([DirectiveDefinition(DirectiveDef("example", None, [VARIABLEDEFINITION], [], False))]))
+Ok(SdlDocument([DirectiveDefinition(DirectiveDef("example", None, [VARIABLEDEFINITION], [], False))]))

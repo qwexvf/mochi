@@ -1,0 +1,5 @@
+---
+version: 1.5.5
+title: Lex error mid-document surfaces as SdlLexError
+---
+Error(SdlLexError(UnterminatedString(Position(3, 5))))

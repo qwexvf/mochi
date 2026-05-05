@@ -1,5 +1,7 @@
 # mochi - Code First GraphQL for Gleam
 
+[📚 Documentation on hexdocs](https://hexdocs.pm/mochi/) · [📦 Package on hex.pm](https://hex.pm/packages/mochi)
+
 **mochi** is a type-safe, Code First GraphQL library for Gleam. Define your GraphQL schemas using Gleam types and automatically generate TypeScript types and GraphQL SDL.
 
 Inspired by:

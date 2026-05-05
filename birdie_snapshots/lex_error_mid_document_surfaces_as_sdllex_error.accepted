@@ -1,7 +1,0 @@
----
-version: 1.5.5
-title: Lex error mid-document surfaces as SDLLexError
-file: ./test/mochi_snapshot_test.gleam
-test_name: unterminated_string_mid_definition_test
----
-Error(SDLLexError(UnterminatedString(Position(3, 5))))

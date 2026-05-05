@@ -4,4 +4,4 @@ title: Union type SDL parsing
 file: ./test/mochi_snapshot_test.gleam
 test_name: union_type_parsing_test
 ---
-Ok(SDLDocument([TypeDefinition(UnionTypeDefinition(UnionTypeDef("SearchResult", None, [], ["User", "Post", "Comment"])))]))
+Ok(SdlDocument([TypeDefinition(UnionTypeDefinition(UnionTypeDef("SearchResult", None, [], ["User", "Post", "Comment"])))]))

@@ -4,8 +4,8 @@
 import gleam/option.{type Option}
 
 /// SDL Document containing type definitions
-pub type SDLDocument {
-  SDLDocument(definitions: List(TypeSystemDefinition))
+pub type SdlDocument {
+  SdlDocument(definitions: List(TypeSystemDefinition))
 }
 
 /// Top-level type system definitions
@@ -73,7 +73,7 @@ pub type FieldDef {
     name: String,
     description: Option(String),
     arguments: List(ArgumentDef),
-    field_type: SDLType,
+    field_type: SdlType,
     directives: List(DirectiveUsage),
   )
 }
@@ -83,33 +83,33 @@ pub type ArgumentDef {
   ArgumentDef(
     name: String,
     description: Option(String),
-    arg_type: SDLType,
-    default_value: Option(SDLValue),
+    arg_type: SdlType,
+    default_value: Option(SdlValue),
     directives: List(DirectiveUsage),
   )
 }
 
 /// SDL Type system (with modifiers)
-pub type SDLType {
+pub type SdlType {
   NamedType(name: String)
-  ListType(inner_type: SDLType)
-  NonNullType(inner_type: SDLType)
+  ListType(inner_type: SdlType)
+  NonNullType(inner_type: SdlType)
 }
 
 /// SDL Values (for default values, etc.)
-pub type SDLValue {
+pub type SdlValue {
   IntValue(value: Int)
   FloatValue(value: Float)
   StringValue(value: String)
   BooleanValue(value: Bool)
   NullValue
   EnumValue(value: String)
-  ListValue(values: List(SDLValue))
+  ListValue(values: List(SdlValue))
   ObjectValue(fields: List(ObjectFieldValue))
 }
 
 pub type ObjectFieldValue {
-  ObjectFieldValue(name: String, value: SDLValue)
+  ObjectFieldValue(name: String, value: SdlValue)
 }
 
 /// Interface type definition
@@ -173,8 +173,8 @@ pub type InputFieldDef {
   InputFieldDef(
     name: String,
     description: Option(String),
-    field_type: SDLType,
-    default_value: Option(SDLValue),
+    field_type: SdlType,
+    default_value: Option(SdlValue),
     directives: List(DirectiveUsage),
   )
 }
@@ -196,7 +196,7 @@ pub type DirectiveUsage {
 }
 
 pub type DirectiveArgument {
-  DirectiveArgument(name: String, value: SDLValue)
+  DirectiveArgument(name: String, value: SdlValue)
 }
 
 /// Where directives can be used
@@ -249,7 +249,7 @@ pub fn get_type_name(type_def: TypeDef) -> String {
 }
 
 /// Convert SDL type to string representation
-pub fn sdl_type_to_string(sdl_type: SDLType) -> String {
+pub fn sdl_type_to_string(sdl_type: SdlType) -> String {
   case sdl_type {
     NamedType(name) -> name
     ListType(inner) -> "[" <> sdl_type_to_string(inner) <> "]"
@@ -258,7 +258,7 @@ pub fn sdl_type_to_string(sdl_type: SDLType) -> String {
 }
 
 /// Check if a type is non-null
-pub fn is_non_null_type(sdl_type: SDLType) -> Bool {
+pub fn is_non_null_type(sdl_type: SdlType) -> Bool {
   case sdl_type {
     NonNullType(_) -> True
     _ -> False
@@ -266,7 +266,7 @@ pub fn is_non_null_type(sdl_type: SDLType) -> Bool {
 }
 
 /// Check if a type is a list
-pub fn is_list_type(sdl_type: SDLType) -> Bool {
+pub fn is_list_type(sdl_type: SdlType) -> Bool {
   case sdl_type {
     ListType(_) -> True
     NonNullType(ListType(_)) -> True
@@ -286,7 +286,7 @@ pub fn get_extension_name(ext: TypeExtensionDef) -> String {
 }
 
 /// Get the base type (unwrap NonNull and List wrappers)
-pub fn get_base_type(sdl_type: SDLType) -> String {
+pub fn get_base_type(sdl_type: SdlType) -> String {
   case sdl_type {
     NamedType(name) -> name
     ListType(inner) -> get_base_type(inner)

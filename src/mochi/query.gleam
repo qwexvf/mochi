@@ -1,10 +1,11 @@
-import gleam/dict.{type Dict}
+import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import mochi/args.{type Args} as args_mod
 import mochi/document_cache
 import mochi/error.{type GqlError}
 import mochi/scalars
@@ -55,15 +56,10 @@ pub type FieldOp(parent, result) =
 // ============================================================================
 
 type InternalResolver(result) {
-  SimpleResolver(
-    fn(Dict(String, Dynamic), ExecutionContext) -> Result(result, GqlError),
-  )
-  TopicResolver(
-    fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, GqlError),
-  )
+  SimpleResolver(fn(Args, ExecutionContext) -> Result(result, GqlError))
+  TopicResolver(fn(Args, ExecutionContext) -> Result(String, GqlError))
   ParentResolver(
-    fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
-      Result(result, GqlError),
+    fn(Option(Dynamic), Args, ExecutionContext) -> Result(result, GqlError),
   )
 }
 
@@ -159,7 +155,7 @@ pub fn query_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  resolve resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  resolve resolver: fn(Args, ExecutionContext) ->
     Result(result, GqlError),
 ) -> QueryOp(result) {
   Op(
@@ -199,7 +195,7 @@ pub fn mutation_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  resolve resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  resolve resolver: fn(Args, ExecutionContext) ->
     Result(result, GqlError),
 ) -> MutationOp(result) {
   Op(
@@ -241,7 +237,7 @@ pub fn subscription_with_args(
   name name: String,
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
-  topic topic_resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  topic topic_resolver: fn(Args, ExecutionContext) ->
     Result(String, GqlError),
 ) -> SubscriptionOp(event) {
   Op(
@@ -297,7 +293,7 @@ pub fn field_with_args(
   args arg_defs: List(ArgDef),
   returns return_type: FieldType,
   decode parent_decoder: fn(Dynamic) -> Result(parent, String),
-  resolve resolver: fn(parent, Dict(String, Dynamic), ExecutionContext) ->
+  resolve resolver: fn(parent, Args, ExecutionContext) ->
     Result(result, GqlError),
 ) -> FieldOp(parent, result) {
   Op(
@@ -364,9 +360,9 @@ fn try_any(
 
 fn apply_gql_guards(
   guards: List(Guard),
-  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  resolver: fn(Args, ExecutionContext) ->
     Result(result, GqlError),
-) -> fn(Dict(String, Dynamic), ExecutionContext) -> Result(result, GqlError) {
+) -> fn(Args, ExecutionContext) -> Result(result, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
       case g(ctx) {
@@ -379,9 +375,9 @@ fn apply_gql_guards(
 
 fn apply_topic_guards(
   guards: List(Guard),
-  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  resolver: fn(Args, ExecutionContext) ->
     Result(String, GqlError),
-) -> fn(Dict(String, Dynamic), ExecutionContext) -> Result(String, GqlError) {
+) -> fn(Args, ExecutionContext) -> Result(String, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(args, ctx) {
       case g(ctx) {
@@ -394,9 +390,9 @@ fn apply_topic_guards(
 
 fn apply_parent_gql_guards(
   guards: List(Guard),
-  resolver: fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
+  resolver: fn(Option(Dynamic), Args, ExecutionContext) ->
     Result(result, GqlError),
-) -> fn(Option(Dynamic), Dict(String, Dynamic), ExecutionContext) ->
+) -> fn(Option(Dynamic), Args, ExecutionContext) ->
   Result(result, GqlError) {
   list.fold(list.reverse(guards), resolver, fn(inner, g) {
     fn(parent, args, ctx) {
@@ -464,197 +460,97 @@ pub fn arg_with_default_desc(
 // Argument Parsing Helpers
 // ============================================================================
 
-fn fetch_required(
-  args: Dict(String, Dynamic),
-  key: String,
-  decoder: decode.Decoder(a),
-  type_label: String,
-) -> Result(a, GqlError) {
-  case dict.get(args, key) {
-    Error(_) -> Error(error.new("Missing required argument: " <> key))
-    Ok(value) ->
-      decode.run(value, decoder)
-      |> result.map_error(fn(_) {
-        error.new(
-          "Invalid type for argument '" <> key <> "': expected " <> type_label,
-        )
-      })
-  }
+// These delegate to `mochi/args`; they exist so resolver code can call
+// `query.get_string(args, "id")` without importing the args module
+// separately. Errors are wrapped into `GqlError` for the resolver result.
+
+fn arg_to_gql(e: args_mod.ArgError) -> GqlError {
+  error.new(args_mod.error_message(e))
 }
 
-fn fetch_optional(
-  args: Dict(String, Dynamic),
-  key: String,
-  decoder: decode.Decoder(a),
-) -> Option(a) {
-  case dict.get(args, key) {
-    Error(_) -> None
-    Ok(value) ->
-      case decode.run(value, decoder) {
-        Ok(v) -> Some(v)
-        Error(_) -> None
-      }
-  }
+pub fn get_string(args: Args, key: String) -> Result(String, GqlError) {
+  args_mod.get_string(args, key) |> result.map_error(arg_to_gql)
 }
 
-fn fetch_or(
-  args: Dict(String, Dynamic),
-  key: String,
-  decoder: decode.Decoder(a),
-  default: a,
-) -> a {
-  case dict.get(args, key) {
-    Error(_) -> default
-    Ok(value) -> result.unwrap(decode.run(value, decoder), default)
-  }
+pub fn get_id(args: Args, key: String) -> Result(String, GqlError) {
+  args_mod.get_id(args, key) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_string(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(String, GqlError) {
-  fetch_required(args, key, decode.string, "String")
+pub fn get_int(args: Args, key: String) -> Result(Int, GqlError) {
+  args_mod.get_int(args, key) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_id(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(String, GqlError) {
-  fetch_required(args, key, decode.string, "ID")
+pub fn get_float(args: Args, key: String) -> Result(Float, GqlError) {
+  args_mod.get_float(args, key) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_int(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(Int, GqlError) {
-  fetch_required(args, key, decode.int, "Int")
+pub fn get_bool(args: Args, key: String) -> Result(Bool, GqlError) {
+  args_mod.get_bool(args, key) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_float(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(Float, GqlError) {
-  fetch_required(args, key, decode.float, "Float")
+pub fn get_optional_string(args: Args, key: String) -> Option(String) {
+  args_mod.get_optional_string(args, key)
 }
 
-pub fn get_bool(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(Bool, GqlError) {
-  fetch_required(args, key, decode.bool, "Bool")
+pub fn get_optional_id(args: Args, key: String) -> Option(String) {
+  args_mod.get_optional_string(args, key)
 }
 
-pub fn get_optional_string(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Option(String) {
-  fetch_optional(args, key, decode.string)
+pub fn get_optional_int(args: Args, key: String) -> Option(Int) {
+  args_mod.get_optional_int(args, key)
 }
 
-pub fn get_optional_id(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Option(String) {
-  get_optional_string(args, key)
+pub fn get_optional_float(args: Args, key: String) -> Option(Float) {
+  args_mod.get_optional_float(args, key)
 }
 
-pub fn get_optional_int(args: Dict(String, Dynamic), key: String) -> Option(Int) {
-  fetch_optional(args, key, decode.int)
+pub fn get_optional_bool(args: Args, key: String) -> Option(Bool) {
+  args_mod.get_optional_bool(args, key)
 }
 
-pub fn get_optional_float(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Option(Float) {
-  fetch_optional(args, key, decode.float)
+pub fn get_string_list(args: Args, key: String) -> Result(List(String), GqlError) {
+  args_mod.get_string_list(args, key) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_optional_bool(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Option(Bool) {
-  fetch_optional(args, key, decode.bool)
-}
-
-pub fn get_string_list(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(List(String), GqlError) {
-  fetch_required(args, key, decode.list(decode.string), "[String]")
-}
-
-pub fn get_int_list(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(List(Int), GqlError) {
-  fetch_required(args, key, decode.list(decode.int), "[Int]")
+pub fn get_int_list(args: Args, key: String) -> Result(List(Int), GqlError) {
+  args_mod.get_int_list(args, key) |> result.map_error(arg_to_gql)
 }
 
 pub fn decode_input(
-  args: Dict(String, Dynamic),
+  args: Args,
   key: String,
   decoder: decode.Decoder(a),
 ) -> Result(a, GqlError) {
-  case dict.get(args, key) {
-    Error(_) -> Error(error.new("Missing required argument: " <> key))
-    Ok(value) ->
-      decode.run(value, decoder)
-      |> result.map_error(fn(_) {
-        error.new("Invalid input for '" <> key <> "'")
-      })
-  }
+  args_mod.decode_input(args, key, decoder) |> result.map_error(arg_to_gql)
 }
 
-pub fn get_dynamic(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(Dynamic, GqlError) {
-  dict.get(args, key)
+pub fn get_dynamic(args: Args, key: String) -> Result(Dynamic, GqlError) {
+  dict.get(args_mod.to_dict(args), key)
   |> result.map_error(fn(_) { error.new("Missing required argument: " <> key) })
 }
 
-pub fn get_optional_dynamic(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Option(Dynamic) {
-  dict.get(args, key)
-  |> option.from_result
+pub fn get_optional_dynamic(args: Args, key: String) -> Option(Dynamic) {
+  dict.get(args_mod.to_dict(args), key) |> option.from_result
 }
 
-pub fn get_string_or(
-  args: Dict(String, Dynamic),
-  key: String,
-  default: String,
-) -> String {
-  fetch_or(args, key, decode.string, default)
+pub fn get_string_or(args: Args, key: String, default: String) -> String {
+  args_mod.get_optional_string(args, key) |> option.unwrap(default)
 }
 
-pub fn get_id_or(
-  args: Dict(String, Dynamic),
-  key: String,
-  default: String,
-) -> String {
+pub fn get_id_or(args: Args, key: String, default: String) -> String {
   get_string_or(args, key, default)
 }
 
-pub fn get_int_or(args: Dict(String, Dynamic), key: String, default: Int) -> Int {
-  fetch_or(args, key, decode.int, default)
+pub fn get_int_or(args: Args, key: String, default: Int) -> Int {
+  args_mod.get_optional_int(args, key) |> option.unwrap(default)
 }
 
-pub fn get_float_or(
-  args: Dict(String, Dynamic),
-  key: String,
-  default: Float,
-) -> Float {
-  fetch_or(args, key, decode.float, default)
+pub fn get_float_or(args: Args, key: String, default: Float) -> Float {
+  args_mod.get_optional_float(args, key) |> option.unwrap(default)
 }
 
-pub fn get_bool_or(
-  args: Dict(String, Dynamic),
-  key: String,
-  default: Bool,
-) -> Bool {
-  fetch_or(args, key, decode.bool, default)
+pub fn get_bool_or(args: Args, key: String, default: Bool) -> Bool {
+  args_mod.get_optional_bool(args, key) |> option.unwrap(default)
 }
 
 // ============================================================================
@@ -662,12 +558,12 @@ pub fn get_bool_or(
 // ============================================================================
 
 fn build_gql_resolver(
-  resolver: fn(Dict(String, Dynamic), ExecutionContext) ->
+  resolver: fn(Args, ExecutionContext) ->
     Result(result, GqlError),
   result_encoder: fn(result) -> Dynamic,
 ) -> schema.RichResolver {
   fn(info: ResolverInfo) {
-    case resolver(info.arguments, info.context) {
+    case resolver(info.args, info.context) {
       Error(err) -> Error(error.to_payload(err))
       Ok(res) -> Ok(result_encoder(res))
     }
@@ -717,7 +613,7 @@ pub fn to_field_def(op: Op(k, r)) -> FieldDefinition {
     ParentResolver(resolver) -> {
       let guarded = apply_parent_gql_guards(op.guards, resolver)
       schema.rich_resolver_fn(base, fn(info: ResolverInfo) {
-        case guarded(info.parent, info.arguments, info.context) {
+        case guarded(info.parent, info.args, info.context) {
           Error(err) -> Error(error.to_payload(err))
           Ok(res) -> Ok(op.result_encoder(res))
         }

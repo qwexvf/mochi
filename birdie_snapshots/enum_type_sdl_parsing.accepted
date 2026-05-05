@@ -4,4 +4,4 @@ title: Enum type SDL parsing
 file: ./test/mochi_snapshot_test.gleam
 test_name: enum_type_parsing_test
 ---
-Ok(SDLDocument([TypeDefinition(EnumTypeDefinition(EnumTypeDef("UserRole", None, [], [EnumValueDef("ADMIN", None, []), EnumValueDef("USER", None, []), EnumValueDef("MODERATOR", None, [])])))]))
+Ok(SdlDocument([TypeDefinition(EnumTypeDefinition(EnumTypeDef("UserRole", None, [], [EnumValueDef("ADMIN", None, []), EnumValueDef("USER", None, []), EnumValueDef("MODERATOR", None, [])])))]))

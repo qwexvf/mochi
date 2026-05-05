@@ -247,18 +247,45 @@ pub fn serialize(response: GraphQLResponse) -> Dynamic {
   to_dynamic(response)
 }
 
-/// Convert a GraphQLResponse to a JSON string
+/// Convert a GraphQLResponse to a JSON string.
+///
+/// If the response data contains a runtime shape that can't be encoded as
+/// JSON (e.g. a resolver returned a tuple or function), fall back to a
+/// spec-compliant error response describing the failure rather than
+/// silently emitting `null` for the offending value.
 pub fn to_json(response: GraphQLResponse) -> String {
-  response
-  |> to_dynamic
-  |> json.encode
+  case json.encode(to_dynamic(response)) {
+    Ok(s) -> s
+    Error(err) -> encode_error_fallback(err, False)
+  }
 }
 
-/// Convert a GraphQLResponse to a pretty-printed JSON string
+/// Convert a GraphQLResponse to a pretty-printed JSON string. Same fallback
+/// behaviour as [`to_json`](#to_json) on encoding failure.
 pub fn to_json_pretty(response: GraphQLResponse) -> String {
-  response
-  |> to_dynamic
-  |> json.encode_pretty(2)
+  case json.encode_pretty(to_dynamic(response), 2) {
+    Ok(s) -> s
+    Error(err) -> encode_error_fallback(err, True)
+  }
+}
+
+fn encode_error_fallback(err: json.EncodeError, pretty: Bool) -> String {
+  let message = "Internal: " <> json.describe_error(err)
+  let fallback =
+    failure([error.new(message) |> error.with_code("INTERNAL_SERVER_ERROR")])
+    |> to_dynamic
+  let encoded = case pretty {
+    True -> json.encode_pretty(fallback, 2)
+    False -> json.encode(fallback)
+  }
+  case encoded {
+    Ok(s) -> s
+    // The fallback itself only contains strings/dicts/lists, so this is
+    // unreachable in practice. Hand-roll a literal so callers still get
+    // valid JSON in the impossible case.
+    Error(_) ->
+      "{\"data\":null,\"errors\":[{\"message\":\"Internal: response encoding failed\"}]}"
+  }
 }
 
 // ============================================================================

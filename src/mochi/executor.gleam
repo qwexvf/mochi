@@ -10,12 +10,13 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import mochi/ast
+import mochi/args
+import mochi/internal/ast
 import mochi/document_cache
 import mochi/error as graphql_error
 import mochi/input_coercion
 import mochi/introspection
-import mochi/lexer
+import mochi/internal/lexer
 import mochi/parser
 import mochi/schema
 import mochi/telemetry
@@ -1138,6 +1139,7 @@ fn resolve_field(
     schema.ResolverInfo(
       parent: parent_value,
       arguments: field_args,
+      args: args.from_dict(field_args),
       context: context.execution_context,
       info: types.to_dynamic(dict.new()),
     )
@@ -1198,6 +1200,7 @@ fn resolve_rich_field(
     schema.ResolverInfo(
       parent: parent_value,
       arguments: field_args,
+      args: args.from_dict(field_args),
       context: context.execution_context,
       info: types.to_dynamic(dict.new()),
     )

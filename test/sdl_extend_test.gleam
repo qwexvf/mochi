@@ -1,9 +1,9 @@
 import gleam/list
 import gleam/string
-import mochi/sdl_ast
-import mochi/sdl_parser
+import mochi/internal/sdl_ast
+import mochi/internal/sdl_parser
 
-fn parse_ok(sdl: String) -> sdl_ast.SDLDocument {
+fn parse_ok(sdl: String) -> sdl_ast.SdlDocument {
   case sdl_parser.parse_sdl(sdl) {
     Ok(doc) -> doc
     Error(e) ->
@@ -11,7 +11,7 @@ fn parse_ok(sdl: String) -> sdl_ast.SDLDocument {
   }
 }
 
-fn first_extension(doc: sdl_ast.SDLDocument) -> sdl_ast.TypeExtensionDef {
+fn first_extension(doc: sdl_ast.SdlDocument) -> sdl_ast.TypeExtensionDef {
   case doc.definitions {
     [sdl_ast.TypeExtension(ext), ..] -> ext
     _ -> panic as "Expected TypeExtension as first definition"
