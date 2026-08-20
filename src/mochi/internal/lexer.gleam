@@ -312,8 +312,7 @@ fn read_exponent(input: BitArray, e_char: String) -> #(String, BitArray, Int) {
 
 fn scan_digits(b: BitArray, acc: Int) -> Int {
   case b {
-    <<byte, rest:bits>> if byte >= 48 && byte <= 57 ->
-      scan_digits(rest, acc + 1)
+    <<byte, rest:bits>> if byte >= 48 && byte <= 57 -> scan_digits(rest, acc + 1)
     _ -> acc
   }
 }

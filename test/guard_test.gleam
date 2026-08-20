@@ -371,7 +371,9 @@ fn build_schema_with_guard(guard_fn: schema.FieldGuard) -> schema.Schema {
   |> schema.add_type(schema.ObjectTypeDef(user_type))
 }
 
-fn build_schema_with_guards(guard_fns: List(schema.FieldGuard)) -> schema.Schema {
+fn build_schema_with_guards(
+  guard_fns: List(schema.FieldGuard),
+) -> schema.Schema {
   let user_type =
     schema.object("User")
     |> schema.id_field("id")

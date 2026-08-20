@@ -83,6 +83,11 @@ pub type QueryExecutionContext {
     execution_context: schema.ExecutionContext,
     variable_values: Dict(String, Dynamic),
     fragments: Dict(String, ast.Fragment),
+    /// Concrete object type names each type name covers: an object covers
+    /// itself, an interface its implementors, a union its members. Built once
+    /// per execution so selection projection can resolve fragment type
+    /// conditions without rescanning the schema per field.
+    type_members: Dict(String, List(String)),
   )
 }
 
@@ -195,6 +200,7 @@ pub fn execute_with_operation_name(
       execution_context: execution_context,
       variable_values: variable_values,
       fragments: fragments,
+      type_members: build_type_members(schema_def),
     )
 
   case find_operation_by_name(document, operation_name) {
@@ -857,6 +863,372 @@ fn execute_field(
 }
 
 // ============================================================================
+// Selection Projection
+// ============================================================================
+
+/// Concrete object type names covered by each type name in the schema: an object
+/// covers itself, an interface its implementors, a union its members.
+///
+/// Built once per execution so fragment type conditions resolve without
+/// rescanning the schema per field.
+fn build_type_members(schema_def: schema.Schema) -> Dict(String, List(String)) {
+  dict.fold(schema_def.types, dict.new(), fn(members, name, type_def) {
+    case type_def {
+      schema.ObjectTypeDef(object) ->
+        dict.insert(members, name, [name])
+        |> add_implementor(object.interfaces, name)
+      schema.UnionTypeDef(union) ->
+        dict.insert(members, name, list.map(union.types, fn(t) { t.name }))
+      _ -> members
+    }
+  })
+}
+
+fn add_implementor(
+  members: Dict(String, List(String)),
+  interfaces: List(schema.InterfaceType),
+  object_name: String,
+) -> Dict(String, List(String)) {
+  list.fold(interfaces, members, fn(members, interface) {
+    let existing = dict.get(members, interface.name) |> result.unwrap([])
+    dict.insert(members, interface.name, [object_name, ..existing])
+  })
+}
+
+/// Where a selection set sits in the schema while it is being flattened.
+type Scope {
+  Scope(
+    /// Concrete types this selection set is written against.
+    candidates: List(String),
+    /// Types a fragment condition narrowed to, or `None` outside any fragment.
+    only_for: Option(List(String)),
+    /// Fragment spreads already entered, so a cycle cannot recurse forever.
+    seen_fragments: List(String),
+  )
+}
+
+/// The types a field selected in this scope actually applies to.
+fn scope_types(scope: Scope) -> List(String) {
+  option.unwrap(scope.only_for, scope.candidates)
+}
+
+/// Flatten a field's selection set into what a resolver can project on.
+///
+/// Each selected field records the concrete types its fragment condition covers,
+/// so a resolver for a union or interface field can narrow the selection to the
+/// type it is about to return.
+fn flatten_selection(
+  selection_set: Option(ast.SelectionSet),
+  return_type: schema.FieldType,
+  context: QueryExecutionContext,
+) -> List(schema.SelectedField) {
+  case selection_set {
+    None -> []
+    Some(set) ->
+      collect_selected(
+        set.selections,
+        context,
+        Scope(
+          candidates: [named_type_of(return_type)],
+          only_for: None,
+          seen_fragments: [],
+        ),
+      )
+  }
+}
+
+fn collect_selected(
+  selections: List(ast.Selection),
+  context: QueryExecutionContext,
+  scope: Scope,
+) -> List(schema.SelectedField) {
+  selections
+  |> list.flat_map(fn(selection) {
+    case selection {
+      ast.FieldSelection(field) -> collect_field(field, context, scope)
+      ast.InlineFragment(inline) ->
+        collect_fragment(
+          inline.selection_set,
+          inline.type_condition,
+          inline.directives,
+          context,
+          scope,
+        )
+      ast.FragmentSpread(spread) -> collect_spread(spread, context, scope)
+    }
+  })
+  |> merge_selected
+}
+
+fn collect_field(
+  field: ast.Field,
+  context: QueryExecutionContext,
+  scope: Scope,
+) -> List(schema.SelectedField) {
+  let selected =
+    should_include_field(field.directives, context.variable_values)
+    && !string.starts_with(field.name, "__")
+  case selected {
+    False -> []
+    True -> [
+      schema.SelectedField(
+        name: field.name,
+        only_for: scope.only_for,
+        arguments: selection_arguments(field.arguments, context.variable_values),
+        columns: columns_for(context, scope_types(scope), field.name),
+        children: collect_children(field, context, scope),
+      ),
+    ]
+  }
+}
+
+fn collect_children(
+  field: ast.Field,
+  context: QueryExecutionContext,
+  scope: Scope,
+) -> List(schema.SelectedField) {
+  case field.selection_set {
+    None -> []
+    Some(set) ->
+      collect_selected(
+        set.selections,
+        context,
+        Scope(
+          candidates: child_candidates(context, scope_types(scope), field.name),
+          only_for: None,
+          seen_fragments: scope.seen_fragments,
+        ),
+      )
+  }
+}
+
+fn collect_fragment(
+  selection_set: ast.SelectionSet,
+  type_condition: Option(String),
+  directives: List(ast.Directive),
+  context: QueryExecutionContext,
+  scope: Scope,
+) -> List(schema.SelectedField) {
+  case should_include_field(directives, context.variable_values) {
+    False -> []
+    True ->
+      collect_selected(
+        selection_set.selections,
+        context,
+        Scope(
+          ..scope,
+          only_for: narrow(scope.only_for, type_condition, context),
+        ),
+      )
+  }
+}
+
+fn collect_spread(
+  spread: ast.FragmentSpreadValue,
+  context: QueryExecutionContext,
+  scope: Scope,
+) -> List(schema.SelectedField) {
+  let entered = list.contains(scope.seen_fragments, spread.name)
+  case entered, dict.get(context.fragments, spread.name) {
+    False, Ok(fragment) ->
+      collect_fragment(
+        fragment.selection_set,
+        Some(fragment.type_condition),
+        spread.directives,
+        context,
+        Scope(..scope, seen_fragments: [spread.name, ..scope.seen_fragments]),
+      )
+    _, _ -> []
+  }
+}
+
+/// Narrow the concrete types a selection applies to by a fragment's condition.
+fn narrow(
+  only_for: Option(List(String)),
+  type_condition: Option(String),
+  context: QueryExecutionContext,
+) -> Option(List(String)) {
+  case type_condition {
+    None -> only_for
+    Some(condition) -> Some(intersect(only_for, members_of(context, condition)))
+  }
+}
+
+/// An unknown condition covers only the condition name itself, so an
+/// unrecognised type never silently widens the selection.
+fn members_of(
+  context: QueryExecutionContext,
+  type_name: String,
+) -> List(String) {
+  dict.get(context.type_members, type_name) |> result.unwrap([type_name])
+}
+
+/// Types common to both — or all of `members`, when nothing has narrowed yet.
+fn intersect(
+  only_for: Option(List(String)),
+  members: List(String),
+) -> List(String) {
+  case only_for {
+    None -> members
+    Some(current) -> list.filter(current, list.contains(members, _))
+  }
+}
+
+/// The named type inside any wrapping NonNull/List — the type whose fields a
+/// selection set is written against.
+fn named_type_of(field_type: schema.FieldType) -> String {
+  case field_type {
+    schema.Named(name) -> name
+    schema.NonNull(inner) -> named_type_of(inner)
+    schema.List(inner) -> named_type_of(inner)
+  }
+}
+
+/// Every declaration of `name` across the types a selection applies to. More
+/// than one when a fragment condition covers an interface or union.
+fn declarations_for(
+  context: QueryExecutionContext,
+  types: List(String),
+  name: String,
+) -> List(schema.FieldDefinition) {
+  list.filter_map(types, fn(type_name) {
+    fields_of_type(context, type_name) |> dict.get(name)
+  })
+}
+
+fn fields_of_type(
+  context: QueryExecutionContext,
+  type_name: String,
+) -> Dict(String, schema.FieldDefinition) {
+  case dict.get(context.schema.types, type_name) {
+    Ok(schema.ObjectTypeDef(object)) -> object.fields
+    Ok(schema.InterfaceTypeDef(interface)) -> interface.fields
+    _ -> dict.new()
+  }
+}
+
+/// Columns a selected field needs, summed over every type that declares it.
+fn columns_for(
+  context: QueryExecutionContext,
+  types: List(String),
+  name: String,
+) -> List(String) {
+  case declarations_for(context, types, name) {
+    // on no known type: keep the derived default rather than reporting that the
+    // field needs nothing, which would silently drop a column
+    [] -> [schema.snake_case(name)]
+    declarations ->
+      list.flat_map(declarations, schema.resolved_columns) |> list.unique
+  }
+}
+
+/// Concrete types a child selection set is written against.
+fn child_candidates(
+  context: QueryExecutionContext,
+  types: List(String),
+  name: String,
+) -> List(String) {
+  declarations_for(context, types, name)
+  |> list.first
+  |> result.map(fn(field) { [named_type_of(field.field_type)] })
+  |> result.unwrap([])
+}
+
+/// Field arguments with variables substituted. Raw literal shapes — schema
+/// coercion and default values are deliberately not applied here.
+fn selection_arguments(
+  arguments: List(ast.Argument),
+  variables: Dict(String, Dynamic),
+) -> Dict(String, Dynamic) {
+  list.fold(arguments, dict.new(), fn(acc, arg) {
+    case selection_value(arg.value, variables) {
+      // an unbound variable is omitted rather than recorded as its own name
+      None -> acc
+      Some(value) -> dict.insert(acc, arg.name, value)
+    }
+  })
+}
+
+fn selection_value(
+  value: ast.Value,
+  variables: Dict(String, Dynamic),
+) -> Option(Dynamic) {
+  case value {
+    ast.IntValue(i) -> Some(types.to_dynamic(i))
+    ast.FloatValue(f) -> Some(types.to_dynamic(f))
+    ast.StringValue(str) -> Some(types.to_dynamic(str))
+    ast.BooleanValue(b) -> Some(types.to_dynamic(b))
+    ast.EnumValue(e) -> Some(types.to_dynamic(e))
+    ast.NullValue -> Some(types.to_dynamic(Nil))
+    ast.VariableValue(name) -> dict.get(variables, name) |> option.from_result
+    ast.ListValue(values) ->
+      Some(
+        types.to_dynamic(
+          list.filter_map(values, fn(v) {
+            selection_value(v, variables) |> option.to_result(Nil)
+          }),
+        ),
+      )
+    ast.ObjectValue(fields) ->
+      Some(
+        types.to_dynamic(selection_arguments(
+          list.map(fields, fn(f) { ast.Argument(f.name, f.value) }),
+          variables,
+        )),
+      )
+  }
+}
+
+/// Dedupe by name, type condition and arguments, merging sub-selections and
+/// keeping first-seen order. Entries differing in any of the three stay apart, so
+/// a field selected twice with different arguments is visible as two calls.
+fn merge_selected(
+  fields: List(schema.SelectedField),
+) -> List(schema.SelectedField) {
+  list.fold(fields, [], insert_merging)
+  |> list.reverse
+}
+
+fn insert_merging(
+  merged: List(schema.SelectedField),
+  field: schema.SelectedField,
+) -> List(schema.SelectedField) {
+  case list.any(merged, same_selection(_, field)) {
+    False -> [field, ..merged]
+    True ->
+      list.map(merged, fn(existing) {
+        case same_selection(existing, field) {
+          False -> existing
+          True ->
+            schema.SelectedField(
+              ..existing,
+              children: merge_selected(list.append(
+                existing.children,
+                field.children,
+              )),
+            )
+        }
+      })
+  }
+}
+
+fn same_selection(a: schema.SelectedField, b: schema.SelectedField) -> Bool {
+  a.name == b.name && a.only_for == b.only_for && a.arguments == b.arguments
+}
+
+/// Execution context with `selection` set to what the client asked for on the
+/// value this field's resolver returns.
+fn context_for_field(
+  context: QueryExecutionContext,
+  field: ast.Field,
+  field_def: schema.FieldDefinition,
+) -> schema.ExecutionContext {
+  schema.with_lazy_selection(context.execution_context, fn() {
+    flatten_selection(field.selection_set, field_def.field_type, context)
+  })
+}
+
+// ============================================================================
 // Directive Evaluation
 // ============================================================================
 
@@ -1135,19 +1507,21 @@ fn resolve_field(
   let field_location =
     option.map(field.location, fn(pos) { #(pos.line, pos.column) })
 
+  let field_execution_context = context_for_field(context, field, field_def)
+
   let resolver_info =
     schema.ResolverInfo(
       parent: parent_value,
       arguments: field_args,
       args: args.from_dict(field_args),
-      context: context.execution_context,
+      context: field_execution_context,
       info: types.to_dynamic(dict.new()),
     )
 
   // Execute resolver, optionally through middleware pipeline
   let resolve_result =
     execute_resolver_with_middleware(
-      context.execution_context,
+      field_execution_context,
       field_def,
       resolver_info,
       resolver,
@@ -1201,7 +1575,7 @@ fn resolve_rich_field(
       parent: parent_value,
       arguments: field_args,
       args: args.from_dict(field_args),
-      context: context.execution_context,
+      context: context_for_field(context, field, field_def),
       info: types.to_dynamic(dict.new()),
     )
 
@@ -1963,7 +2337,11 @@ fn get_cached(
   }
 }
 
-fn cache_put(schema_def: schema.Schema, query: String, doc: ast.Document) -> Nil {
+fn cache_put(
+  schema_def: schema.Schema,
+  query: String,
+  doc: ast.Document,
+) -> Nil {
   case schema_def.document_cache {
     None -> Nil
     Some(cache) -> document_cache.put(cache, query, doc)

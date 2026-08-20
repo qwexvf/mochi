@@ -10,7 +10,9 @@ import mochi/output
 import mochi/schema
 import mochi/types
 
-pub fn get_introspection_object_type(name: String) -> Option(schema.ObjectType) {
+pub fn get_introspection_object_type(
+  name: String,
+) -> Option(schema.ObjectType) {
   case name {
     "__Schema" -> Some(get_introspection_schema_type())
     "__Type" -> Some(get_introspection_type_type())
@@ -233,6 +235,7 @@ fn field_def(
     deprecation_reason: None,
     topic_fn: None,
     rich_resolver: None,
+    columns: schema.DerivedColumn,
   )
 }
 
@@ -281,6 +284,7 @@ fn field_def_with_include_deprecated(
     deprecation_reason: None,
     topic_fn: None,
     rich_resolver: None,
+    columns: schema.DerivedColumn,
   )
 }
 
@@ -573,7 +577,10 @@ fn get_scalar_description(name: String) -> String {
   }
 }
 
-fn lookup_type_introspection(schema_def: schema.Schema, name: String) -> Dynamic {
+fn lookup_type_introspection(
+  schema_def: schema.Schema,
+  name: String,
+) -> Dynamic {
   case dict.get(schema_def.types, name) {
     Ok(type_def) -> build_type_def_introspection(schema_def, type_def)
     Error(_) -> lookup_root_type(schema_def, name)

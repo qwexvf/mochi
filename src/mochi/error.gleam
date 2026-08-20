@@ -122,7 +122,10 @@ pub fn with_extensions(
 }
 
 /// Set error category in extensions
-pub fn with_category(err: GraphQLError, category: ErrorCategory) -> GraphQLError {
+pub fn with_category(
+  err: GraphQLError,
+  category: ErrorCategory,
+) -> GraphQLError {
   with_extension(
     err,
     "category",
@@ -157,7 +160,9 @@ pub fn with_error_code(err: GraphQLError, code: ErrorCode) -> GraphQLError {
   with_code(err, code_to_string(code))
 }
 
-pub fn to_payload(err: GraphQLError) -> #(String, Option(Dict(String, Dynamic))) {
+pub fn to_payload(
+  err: GraphQLError,
+) -> #(String, Option(Dict(String, Dynamic))) {
   #(err.message, err.extensions)
 }
 
@@ -190,7 +195,10 @@ pub fn authentication_error(message: String) -> GraphQLError {
 }
 
 /// Create an authorization error
-pub fn authorization_error(message: String, path: List(String)) -> GraphQLError {
+pub fn authorization_error(
+  message: String,
+  path: List(String),
+) -> GraphQLError {
   new_at(message, path)
   |> with_category(AuthorizationErrorCategory)
   |> with_code("FORBIDDEN")
@@ -357,6 +365,9 @@ pub fn append_index(path: List(PathSegment), index: Int) -> List(PathSegment) {
 }
 
 /// Add field segment to path
-pub fn append_field(path: List(PathSegment), field: String) -> List(PathSegment) {
+pub fn append_field(
+  path: List(PathSegment),
+  field: String,
+) -> List(PathSegment) {
   list.append(path, [FieldSegment(field)])
 }

@@ -390,7 +390,9 @@ pub fn timing_middleware(
 }
 
 /// Transform middleware that transforms the resolved value
-pub fn transform_middleware(transform: fn(Dynamic) -> Dynamic) -> MiddlewareDef {
+pub fn transform_middleware(
+  transform: fn(Dynamic) -> Dynamic,
+) -> MiddlewareDef {
   middleware("transform", fn(resolution, next) {
     let result = next(resolution)
     case result.value {
@@ -415,7 +417,9 @@ pub fn validation_middleware(
 }
 
 /// Error wrapping middleware that transforms errors
-pub fn error_wrapper_middleware(wrapper: fn(String) -> String) -> MiddlewareDef {
+pub fn error_wrapper_middleware(
+  wrapper: fn(String) -> String,
+) -> MiddlewareDef {
   middleware("error_wrapper", fn(resolution, next) {
     let result = next(resolution)
     case result.error {

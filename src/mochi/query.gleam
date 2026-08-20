@@ -13,6 +13,7 @@ import mochi/schema.{
   type ExecutionContext, type FieldDefinition, type FieldType, type ObjectType,
   type ResolverInfo, type Schema,
 }
+import mochi/selection
 import mochi/types as t
 
 // ============================================================================
@@ -551,6 +552,98 @@ pub fn get_bool_or(args: Args, key: String, default: Bool) -> Bool {
 }
 
 // ============================================================================
+// Selection Projection
+// ============================================================================
+
+/// The columns the client's selection needs, plus `always`.
+///
+/// Sugar for the common case. Anything else — narrowing a union, reading a nested
+/// field's columns or arguments — comes from `schema.selection(ctx)` piped
+/// through `mochi/selection`:
+///
+/// ```gleam
+/// let selected = schema.selection(ctx)
+/// selected |> selection.for_type("Cat") |> selection.columns(always: ["id"])
+/// selected |> selection.children("posts") |> selection.columns(always: ["user_id"])
+/// ```
+pub fn selected_columns(
+  ctx: ExecutionContext,
+  always always: List(String),
+) -> List(String) {
+  schema.selection(ctx) |> selection.columns(always: always)
+}
+
+/// Check every field of `type_name` against the table's real column list.
+///
+/// Catches the mistake the derived default is designed to make loud: a field
+/// whose column doesn't exist. Call it from a test or at boot, so a rename fails
+/// there instead of at query time.
+///
+/// ```gleam
+/// pub fn user_columns_match_table_test() {
+///   query.check_columns(my_schema, "User", table: ["id", "email", "first_name"])
+///   |> should.equal(Ok(Nil))
+/// }
+/// ```
+///
+/// Returns one message per offending field. Fields declared `no_columns`, and
+/// fields whose columns are all present, are ignored.
+pub fn check_columns(
+  schema_def: Schema,
+  type_name: String,
+  table table_columns: List(String),
+) -> Result(Nil, List(String)) {
+  use object <- result.try(object_type(schema_def, type_name))
+  case missing_columns(object, table_columns) {
+    [] -> Ok(Nil)
+    problems -> Error(problems)
+  }
+}
+
+fn object_type(
+  schema_def: Schema,
+  type_name: String,
+) -> Result(ObjectType, List(String)) {
+  case dict.get(schema_def.types, type_name) {
+    Ok(schema.ObjectTypeDef(object)) -> Ok(object)
+    Ok(_) -> Error(["'" <> type_name <> "' is not an object type"])
+    Error(_) -> Error(["type '" <> type_name <> "' is not in the schema"])
+  }
+}
+
+fn missing_columns(
+  object: ObjectType,
+  table_columns: List(String),
+) -> List(String) {
+  dict.values(object.fields)
+  |> list.sort(fn(a, b) { string.compare(a.name, b.name) })
+  |> list.flat_map(fn(field) {
+    schema.resolved_columns(field)
+    |> list.filter(fn(column) { !list.contains(table_columns, column) })
+    |> list.map(missing_column_message(object.name, field, _))
+  })
+}
+
+fn missing_column_message(
+  type_name: String,
+  field: FieldDefinition,
+  column: String,
+) -> String {
+  let hint = case field.columns {
+    schema.DerivedColumn ->
+      " (undeclared — add types.from_columns or types.no_columns)"
+    _ -> ""
+  }
+  type_name
+  <> "."
+  <> field.name
+  <> " needs column '"
+  <> column
+  <> "', which the table does not have"
+  <> hint
+}
+
+// ============================================================================
 // Schema Building
 // ============================================================================
 
@@ -713,7 +806,10 @@ pub fn add_union(builder: SchemaBuilder, u: schema.UnionType) -> SchemaBuilder {
   SchemaBuilder(..builder, unions: [u, ..builder.unions])
 }
 
-pub fn add_scalar(builder: SchemaBuilder, s: schema.ScalarType) -> SchemaBuilder {
+pub fn add_scalar(
+  builder: SchemaBuilder,
+  s: schema.ScalarType,
+) -> SchemaBuilder {
   SchemaBuilder(..builder, scalars: [s, ..builder.scalars])
 }
 
