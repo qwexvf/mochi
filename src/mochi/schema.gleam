@@ -177,7 +177,112 @@ pub type FieldDefinition {
     /// Maps resolved arguments + context to a pub/sub topic string.
     topic_fn: Option(fn(args.Args, ExecutionContext) -> Result(String, String)),
     rich_resolver: Option(RichResolver),
+    /// Where this field's data comes from, for selection projection.
+    /// See `ColumnSource`.
+    columns: ColumnSource,
   )
+}
+
+/// Which storage columns a field needs, so `query.selected_columns` can derive a
+/// projection from the schema instead of a hand-written mapping.
+///
+/// The default is `DerivedColumn`, never "no columns": a field nobody declared
+/// still asks for something, so a wrong guess surfaces as a database error
+/// rather than as a silently blank row.
+pub type ColumnSource {
+  /// Undeclared: the column is the field name in snake_case (`fullName` ->
+  /// `full_name`).
+  DerivedColumn
+  /// The columns this field needs. One field may need several
+  /// (`fullName` -> `first_name`, `last_name`).
+  Columns(names: List(String))
+  /// This field needs no column of its own — a join, or a value computed from
+  /// columns that other fields already claim.
+  NoColumns
+}
+
+/// Declare the columns a field needs.
+pub fn field_columns(
+  field: FieldDefinition,
+  names: List(String),
+) -> FieldDefinition {
+  FieldDefinition(..field, columns: Columns(names))
+}
+
+/// Declare that a field needs no column of its own.
+pub fn field_no_columns(field: FieldDefinition) -> FieldDefinition {
+  FieldDefinition(..field, columns: NoColumns)
+}
+
+/// The columns a field needs, applying the `DerivedColumn` default.
+pub fn resolved_columns(field: FieldDefinition) -> List(String) {
+  case field.columns {
+    Columns(names) -> names
+    NoColumns -> []
+    DerivedColumn -> [snake_case(field.name)]
+  }
+}
+
+/// `fullName` -> `full_name`, `publishedAt` -> `published_at`, `userID` ->
+/// `user_id`, `HTTPStatus` -> `http_status`. Already-snake names pass through.
+pub fn snake_case(name: String) -> String {
+  to_snake(string.to_graphemes(name), None, "")
+}
+
+fn to_snake(
+  chars: List(String),
+  previous: Option(String),
+  acc: String,
+) -> String {
+  case chars {
+    [] -> acc
+    [char, ..rest] ->
+      to_snake(
+        rest,
+        Some(char),
+        acc <> piece(char, previous: previous, next: first(rest)),
+      )
+  }
+}
+
+fn first(chars: List(String)) -> Option(String) {
+  list.first(chars) |> option.from_result
+}
+
+/// One character's contribution to the snake_case name.
+fn piece(
+  char: String,
+  previous previous: Option(String),
+  next next: Option(String),
+) -> String {
+  case is_upper(char), opens_word(previous, next) {
+    False, _ -> char
+    True, True -> "_" <> string.lowercase(char)
+    True, False -> string.lowercase(char)
+  }
+}
+
+/// A capital opens a new word when it follows a lowercase character or digit
+/// (`fullName`), or when it ends a run of capitals that a lowercase character
+/// continues (`HTTPStatus` -> `http_status`).
+fn opens_word(previous: Option(String), next: Option(String)) -> Bool {
+  case holds(previous, continues_word) {
+    True -> True
+    False -> holds(previous, is_upper) && holds(next, continues_word)
+  }
+}
+
+fn holds(char: Option(String), predicate: fn(String) -> Bool) -> Bool {
+  option.map(char, predicate) |> option.unwrap(False)
+}
+
+/// Lowercase letters and digits continue the current word; `_` already separates.
+fn continues_word(char: String) -> Bool {
+  char != "_" && !is_upper(char)
+}
+
+fn is_upper(char: String) -> Bool {
+  string.uppercase(char) == char && string.lowercase(char) != char
 }
 
 pub type FieldType {
@@ -323,6 +428,64 @@ pub type ExecutionContext {
     /// Optional telemetry event callback — receives SchemaEvents during execution.
     /// Use `telemetry.to_schema_fn/1` to bridge to a full TelemetryConfig.
     telemetry_fn: Option(TelemetryFn),
+    /// What the client selected on the value this resolver returns. Set by the
+    /// executor before each resolver call. Computed on demand, so a resolver
+    /// that never asks pays nothing — read it via `selected_fields`,
+    /// `has_selection`, `selection_of`, or `selection` for the whole list.
+    selection: Selection,
+  )
+}
+
+/// A field the client asked for, plus its own sub-selection.
+///
+/// `name` is the schema field name, never the response alias, so it maps
+/// straight onto a column allowlist. Meta fields (`__typename`, `__schema`,
+/// `__type`) are excluded, and `@skip`/`@include` are already applied.
+/// Entries are merged by name, so the same field selected twice with different
+/// arguments appears once with the union of its sub-selections.
+pub type SelectedField {
+  SelectedField(
+    name: String,
+    /// Concrete object type names this field applies to, or `None` when it was
+    /// selected unconditionally. Set when the field appeared inside a fragment
+    /// carrying a type condition; interfaces and unions are expanded to their
+    /// concrete members, so a resolver returning one of several types can ask
+    /// for exactly its own fields via `selected_fields_for`.
+    only_for: Option(List(String)),
+    /// Arguments written on this field, with variables substituted. Raw literal
+    /// shapes — not coerced against the schema, so schema defaults are absent
+    /// and enum values arrive as strings.
+    arguments: Dict(String, Dynamic),
+    /// Storage columns this field needs, taken from the schema — declared with
+    /// `types.from_columns` / `types.no_columns`, or the field name in
+    /// snake_case when undeclared. `query.selected_columns` sums these, so no
+    /// hand-written field-to-column mapping is needed.
+    columns: List(String),
+    children: List(SelectedField),
+  )
+}
+
+/// The selection carried by an ExecutionContext, computed on first read.
+///
+/// Building it walks the query's selection set, so it is deferred: resolvers
+/// that ignore the selection never pay for it. Each read recomputes, so bind it
+/// once (`let selected = schema.selection(ctx)`) when using it repeatedly.
+pub opaque type Selection {
+  Selection(force: fn() -> List(SelectedField))
+}
+
+/// An unconditional selected field with no arguments — the common shape when
+/// building a selection by hand in tests.
+pub fn selected_field(
+  name: String,
+  children: List(SelectedField),
+) -> SelectedField {
+  SelectedField(
+    name: name,
+    only_for: None,
+    arguments: dict.new(),
+    columns: [snake_case(name)],
+    children: children,
   )
 }
 
@@ -347,14 +510,48 @@ pub type ResolverInfo {
 /// Create a new execution context. The `user_context` value can be any
 /// app-defined type; it is wrapped opaquely and surfaced to resolvers via
 /// `context_accessor` / `read_user_context`.
-pub fn execution_context(user_context user_context_value: a) -> ExecutionContext {
+pub fn execution_context(
+  user_context user_context_value: a,
+) -> ExecutionContext {
   ExecutionContext(
     user_context: UserContext(coerce_to_dynamic(user_context_value)),
     data_loaders: dict.new(),
     middleware_fn: None,
     telemetry: None,
     telemetry_fn: None,
+    selection: Selection(fn() { [] }),
   )
+}
+
+/// The fields the client selected on the value this resolver returns.
+///
+/// Computed on first read, so a resolver that never asks pays nothing. Each call
+/// recomputes, so bind it once and pipe it through `mochi/selection`:
+///
+/// ```gleam
+/// let selected = schema.selection(ctx)
+/// selected |> selection.columns(always: ["id"])
+/// ```
+pub fn selection(context: ExecutionContext) -> List(SelectedField) {
+  context.selection.force()
+}
+
+/// Set the selection on a context — useful for testing a resolver's projection
+/// logic without running a query.
+pub fn with_selection(
+  context: ExecutionContext,
+  fields: List(SelectedField),
+) -> ExecutionContext {
+  ExecutionContext(..context, selection: Selection(fn() { fields }))
+}
+
+/// Set a selection computed on first read. The executor uses this so a resolver
+/// that ignores the selection never pays for building it.
+pub fn with_lazy_selection(
+  context: ExecutionContext,
+  compute: fn() -> List(SelectedField),
+) -> ExecutionContext {
+  ExecutionContext(..context, selection: Selection(compute))
 }
 
 /// Create a typed accessor for `user_context`. Define once per app, use in every resolver.
@@ -645,6 +842,7 @@ pub fn field_def(name: String, field_type: FieldType) -> FieldDefinition {
     deprecation_reason: None,
     topic_fn: None,
     rich_resolver: None,
+    columns: DerivedColumn,
   )
 }
 
@@ -677,7 +875,10 @@ pub fn argument(
   )
 }
 
-pub fn resolver(field: FieldDefinition, resolve_fn: Resolver) -> FieldDefinition {
+pub fn resolver(
+  field: FieldDefinition,
+  resolve_fn: Resolver,
+) -> FieldDefinition {
   FieldDefinition(..field, resolver: Some(resolve_fn))
 }
 
@@ -813,6 +1014,7 @@ pub fn auto_field(
       deprecation_reason: None,
       topic_fn: None,
       rich_resolver: None,
+      columns: DerivedColumn,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -881,7 +1083,11 @@ pub fn required_list_field(
 }
 
 /// Add a reference field to another type with auto-resolver
-pub fn ref_field(obj: ObjectType, name: String, type_name: String) -> ObjectType {
+pub fn ref_field(
+  obj: ObjectType,
+  name: String,
+  type_name: String,
+) -> ObjectType {
   auto_field(obj, name, Named(type_name))
 }
 
@@ -918,6 +1124,7 @@ pub fn resolver_field(
       deprecation_reason: None,
       topic_fn: None,
       rich_resolver: None,
+      columns: DerivedColumn,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }
@@ -966,6 +1173,7 @@ pub fn query_with_args(
       deprecation_reason: None,
       topic_fn: None,
       rich_resolver: None,
+      columns: DerivedColumn,
     )
   ObjectType(..obj, fields: dict.insert(obj.fields, name, f))
 }

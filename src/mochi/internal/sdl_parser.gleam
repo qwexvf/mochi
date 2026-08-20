@@ -145,7 +145,9 @@ fn parse_type_system_definition(
 }
 
 /// Parse optional description (triple-quoted string)
-fn parse_optional_description(parser: SdlParser) -> #(Option(String), SdlParser) {
+fn parse_optional_description(
+  parser: SdlParser,
+) -> #(Option(String), SdlParser) {
   case peek_token(parser) {
     Ok(sdl_lexer.SdlTokenWithPosition(sdl_lexer.Description(content), _)) -> {
       case consume_token(parser) {
@@ -613,7 +615,9 @@ fn parse_type_extension(
 
 // Helper parsing functions
 
-fn parse_name(parser: SdlParser) -> Result(#(String, SdlParser), SdlParseError) {
+fn parse_name(
+  parser: SdlParser,
+) -> Result(#(String, SdlParser), SdlParseError) {
   case consume_token(parser) {
     Ok(#(sdl_lexer.SdlTokenWithPosition(sdl_lexer.Name(name), _), parser)) ->
       Ok(#(name, parser))
@@ -1251,7 +1255,9 @@ fn parse_input_field_definition(
 
 // Utility functions
 
-fn peek_token(parser: SdlParser) -> Result(SdlTokenWithPosition, SdlParseError) {
+fn peek_token(
+  parser: SdlParser,
+) -> Result(SdlTokenWithPosition, SdlParseError) {
   case parser.current {
     Ok(token) -> Ok(token)
     Error(err) -> Error(SdlLexError(err))

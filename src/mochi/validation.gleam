@@ -411,7 +411,10 @@ fn validate_selection(
   }
 }
 
-fn validate_field(ctx: ValidationContext, field: ast.Field) -> ValidationContext {
+fn validate_field(
+  ctx: ValidationContext,
+  field: ast.Field,
+) -> ValidationContext {
   let ctx = case field.location {
     Some(lexer.Position(line, column)) ->
       ValidationContext(..ctx, current_location: Some(#(line, column)))

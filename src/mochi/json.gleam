@@ -39,7 +39,10 @@ pub fn encode(value: Dynamic) -> Result(String, EncodeError) {
 
 /// Encode a Dynamic value to a pretty-printed JSON string with the given
 /// indent width. Walks the value tree directly — does not re-parse JSON.
-pub fn encode_pretty(value: Dynamic, indent: Int) -> Result(String, EncodeError) {
+pub fn encode_pretty(
+  value: Dynamic,
+  indent: Int,
+) -> Result(String, EncodeError) {
   use v <- result.map(output.from_dynamic(value))
   pretty_value(v, indent, 0)
   |> string_tree.to_string

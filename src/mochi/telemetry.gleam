@@ -164,7 +164,9 @@ pub fn new_context(config: TelemetryConfig) -> TelemetryContext {
 }
 
 /// Create a context from an Option config
-pub fn from_option(config: Option(TelemetryConfig)) -> Option(TelemetryContext) {
+pub fn from_option(
+  config: Option(TelemetryConfig),
+) -> Option(TelemetryContext) {
   case config {
     Some(c) -> Some(new_context(c))
     None -> None

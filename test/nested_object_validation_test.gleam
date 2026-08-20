@@ -770,8 +770,7 @@ pub fn field_from_nested_level_on_org_root_is_rejected_test() {
   let q = "{ org { headCount } }"
   let result = executor.execute_query(s, q)
   case result.errors {
-    [] ->
-      panic as "Expected error: headCount is on Department, not Organization"
+    [] -> panic as "Expected error: headCount is on Department, not Organization"
     _ -> Nil
   }
 }

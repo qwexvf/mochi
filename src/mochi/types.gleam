@@ -133,6 +133,7 @@ pub type TypeField(a) {
     extractor: fn(a) -> Dynamic,
     is_deprecated: Bool,
     deprecation_reason: Option(String),
+    columns: schema.ColumnSource,
   )
   /// Field with arguments and resolver
   TypeFieldWithArgs(
@@ -143,6 +144,7 @@ pub type TypeField(a) {
     resolver: fn(a, args_mod.Args, ExecutionContext) -> Result(Dynamic, String),
     is_deprecated: Bool,
     deprecation_reason: Option(String),
+    columns: schema.ColumnSource,
   )
 }
 
@@ -154,6 +156,54 @@ pub fn object(name: String) -> TypeBuilder(a) {
 /// Add description to type
 pub fn description(builder: TypeBuilder(a), desc: String) -> TypeBuilder(a) {
   TypeBuilder(..builder, description: Some(desc))
+}
+
+/// Declare which storage columns the most recently added field needs, so
+/// projection can be derived from the schema instead of a hand-written mapping.
+///
+/// ```gleam
+/// types.object("User")
+/// |> types.string("email", fn(u: User) { u.email })          // column "email"
+/// |> types.string("fullName", fn(u: User) { u.first <> u.last })
+/// |> types.from_columns(["first_name", "last_name"])         // one field, two columns
+/// ```
+///
+/// An undeclared field asks for its own name in snake_case (`publishedAt` ->
+/// `published_at`), so forgetting a declaration produces a database error rather
+/// than a silently blank value. Use `no_columns` for a field backed by no column
+/// of its own.
+pub fn from_columns(
+  builder: TypeBuilder(a),
+  names: List(String),
+) -> TypeBuilder(a) {
+  set_last_columns(builder, schema.Columns(names))
+}
+
+/// Declare that the most recently added field needs no column of its own — a
+/// join, or a value computed from columns other fields already claim.
+pub fn no_columns(builder: TypeBuilder(a)) -> TypeBuilder(a) {
+  set_last_columns(builder, schema.NoColumns)
+}
+
+fn set_last_columns(
+  builder: TypeBuilder(a),
+  source: schema.ColumnSource,
+) -> TypeBuilder(a) {
+  case builder.fields {
+    [] -> builder
+    [field, ..rest] ->
+      TypeBuilder(..builder, fields: [with_columns(field, source), ..rest])
+  }
+}
+
+fn with_columns(
+  field: TypeField(a),
+  source: schema.ColumnSource,
+) -> TypeField(a) {
+  case field {
+    TypeField(..) -> TypeField(..field, columns: source)
+    TypeFieldWithArgs(..) -> TypeFieldWithArgs(..field, columns: source)
+  }
 }
 
 /// Mark the most recently added field as deprecated with a reason.
@@ -234,6 +284,7 @@ fn add_field(
       extractor: extractor,
       is_deprecated: False,
       deprecation_reason: None,
+      columns: schema.DerivedColumn,
     ),
     ..builder.fields
   ])
@@ -717,6 +768,7 @@ pub fn field_with_args(
       resolver: resolver,
       is_deprecated: False,
       deprecation_reason: None,
+      columns: schema.DerivedColumn,
     )
   TypeBuilder(..builder, fields: [field, ..builder.fields])
 }
@@ -807,7 +859,9 @@ pub fn build_with_encoder(
 /// Safe as long as the resolver returns values of type `a` and the extractors
 /// are defined for the same type `a`. Do not use when resolvers return
 /// pre-encoded Dicts.
-pub fn build_direct(builder: TypeBuilder(a)) -> #(ObjectType, fn(a) -> Dynamic) {
+pub fn build_direct(
+  builder: TypeBuilder(a),
+) -> #(ObjectType, fn(a) -> Dynamic) {
   let schema_fields =
     list.map(list.reverse(builder.fields), fn(f) { to_field_def_direct(f) })
 
@@ -824,6 +878,17 @@ pub fn build_direct(builder: TypeBuilder(a)) -> #(ObjectType, fn(a) -> Dynamic) 
     })
 
   #(object_type, to_dynamic)
+}
+
+fn apply_columns(
+  field: FieldDefinition,
+  source: schema.ColumnSource,
+) -> FieldDefinition {
+  case source {
+    schema.DerivedColumn -> field
+    schema.Columns(names) -> schema.field_columns(field, names)
+    schema.NoColumns -> schema.field_no_columns(field)
+  }
 }
 
 fn apply_deprecation(
@@ -850,6 +915,7 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       extractor,
       is_deprecated,
       deprecation_reason,
+      columns,
     ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
@@ -865,6 +931,8 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
         None -> base
       }
       apply_deprecation(with_desc, is_deprecated, deprecation_reason)
+      |> apply_columns(columns)
+      |> apply_columns(columns)
     }
 
     TypeFieldWithArgs(
@@ -875,6 +943,7 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
       field_resolver,
       is_deprecated,
       deprecation_reason,
+      columns,
     ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
@@ -893,6 +962,8 @@ fn to_field_def_direct(f: TypeField(a)) -> FieldDefinition {
         None -> with_args
       }
       apply_deprecation(with_desc, is_deprecated, deprecation_reason)
+      |> apply_columns(columns)
+      |> apply_columns(columns)
     }
   }
 }
@@ -902,9 +973,9 @@ pub fn encoder(builder: TypeBuilder(a)) -> fn(a) -> Dynamic {
     let field_pairs =
       list.filter_map(builder.fields, fn(f) {
         case f {
-          TypeField(name, _, _, extractor, _, _) ->
+          TypeField(name, _, _, extractor, _, _, _) ->
             Ok(#(name, extractor(value)))
-          TypeFieldWithArgs(_, _, _, _, _, _, _) -> Error(Nil)
+          TypeFieldWithArgs(_, _, _, _, _, _, _, _) -> Error(Nil)
         }
       })
     to_dynamic(dict.from_list(field_pairs))
@@ -923,6 +994,7 @@ fn to_field_def(
       extractor,
       is_deprecated,
       deprecation_reason,
+      columns,
     ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
@@ -940,6 +1012,8 @@ fn to_field_def(
         None -> base
       }
       apply_deprecation(with_desc, is_deprecated, deprecation_reason)
+      |> apply_columns(columns)
+      |> apply_columns(columns)
     }
 
     TypeFieldWithArgs(
@@ -950,6 +1024,7 @@ fn to_field_def(
       field_resolver,
       is_deprecated,
       deprecation_reason,
+      columns,
     ) -> {
       let resolver = fn(info: ResolverInfo) {
         case info.parent {
@@ -973,6 +1048,8 @@ fn to_field_def(
         None -> with_args
       }
       apply_deprecation(with_desc, is_deprecated, deprecation_reason)
+      |> apply_columns(columns)
+      |> apply_columns(columns)
     }
   }
 }

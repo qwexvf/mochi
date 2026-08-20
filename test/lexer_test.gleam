@@ -42,7 +42,9 @@ pub fn punctuation_tokens_test() {
   }
 }
 
-fn inspect_error_or_ok(r: Result(List(lexer.Token), lexer.LexerError)) -> String {
+fn inspect_error_or_ok(
+  r: Result(List(lexer.Token), lexer.LexerError),
+) -> String {
   case r {
     Ok(_) -> "ok-but-wrong-tokens"
     Error(e) -> inspect_error(e)

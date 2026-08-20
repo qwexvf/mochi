@@ -133,8 +133,7 @@ pub fn next_sdl_token(
     <<"#":utf8, rest:bits>> -> read_comment(advance(lexer, rest, 1), position)
     <<"-":utf8, _:bits>> -> read_number(lexer, position)
     <<b, _:bits>> if b >= 48 && b <= 57 -> read_number(lexer, position)
-    <<b, _:bits>> if b >= 97 && b <= 122 ->
-      read_name_or_keyword(lexer, position)
+    <<b, _:bits>> if b >= 97 && b <= 122 -> read_name_or_keyword(lexer, position)
     <<b, _:bits>> if b >= 65 && b <= 90 -> read_name_or_keyword(lexer, position)
     <<95, _:bits>> -> read_name_or_keyword(lexer, position)
     <<b, _:bits>> -> Error(UnexpectedCharacter(byte_to_string(b), position))
