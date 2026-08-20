@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.1.0
+
+Selection projection — resolvers can read the client's field selection and
+fetch only the columns they need instead of `select *`.
+
+### Added
+
+- `mochi/selection` — read the selection set in a resolver via
+  `schema.selection(ctx)`, then `names`, `has`, `find`, `children`,
+  `for_type`, `columns`, and the `argument` / `int_argument` /
+  `string_argument` / `bool_argument` accessors. `SelectedField` is the
+  entry type.
+- Column declarations live next to the field: `types.from_columns`,
+  `types.no_columns`, `schema.field_columns`, `schema.field_no_columns`,
+  `schema.resolved_columns`, and the `ColumnSource` type. An undeclared
+  field asks for its own name in snake_case, so a forgotten declaration
+  fails at the database instead of silently dropping data.
+- `query.selected_columns` for the common "columns to select" case, and
+  `query.check_columns` to verify declarations against a real table in a
+  test.
+- `document_cache.new_with_min_size` to configure the minimum query size
+  worth caching.
+
+### Changed
+
+- `document_cache` skips caching queries below 200 bytes — re-parsing them
+  is cheaper than the cache round-trip — and uses tuned ETS options.
+
 ## 2.0.0
 
 Tighten the public API and rewrite the lexer + JSON hot paths.
