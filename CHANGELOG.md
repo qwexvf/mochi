@@ -1,9 +1,19 @@
 # Changelog
 
-## 2.1.0
+## 3.0.0
 
 Selection projection — resolvers can read the client's field selection and
 fetch only the columns they need instead of `select *`.
+
+(Supersedes the reverted 2.1.0, which shipped the breaking change below as a
+minor by mistake.)
+
+### Breaking
+
+- `schema.FieldDefinition` gained a required `columns: ColumnSource` field.
+  Code that constructs `FieldDefinition(...)` directly must pass it — use
+  `schema.DerivedColumn` for the previous default. The `types` / `query`
+  builders are unaffected.
 
 ### Added
 
