@@ -2,15 +2,15 @@
 
 [📚 Documentation on hexdocs](https://hexdocs.pm/mochi/) · [📦 Package on hex.pm](https://hex.pm/packages/mochi)
 
-**mochi** is a type-safe, Code First GraphQL library for Gleam. Define your GraphQL schemas using Gleam types and automatically generate TypeScript types and GraphQL SDL.
+**mochi** is a Code First GraphQL library for Gleam. You define the schema with Gleam types, and it can generate TypeScript types and GraphQL SDL from it.
 
 Inspired by:
-- [Absinthe](https://github.com/absinthe-graphql/absinthe) - The GraphQL toolkit for Elixir
-- [dataloader](https://github.com/graphql/dataloader) - DataLoader pattern for batching and caching
-- [gqlkit](https://github.com/izumin5210/gqlkit) - Write TypeScript, generate GraphQL
-- [Pothos](https://github.com/hayes/pothos) - Code First GraphQL for TypeScript
-- [TypeGraphQL](https://github.com/MichalLytek/type-graphql) - Code First GraphQL with TypeScript decorators
-- [Nexus](https://github.com/graphql-nexus/nexus) - Declarative, Code First GraphQL for TypeScript
+- [Absinthe](https://github.com/absinthe-graphql/absinthe), the GraphQL toolkit for Elixir
+- [dataloader](https://github.com/graphql/dataloader), batching and caching with the DataLoader pattern
+- [gqlkit](https://github.com/izumin5210/gqlkit): write TypeScript, generate GraphQL
+- [Pothos](https://github.com/hayes/pothos), Code First GraphQL for TypeScript
+- [TypeGraphQL](https://github.com/MichalLytek/type-graphql), Code First GraphQL with TypeScript decorators
+- [Nexus](https://github.com/graphql-nexus/nexus), declarative Code First GraphQL for TypeScript
 
 ## Installation
 
@@ -100,13 +100,11 @@ pub fn main() {
 
 ## Performance
 
-Mochi is built for performance on the BEAM VM.
-
 **Test system:** AMD Ryzen 7 PRO 7840U (8 cores) · 64 GB RAM · 4 wrk threads · 100 connections · 10s runs · all servers in Docker · mochi v2.0.0
 
 All servers run in Docker on the same bridge network. wrk runs on the host and hits each container via its mapped port.
 
-### No document cache — parse + validate + execute every request
+### No document cache (parse + validate + execute on every request)
 
 #### Simple query: `{ users { id name } }`
 
@@ -128,7 +126,7 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 | mercurius | Node.js + Fastify | 2,834 | 50.33ms |
 | apollo | Node.js | 1,954 | 78.72ms |
 
-### With document cache — skip parse + validate on repeated queries
+### With document cache (repeated queries skip parse + validate)
 
 #### Simple query: `{ users { id name } }`
 
@@ -154,20 +152,20 @@ All servers run in Docker on the same bridge network. wrk runs on the host and h
 
 **BEAM scheduler vs. single-threaded JS event loop.** Node.js serialises all requests through one event loop. The BEAM runs a scheduler per CPU core, each handling thousands of lightweight processes simultaneously. Under 100 concurrent connections mochi saturates all cores; Node.js cannot without clustering.
 
-**No shared-heap GC pauses.** Every request on the BEAM lives in its own process heap. When a request finishes, that heap is reclaimed instantly — no stop-the-world pause. V8 has a single shared heap across all in-flight requests, so GC pauses add latency spikes for every concurrent request.
+**No shared-heap GC pauses.** Every request on the BEAM lives in its own process heap. When a request finishes, that heap is freed right away, with no stop-the-world pause. V8 has a single shared heap across all in-flight requests, so GC pauses add latency spikes for every concurrent request.
 
 **Flat execution path.** Gleam pattern matching on union types compiles to native BEAM tagged-tuple dispatch. There are no promise chains, middleware stacks, or resolver-wrapping layers.
 
-**Note on the cache results.** The Node.js servers gain 2–3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput barely moves with cache enabled, and direction can flip between query sizes — see the medians from a 5-run mochi-only sweep at 100 connections × 10s:
+**Note on the cache results.** The Node.js servers gain 2-3× throughput from caching because parse + validate dominates their request cost. Mochi's throughput barely moves with the cache on, and the direction can flip between query sizes. Medians from a 5-run mochi-only sweep at 100 connections × 10s:
 
 | Query | No cache (median) | With cache (median) | Δ |
 |-------|------|------|---|
 | simple (46 bytes) | 17,474 | 16,860 | **−3.5%** |
 | medium (50 bytes, heavier execution) | 7,903 | 8,264 | **+4.6%** |
 
-Both gaps are at the edge of run-to-run variance. The reason cache barely helps mochi: after the lexer rewrite, parsing a small query takes ~3 µs out of a ~6 ms request — replacing it with a 250 ns `ets:lookup` saves 0.05% of request time, well below the wrk noise floor. As parse cost scales with query size and complexity, the saving grows; an in-process measurement on a 700-byte query shows parse 122 µs vs cached lookup 2 µs (60× difference) and the cache becomes an unambiguous win.
+Both gaps are at the edge of run-to-run variance. The cache barely helps mochi because, after the lexer rewrite, parsing a small query takes ~3 µs out of a ~6 ms request. Swapping that for a 250 ns `ets:lookup` saves 0.05% of request time, well below the wrk noise floor. The saving grows with query size and complexity. Measured in-process, a 700-byte query takes 122 µs to parse vs 2 µs for a cached lookup (60×), and there the cache clearly wins.
 
-The cache is therefore mostly useful in mochi for **large queries** (deeply nested, lots of fields, fragments) — exactly the cases where parsing actually costs something. For the small queries common in microservice traffic, mochi's parser is fast enough that caching is unnecessary. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
+So in mochi the cache is mostly useful for **large queries** (deeply nested, lots of fields, fragments), where parsing costs something. For the small queries common in microservice traffic, the parser is fast enough that you don't need it. See [`mochi/test/perf_bench.gleam`](mochi/test/perf_bench.gleam) for the in-process numbers.
 
 ### Running the benchmarks
 
@@ -178,33 +176,31 @@ cd examples/mochi_wisp/benchmark
 
 ## Features
 
-- **Code First Schema Definition** - Define GraphQL schemas using Gleam types with type-safe field extractors
-- **Typed argument access** - `Args` opaque + `query.get_*` helpers; no raw `Dict(String, Dynamic)` in resolver code
-- **Typed user context** - `schema.UserContext` + `context_accessor` so app context isn't `Dynamic`-shaped at the API level
-- **Fast parser** - byte-level `BitArray` lexer; 985-byte query tokenizes in ~30 µs on Erlang
-- **Parse Caching** - ETS-backed document cache with byte-size threshold; auto-skip for queries small enough that parsing is cheaper than lookup
-- **Batch Execution** - Execute multiple GraphQL requests in one call, with optional parallel dispatch
-- **TypeScript Codegen** - Generate `.d.ts` type definitions from your schema
-- **SDL Generation** - Generate `.graphql` schema files
-- **SDL Type Extensions** - Split schemas across multiple files using `extend type`, `extend union`, `extend enum`, etc.
-- **Operation Resolver Codegen** - Generate mochi resolver boilerplate from `.gql` client operation files
-- **Query Validation** - Validate GraphQL queries against your schema
-- **Custom Directives** - Define and execute custom directives with handlers
-- **@deprecated Support** - Mark fields and enum values as deprecated
-- **Interface Types** - Define GraphQL interfaces with type resolution
-- **Union Types** - Define union types with runtime type resolution
-- **Fragment Support** - Full support for GraphQL fragments
-- **Subscriptions** - Real-time updates with PubSub pattern
-- **Error Extensions** - GraphQL-spec compliant errors with locations, path, and extensions
-- **JSON Serialization** - Built-in JSON encoding for responses
-- **Null Propagation** - Proper null bubbling per GraphQL specification
-- **DataLoader** - N+1 query prevention with automatic batching and caching
-- **Guards** - Composable precondition checks for authorization, feature flags, and access control
-- **Query Security** - Depth limiting, complexity analysis, alias limits
-- **Persisted Queries** - Automatic Persisted Queries (APQ) with SHA256 hashing
-- **GraphQL Playgrounds** - Built-in GraphiQL, Playground, Apollo Sandbox, and simple explorer
-- **BEAM Powered** - Built for performance on Erlang/OTP
-- **Zero Config** - Simple, intuitive API with sensible defaults
+- **Code First schema definition**: GraphQL schemas from Gleam types, with type-safe field extractors
+- **Typed argument access**: opaque `Args` plus `query.get_*` helpers, so resolver code never sees a raw `Dict(String, Dynamic)`
+- **Typed user context**: `schema.UserContext` and `context_accessor`, so your app context isn't `Dynamic` at the API level
+- **Parser**: byte-level `BitArray` lexer. A 985-byte query tokenizes in ~30 µs on Erlang
+- **Parse caching**: ETS-backed document cache with a byte-size threshold. Queries small enough that parsing beats a lookup skip it
+- **Batch execution**: several GraphQL requests in one call, optionally run in parallel
+- **TypeScript codegen**: `.d.ts` type definitions from your schema
+- **SDL generation**: `.graphql` schema files
+- **SDL type extensions**: split schemas across files with `extend type`, `extend union`, `extend enum`, etc.
+- **Operation resolver codegen**: mochi resolver boilerplate from `.gql` client operation files
+- **Query validation** against your schema
+- **Custom directives** with handlers
+- **@deprecated** on fields and enum values
+- **Interfaces** with type resolution
+- **Unions** with runtime type resolution
+- **Fragments**
+- **Subscriptions**: real-time updates over PubSub
+- **Error extensions**: spec-compliant errors with locations, path, and extensions
+- **JSON encoding** for responses
+- **Null propagation**: null bubbling as the GraphQL spec defines it
+- **DataLoader**: avoids N+1 queries by batching and caching
+- **Guards**: composable precondition checks for auth, feature flags, and access control
+- **Query security**: depth limits, complexity analysis, alias limits
+- **Persisted queries**: Automatic Persisted Queries (APQ) with SHA256 hashes
+- **GraphQL playgrounds**: GraphiQL, Playground, Apollo Sandbox, and a simple explorer
 
 ## TypeScript Codegen
 
@@ -377,7 +373,7 @@ let my_schema = query.new()
 
 ### Argument Parsing Helpers
 
-Resolvers receive arguments as a `mochi/args.Args` opaque type — typed access without exposing `Dict(String, Dynamic)` in your code. Every `query.get_*` helper accepts `Args` directly:
+Resolvers get their arguments as an opaque `mochi/args.Args`, so your code reads typed values and never touches a `Dict(String, Dynamic)`. Every `query.get_*` helper accepts `Args` directly:
 
 ```gleam
 // Required arguments (return Result)
@@ -399,7 +395,7 @@ query.get_int_list(args, "ids")      // -> Result(List(Int), GqlError)
 query.decode_input(args, "input", input_decoder)  // -> Result(a, GqlError)
 ```
 
-The same accessors are also available without the `GqlError` wrapping in `mochi/args` directly (returning a structured `ArgError`) — useful when you want to translate to your own error type.
+The same accessors are also available without the `GqlError` wrapping in `mochi/args` directly (returning a structured `ArgError`). Use those when you want to map to your own error type.
 
 ### Decoder Helpers (`mochi/decoders`)
 
@@ -428,7 +424,7 @@ fn decode_user(dyn) {
 | `optional_string(name)` / `optional_int(name)` / `optional_bool(name)` | Common output-decoder fallbacks. Continuation-passing form for `use`-binding. |
 | `list_filtering(name, item)` | Optional list field whose items are decoded via a per-item callback; malformed items are silently dropped, missing field defaults to `[]`. |
 
-> **Output decoders only.** The `optional_*` helpers conflate "field absent" with "field present but defaulted." That's correct for `types.build` callbacks (mochi only invokes them on schema-conforming output values) but wrong for input validation — never use these for mutation arguments where "user sent nothing" must differ from "user sent an empty value."
+> **Output decoders only.** The `optional_*` helpers conflate "field absent" with "field present but defaulted." That's correct for `types.build` callbacks (mochi only invokes them on schema-conforming output values) but wrong for input validation. Don't use them for mutation arguments where "user sent nothing" must differ from "user sent an empty value."
 
 ### Schema Module (`mochi/schema`)
 
@@ -455,7 +451,7 @@ let search = schema.union("SearchResult")
 
 ### User context (`schema.UserContext`)
 
-Resolvers expect a *specific* user-context type — the one your app configured. The execution context wraps that value opaquely so the API doesn't pretend to accept "any data here":
+Resolvers expect a *specific* user-context type: the one your app configured. The execution context wraps it opaquely, so the API doesn't pretend to accept "any data here":
 
 ```gleam
 // Construct: pass any app-defined value
@@ -575,11 +571,11 @@ case json.encode(value) {
 
 The document cache is enabled automatically when you build a schema with `query.build`. Parsed `ast.Document` values are stored in an ETS table (Erlang) or `Map` (JavaScript) keyed by the query string. Repeated requests for the same query skip the parser entirely.
 
-After the v2.0 lexer rewrite, parsing a small query (~50 bytes) takes ~3 µs. The cache only pays off when parse cost meaningfully exceeds the lookup + term-copy cost — so by default queries below **200 bytes bypass the cache** and just re-parse. Above the threshold, caching is unambiguously a win (a 700-byte query parses in ~120 µs vs ~2 µs for a hit).
+After the v2.0 lexer rewrite, parsing a small query (~50 bytes) takes ~3 µs. The cache only pays off when parsing costs clearly more than the lookup plus term copy, so by default queries under **200 bytes bypass the cache** and get re-parsed. Above that, caching wins (a 700-byte query parses in ~120 µs vs ~2 µs for a hit).
 
 Defaults:
-- max size: **1000 entries** — when full, new unique queries fall back to parsing
-- min size: **200 bytes** — shorter queries skip the cache
+- max size: **1000 entries**. When full, new unique queries fall back to parsing
+- min size: **200 bytes**; shorter queries skip the cache
 
 ```gleam
 import mochi/document_cache
@@ -619,7 +615,7 @@ let result = batch.execute_batch(schema, requests, config, ctx)
 
 ### Query Security (`mochi/security`)
 
-Protect against malicious queries. See module docs for full API.
+Limits for malicious or expensive queries. See module docs for full API.
 
 ```gleam
 import mochi/security
@@ -632,13 +628,13 @@ case security.validate(document, security.default_config()) {
 
 ### Automatic Persisted Queries (`mochi/apq`)
 
-APQ is built into the core — no extra package needed. Clients send a SHA256 hash instead of the full query string on repeat requests, reducing bandwidth on mobile or high-latency networks.
+APQ is in the core package. On repeat requests the client sends a SHA256 hash instead of the full query, which saves bandwidth on mobile or high-latency networks.
 
 The protocol works in two passes:
 
-1. **First request** — client sends `{ "extensions": { "persistedQuery": { "version": 1, "sha256Hash": "<hash>" } } }` with no `query` field. Server responds with `PersistedQueryNotFound`.
-2. **Second request** — client resends with both `query` and `extensions`. Server verifies the hash, stores the query, and executes it.
-3. **All subsequent requests** — client sends hash only. Server looks it up and executes directly.
+1. **First request**: client sends `{ "extensions": { "persistedQuery": { "version": 1, "sha256Hash": "<hash>" } } }` with no `query` field. Server responds with `PersistedQueryNotFound`.
+2. **Second request**: client resends with both `query` and `extensions`. Server verifies the hash, stores the query, and executes it.
+3. **Every request after that**: client sends only the hash. Server looks it up and executes directly.
 
 Wire it into your HTTP handler by holding an `apq.Store` in your server state:
 
@@ -677,7 +673,7 @@ fn handle_graphql(body: String, store: apq.Store) -> #(apq.Store, String) {
 }
 ```
 
-The `apq.Store` is an immutable dict — you get a new one back from `apq.process` whenever a query is registered. Store it in an Erlang `Agent` or ETS table to share it across the process pool.
+The `apq.Store` is an immutable dict; you get a new one back from `apq.process` whenever a query is registered. Store it in an Erlang `Agent` or ETS table to share it across the process pool.
 
 ### GraphQL Playgrounds (`mochi_codegen`)
 
@@ -734,14 +730,14 @@ let ts_code = mochi_codegen.to_typescript(schema)
 let graphql_code = mochi_codegen.to_sdl(schema)
 ```
 
-**CLI** — generate everything from a config file:
+**CLI**: generate everything from a config file:
 
 ```sh
 gleam run -m mochi_codegen/cli -- init      # create mochi.config.yaml
 gleam run -m mochi_codegen/cli -- generate  # generate from config
 ```
 
-**Operation resolver generation** — point the CLI at your `.gql` client operation files and it emits complete mochi field-builder boilerplate (decode blocks, resolve stubs, encoder stubs, and a `register()` function). Only fill in the `resolve:` body.
+**Operation resolver generation**: point the CLI at your `.gql` client operation files and it writes the mochi field-builder boilerplate (decode blocks, resolve stubs, encoder stubs, and a `register()` function). You fill in the `resolve:` body.
 
 ```yaml
 # mochi.config.yaml
@@ -756,11 +752,11 @@ output:
 
 ## Examples
 
-See the [`mochi-examples`](https://github.com/qwexvf/mochi-examples) repository for complete working examples:
+Working examples live in the [`mochi-examples`](https://github.com/qwexvf/mochi-examples) repo:
 
-- **`code_first_example.gleam`** - Basic User/Post schema with queries and mutations
-- **`core_library_examples/`** - Pure GraphQL functionality demonstrations
-- **`mochi_wisp/`** - Full web application with Wisp framework
+- **`code_first_example.gleam`**: basic User/Post schema with queries and mutations
+- **`core_library_examples/`**: core GraphQL features on their own
+- **`mochi_wisp/`**: a full web app on Wisp
 
 ### Basic Schema Example
 
@@ -856,7 +852,7 @@ gleam add mochi_upload       # Multipart file uploads
 | [`mochi_transport`](https://hex.pm/packages/mochi_transport) | WebSocket (graphql-ws) + SSE subscriptions |
 | [`mochi_upload`](https://hex.pm/packages/mochi_upload) | Multipart file uploads |
 
-Automatic Persisted Queries (`mochi/apq`) is built into the core — no separate package needed.
+Automatic Persisted Queries (`mochi/apq`) ship in the core package, nothing extra to install.
 
 ```
 mochi/                       # Core GraphQL engine
