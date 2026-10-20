@@ -2,7 +2,7 @@
 
 [📚 Documentation on hexdocs](https://hexdocs.pm/mochi/) · [📦 Package on hex.pm](https://hex.pm/packages/mochi)
 
-**mochi** is a Code First GraphQL library for Gleam. You define the schema with Gleam types, and it can generate TypeScript types and GraphQL SDL from it.
+**mochi** is a Code First GraphQL library for Gleam. You define the schema with Gleam types. The companion package [`mochi_codegen`](https://github.com/qwexvf/mochi_codegen) generates TypeScript types and GraphQL SDL from it.
 
 Inspired by:
 - [Absinthe](https://github.com/absinthe-graphql/absinthe), the GraphQL toolkit for Elixir
@@ -21,8 +21,11 @@ gleam add mochi
 ## Quick Start
 
 ```gleam
+import gleam/dict
 import gleam/dynamic/decode
+import gleam/result
 import mochi/decoders as md
+import mochi/executor
 import mochi/query
 import mochi/schema
 import mochi/types
@@ -91,10 +94,16 @@ pub fn create_schema() -> schema.Schema {
 // 5. Execute queries
 pub fn main() {
   let my_schema = create_schema()
-  // `execution_context` takes any value — your app's typed context.
+  // `execution_context` takes any value: your app's typed context.
   // Read it back inside resolvers via `schema.context_accessor`.
   let ctx = schema.execution_context(Nil)
-  let result = executor.execute(my_schema, ctx, "{ users { id name } }", dict.new(), option.None)
+  let result =
+    executor.execute_query_with_context(
+      my_schema,
+      "{ users { id name } }",
+      dict.new(),
+      ctx,
+    )
 }
 ```
 
@@ -182,17 +191,18 @@ cd examples/mochi_wisp/benchmark
 - **Parser**: byte-level `BitArray` lexer. A 985-byte query tokenizes in ~30 µs on Erlang
 - **Parse caching**: ETS-backed document cache with a byte-size threshold. Queries small enough that parsing beats a lookup skip it
 - **Batch execution**: several GraphQL requests in one call, optionally run in parallel
-- **TypeScript codegen**: `.d.ts` type definitions from your schema
-- **SDL generation**: `.graphql` schema files
+- **SDL printing**: `mochi/schema_printer` turns a schema back into SDL
+- **TypeScript codegen** (`mochi_codegen`): `.d.ts` type definitions from your schema
+- **SDL generation** (`mochi_codegen`): `.graphql` schema files
 - **SDL type extensions**: split schemas across files with `extend type`, `extend union`, `extend enum`, etc.
-- **Operation resolver codegen**: mochi resolver boilerplate from `.gql` client operation files
+- **Operation resolver codegen** (`mochi_codegen`): mochi resolver boilerplate from `.gql` client operation files
 - **Query validation** against your schema
 - **Custom directives** with handlers
 - **@deprecated** on fields and enum values
 - **Interfaces** with type resolution
 - **Unions** with runtime type resolution
 - **Fragments**
-- **Subscriptions**: real-time updates over PubSub
+- **Subscriptions**: real-time updates over PubSub (PubSub and transports live in `mochi_transport`)
 - **Error extensions**: spec-compliant errors with locations, path, and extensions
 - **JSON encoding** for responses
 - **Null propagation**: null bubbling as the GraphQL spec defines it
@@ -200,7 +210,7 @@ cd examples/mochi_wisp/benchmark
 - **Guards**: composable precondition checks for auth, feature flags, and access control
 - **Query security**: depth limits, complexity analysis, alias limits
 - **Persisted queries**: Automatic Persisted Queries (APQ) with SHA256 hashes
-- **GraphQL playgrounds**: GraphiQL, Playground, Apollo Sandbox, and a simple explorer
+- **GraphQL playgrounds** (`mochi_codegen`): GraphiQL, Playground, Apollo Sandbox, and a simple explorer
 
 ## TypeScript Codegen
 
@@ -630,7 +640,7 @@ case security.validate(document, security.default_config()) {
 
 APQ is in the core package. On repeat requests the client sends a SHA256 hash instead of the full query, which saves bandwidth on mobile or high-latency networks.
 
-The protocol works in two passes:
+The protocol has three steps:
 
 1. **First request**: client sends `{ "extensions": { "persistedQuery": { "version": 1, "sha256Hash": "<hash>" } } }` with no `query` field. Server responds with `PersistedQueryNotFound`.
 2. **Second request**: client resends with both `query` and `extensions`. Server verifies the hash, stores the query, and executes it.
@@ -644,7 +654,7 @@ import gleam/option.{None, Some}
 import mochi/apq
 import mochi/executor
 
-// Server state — hold this across requests (e.g. in an Agent or ETS)
+// Server state: hold this across requests (e.g. in an actor or an ETS table)
 let store = apq.new()
 
 // In your request handler:
@@ -653,7 +663,7 @@ fn handle_graphql(body: String, store: apq.Store) -> #(apq.Store, String) {
 
   case apq.parse_extension(extensions) {
     None -> {
-      // Normal request — no APQ
+      // Normal request, no APQ
       let result = executor.execute_query_with_context(schema, query_opt, ...)
       #(store, respond(result))
     }
@@ -673,7 +683,7 @@ fn handle_graphql(body: String, store: apq.Store) -> #(apq.Store, String) {
 }
 ```
 
-The `apq.Store` is an immutable dict; you get a new one back from `apq.process` whenever a query is registered. Store it in an Erlang `Agent` or ETS table to share it across the process pool.
+The `apq.Store` is an immutable dict; you get a new one back from `apq.process` whenever a query is registered. To share it across request processes, keep it in a long-lived process (for example a `gleam_otp` actor) or an ETS table.
 
 ### GraphQL Playgrounds (`mochi_codegen`)
 
